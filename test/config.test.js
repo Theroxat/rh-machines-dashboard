@@ -9,6 +9,7 @@ const RAW = {
   pelotonSize: 5,
   multicallBatchSize: 500,
   maxBookPages: 200,
+  maxMetadataPages: 80,
 };
 
 test("the seven sealed classes are declared in ascending order", () => {

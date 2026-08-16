@@ -7,6 +7,8 @@ import { ethers } from "ethers";
 import { loadConfig, RPC_URL, CHAIN_ID } from "./config.js";
 import { fetchListings, fetchPublishedFloor } from "./opensea.js";
 import { loadTraits } from "./traits.js";
+import { loadMetadata } from "./metadata.js";
+import { deriveHeadwearLegend } from "./rarity.js";
 import { readInk } from "./ink.js";
 import { fetchPrinter, fetchEthUsd } from "./prices.js";
 import { readProtocol } from "./protocol.js";
@@ -25,6 +27,8 @@ const store = createStore({ staleAfterMs: cfg.bookPollIntervalMs * 3 });
 let traits = new Map();
 let ink = new Map();
 let inkMeta = { readAt: null, failures: null };
+let meta = new Map();
+let legend = null;
 
 async function sweepInk() {
   const { ink: fresh, failures } = await readInk({ provider, batchSize: cfg.multicallBatchSize });
@@ -47,7 +51,7 @@ async function sweepBook() {
   store.succeed(composeSnapshot({
     grid, printer, eth, protocol, publishedFloor,
     book: { listed: book.listings.size, pages: book.pages, skipped: book.skipped },
-    inkMeta, now: Date.now(),
+    inkMeta, meta, legend, now: Date.now(),
   }));
   console.log(`book: ${book.listings.size} listings over ${book.pages} pages`);
 }
@@ -96,6 +100,26 @@ const started = async () => {
   });
   traits = t;
   console.log(`traits: ${t.size} sealed rarities (${source})`);
+
+  // Les images et les traits sont scellés au mint comme les raretés : lus une
+  // fois, cachés à vie. Un échec ici coûte les vignettes et la légende, pas le
+  // marché — le dashboard démarre quand même.
+  try {
+    const loaded = await loadMetadata({
+      apiKey: cfg.openseaApiKey,
+      cachePath: join(here, "..", "data", "metadata.json"),
+      maxPages: cfg.maxMetadataPages,
+      wanted: [...traits.keys()],
+    });
+    meta = loaded.meta;
+    legend = deriveHeadwearLegend({ meta, traits });
+    const amb = legend.ambiguous.length;
+    console.log(`metadata: ${meta.size} machines (${loaded.source}` +
+      (loaded.filled ? `, ${loaded.filled} backfilled one by one` : "") + ")" +
+      (amb ? `, ${amb} ambiguous headwear` : ", headwear maps cleanly to class"));
+  } catch (e) {
+    console.error(`metadata: ${e.message} — the dashboard runs without pictures`);
+  }
 
   await sweepInk().catch((e) => console.error(`ink: ${e.message}`));
 
