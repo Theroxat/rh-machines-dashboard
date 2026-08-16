@@ -22,7 +22,9 @@ export async function fetchPrinter(fetchImpl = fetch) {
     usd,
     change24h: num(p.priceChange?.h24),
     liquidityUsd: num(p.liquidity?.usd),
+    volume24h: num(p.volume?.h24),
     fdv: num(p.fdv),
+    marketCap: num(p.marketCap),
   };
 }
 

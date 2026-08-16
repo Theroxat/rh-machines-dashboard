@@ -17,11 +17,14 @@ const ethPair = (over = {}) => ({
 
 test("the printer price is read with its context", async () => {
   const p = await fetchPrinter(async () => ok({
-    pairs: [{ priceUsd: "0.01260", priceChange: { h24: 598 }, liquidity: { usd: 427948.51 }, fdv: 2165143 }],
+    pairs: [{ priceUsd: "0.01260", priceChange: { h24: 598 }, liquidity: { usd: 427948.51 },
+              volume: { h24: 1170239.13 }, fdv: 2165143, marketCap: 2165143 }],
   }));
   assert.equal(p.usd, 0.0126);
   assert.equal(p.change24h, 598);
   assert.equal(p.liquidityUsd, 427948.51);
+  assert.equal(p.marketCap, 2165143);
+  assert.equal(p.volume24h, 1170239.13);
 });
 
 test("an absent pair is an error, not a price of zero", async () => {

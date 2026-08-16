@@ -28,7 +28,7 @@ const fakeFetch = (pages) => {
   };
 };
 
-test("each machine keeps its image, its headwear and its body", async () => {
+test("each machine keeps its image and every trait that varies", async () => {
   const { meta } = await fetchMetadata({
     apiKey: "k", maxPages: 5,
     fetchImpl: fakeFetch([{ nfts: [nft(1253, "Blueberries")], next: null }]),
@@ -37,7 +37,16 @@ test("each machine keeps its image, its headwear and its body", async () => {
     image: "https://img/1253.webp",
     headwear: "Blueberries",
     body: "Sky",
+    eyes: "Rage",
   });
+});
+
+// Le cache écrit par une version antérieure ne portait pas Eyes. Le relire tel
+// quel donnerait un filtre qui ne trouve jamais rien, sans la moindre erreur.
+test("a cache written by an older shape is refused, not partially trusted", () => {
+  const path = tmp();
+  writeFileSync(path, JSON.stringify({ 1: { image: "u", headwear: "Halo", body: "Sky" } }));
+  assert.equal(readCache(path), null);
 });
 
 test("the cursor is followed to the end of the collection", async () => {
@@ -100,7 +109,7 @@ test("an entry with no usable image is skipped and counted, never half-stored", 
 // le 2026-08-16 : présent sur l'endpoint individuel, absent des 50 pages.
 // Un trou qu'on sait combler ne reste pas un trou.
 test("machines the bulk pages dropped are fetched one by one", async () => {
-  const meta = new Map([[1, { image: "u", headwear: "Fez", body: "Sky" }]]);
+  const meta = new Map([[1, { image: "u", headwear: "Fez", body: "Sky", eyes: "UwU" }]]);
   const asked = [];
   const filled = await backfillMetadata({
     apiKey: "k", meta, wanted: [1, 765], limit: 50,
@@ -114,7 +123,7 @@ test("machines the bulk pages dropped are fetched one by one", async () => {
   });
   assert.deepEqual(asked, ["765"]);          // le 1 déjà connu n'est pas redemandé
   assert.equal(filled, 1);
-  assert.deepEqual(meta.get(765), { image: "https://img/765.webp", headwear: "Fez", body: "Cobalt" });
+  assert.deepEqual(meta.get(765), { image: "https://img/765.webp", headwear: "Fez", body: "Cobalt", eyes: null });
 });
 
 test("a backfill that fails leaves the map alone rather than poisoning it", async () => {
@@ -141,8 +150,8 @@ test("a backfill refuses to hammer the API when the gap is not a gap but a failu
 
 test("a written cache reads back as the same map", () => {
   const path = tmp();
-  writeCache(path, new Map([[1, { image: "u", headwear: "Halo", body: "Sky" }]]));
-  assert.deepEqual(readCache(path).get(1), { image: "u", headwear: "Halo", body: "Sky" });
+  writeCache(path, new Map([[1, { image: "u", headwear: "Halo", body: "Sky", eyes: "UwU" }]]));
+  assert.deepEqual(readCache(path).get(1), { image: "u", headwear: "Halo", body: "Sky", eyes: "UwU" });
 });
 
 test("a corrupt or missing cache is treated as absent, never half-trusted", () => {

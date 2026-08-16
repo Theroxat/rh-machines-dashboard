@@ -76,9 +76,14 @@ A cell shows its **eight cheapest** and states how many it is holding back:
 it. A cut book always says it is cut, so a partial view can never be mistaken for
 a complete one, and an open cell stays open through the fifteen-second refresh.
 
-Above the pictures, each half states its depth in words — `190 of 4,388 listed`.
-That ratio is what gives a floor its meaning: x6 at 0.70 ETH with 3 of 47 on sale
-is not the same market as 40 of 47.
+Above the pictures, each half states two separate numbers — `183 on sale · 4,403
+in this class`. They are deliberately not phrased as a ratio: `183 of 4,403
+listed` read as "183 shown out of 4,403 available" and sent a reader hunting for
+an expand button that had no reason to exist. How many are on sale is what gives
+a floor its meaning — x6 at 0.70 ETH with 3 on sale is not the same market as 40
+— and how many exist is what says whether the class is rare.
+
+A cell with no button is already showing everything it has.
 
 Hover a cell for its **peloton** — the median of its five cheapest listings, the
 market level unmoved by a single dust or fat-finger listing — and its exact

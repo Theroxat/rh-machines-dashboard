@@ -29,11 +29,22 @@ function statBlock(label, value, extra, isInk) {
   `</div>`;
 }
 
+/** Les grands nombres se lisent mieux abrégés : $1,772,000 demande un effort
+ *  que $1.8M ne demande pas, et la précision au dollar près n'apporte rien. */
+export function fmtBig(v) {
+  if (v === null || v === undefined) return "—";
+  if (Math.abs(v) >= 1e9) return `$${(v / 1e9).toFixed(2)}B`;
+  if (Math.abs(v) >= 1e6) return `$${(v / 1e6).toFixed(1)}M`;
+  if (Math.abs(v) >= 1e3) return `$${Math.round(v / 1e3)}k`;
+  return fmtUsd(v);
+}
+
 export function contextHtml(d) {
   const p = d.printer ?? {};
   const e = d.eth ?? {};
   const ink = d.ink ?? {};
   const pr = d.protocol ?? {};
+  const c = d.collection ?? {};
 
   const chg = p.change24h === null || p.change24h === undefined
     ? ""
@@ -44,9 +55,19 @@ export function contextHtml(d) {
     : "pool · no second opinion";
 
   return [
-    statBlock("$PRINTER", fmtUsd(p.usd, 5), chg + (p.liquidityUsd ? ` · ${fmtUsd(p.liquidityUsd, 0)} liquidity` : "")),
+    statBlock("$PRINTER", fmtUsd(p.usd, 5),
+      [chg, `${fmtBig(p.marketCap)} mkt cap`, p.liquidityUsd ? `${fmtBig(p.liquidityUsd)} liquidity` : null]
+        .filter(Boolean).join(" · ")),
     statBlock("ETH", fmtUsd(e.local, 2), ethExtra),
     statBlock("Cost of ink", fmtUsd(ink.activationUsd), `${fmtInt(ink.activationPrinter)} $PRINTER · ${fmtEth(ink.activationEth)} ETH`, true),
+    // Le floor vient de notre carnet, pas du chiffre publié : c'est le même
+    // nombre que la case la moins chère du tableau, il ne peut pas la contredire.
+    statBlock("Collection floor", `${fmtEth(c.floorEth)} ETH`,
+      `${c.floorUsd === null || c.floorUsd === undefined ? "—" : fmtUsd(c.floorUsd, 0)} · ` +
+      `${fmtBig(c.marketCapUsd)} at floor × ${fmtInt(c.machines)}`),
+    statBlock("Volume traded", `${c.volumeEth === null || c.volumeEth === undefined ? "—" : c.volumeEth.toFixed(1)} ETH`,
+      `${fmtBig(c.volumeUsd)} · ${fmtInt(c.sales)} sales · ` +
+      `${c.volume24hEth === null || c.volume24hEth === undefined ? "—" : c.volume24hEth.toFixed(1)} ETH 24h`),
     statBlock("Machines", `${fmtInt(d.totals?.inked)} inked`, `${fmtInt(d.totals?.dormant)} dormant · ${fmtInt(d.totals?.listed)} listed`),
     statBlock("Epoch", pr.epoch ?? "—", pr.ceiling ? `ceiling ${Number(pr.ceiling) / 100}x` : "ceiling unreadable"),
   ].join("");
@@ -67,20 +88,62 @@ function chip(e, isFloor) {
   `</a>`;
 }
 
+export const TRAIT_TYPES = Object.freeze(["Headwear", "Body", "Eyes"]);
+const FIELD = Object.freeze({ Headwear: "headwear", Body: "body", Eyes: "eyes" });
+
+export const EMPTY_FILTER = Object.freeze({ Headwear: null, Body: null, Eyes: null });
+
+export const filterIsActive = (filter) => TRAIT_TYPES.some((t) => filter?.[t]);
+
+/** Une machine dont les métadonnées manquent n'a pas de traits connus. La faire
+ *  passer pour correspondante afficherait dans un filtre une machine dont on
+ *  ignore précisément si elle correspond. */
+export function matchesFilter(machine, filter) {
+  for (const type of TRAIT_TYPES) {
+    const wanted = filter?.[type];
+    if (!wanted) continue;
+    if (!machine || machine[FIELD[type]] !== wanted) return false;
+  }
+  return true;
+}
+
 /**
  * Une moitié de ligne : tout le carnet de cette case, du moins cher au plus
  * cher. Huit machines par défaut, le reste derrière un bouton — la case dit
  * toujours combien elle cache, pour qu'un carnet coupé ne passe jamais pour
  * un carnet complet.
  */
-export function halfCell(half, side, { expanded = false, limit = DEFAULT_LIMIT, key = "" } = {}) {
+export function halfCell(half, side, { expanded = false, limit = DEFAULT_LIMIT, key = "", filter = EMPTY_FILTER } = {}) {
   const g = `g-${side}`;
-  const depth = `${fmtInt(half.listed)} of ${fmtInt(half.supply)} listed`;
+  const active = filterIsActive(filter);
+  const all = half.entries ?? [];
+  const kept = active ? all.filter((e) => matchesFilter(e.machine, filter)) : all;
 
-  if (!half.entries?.length) {
-    return `<td class="${g} edge half" title="Nothing is on sale in this class in this state.">` +
-      `<span class="depth"><span class="absent">no listing</span> · ${depth}</span></td>`;
+  // Deux faits distincts, énoncés séparément. « 5 of 249 listed » se lisait
+  // « 5 affichées sur 249 disponibles » et faisait chercher un bouton de
+  // dépliage qui n'avait pas lieu d'être : les 249 sont les machines qui
+  // existent, et les 5 en vente étaient déjà toutes là.
+  const depth = active
+    ? `${fmtInt(kept.length)} of ${fmtInt(all.length)} on sale match`
+    : `<b>${fmtInt(half.listed)} on sale</b> · ${fmtInt(half.supply)} in this class`;
+
+  if (!kept.length) {
+    // « rien ne correspond ici » et « rien n'est en vente ici » ne sont pas la
+    // même information, et les confondre ferait passer un filtre pour un marché vide.
+    const why = active
+      ? `<span class="absent">no machine matches here</span> · ${fmtInt(all.length)} on sale`
+      : `<span class="absent">no listing</span> · ${fmtInt(half.supply)} in this class`;
+    const tip = active
+      ? "Nothing on sale in this class and state carries the traits you picked."
+      : "Nothing is on sale in this class in this state.";
+    return `<td class="${g} edge half" title="${esc(tip)}"><span class="depth">${why}</span></td>`;
   }
+
+  const half_ = { ...half, entries: kept };
+  return renderHalf(half_, g, { expanded, limit, key, depth, floorLabel: active ? "cheapest match" : "floor price" });
+}
+
+function renderHalf(half, g, { expanded, limit, key, depth, floorLabel }) {
 
   const tip = half.pelotonEth === null
     ? `${half.listed} listings — too few for a peloton, so no median is shown`
@@ -95,14 +158,23 @@ export function halfCell(half, side, { expanded = false, limit = DEFAULT_LIMIT, 
         ? `<button class="more" type="button" data-key="${esc(key)}">+ ${fmtInt(hidden)} more ▾</button>`
         : "");
 
+  // Le floor en tête, en grand et nommé : c'est le chiffre qu'on vient chercher.
+  // Sous un filtre ce n'est plus le floor de la classe mais le moins cher de la
+  // sélection, et l'étiquette le dit plutôt que de laisser croire au premier.
+  const floor = half.entries[0];
+  const head = `<span class="cell-floor">` +
+    `<span class="label">${floorLabel}</span>` +
+    `<span class="price">${fmtEth(floor.priceEth)}</span> <span class="unit">ETH</span></span>`;
+
   return `<td class="${g} edge half" title="${esc(tip)}">` +
+    head +
     `<span class="depth">${depth}</span>` +
     `<span class="strip">${shown.map((e, i) => chip(e, i === 0)).join("")}</span>` +
     more +
   `</td>`;
 }
 
-export function rowsHtml(d, { expanded = new Set(), limit = DEFAULT_LIMIT } = {}) {
+export function rowsHtml(d, { expanded = new Set(), limit = DEFAULT_LIMIT, filter = EMPTY_FILTER } = {}) {
   return d.rows.map((r) => {
     const census = r.chainCount === r.docCount
       ? `<span class="census">${fmtInt(r.chainCount)} machines</span>`
@@ -113,10 +185,49 @@ export function rowsHtml(d, { expanded = new Set(), limit = DEFAULT_LIMIT } = {}
 
     return `<tr>` +
       `<td class="cls-cell"><span class="cls">${r.classLabel}</span>${census}</td>` +
-      halfCell(r.inked,   "ink",     { expanded: expanded.has(inkKey), limit, key: inkKey }) +
-      halfCell(r.dormant, "dormant", { expanded: expanded.has(dorKey), limit, key: dorKey }) +
+      halfCell(r.inked,   "ink",     { expanded: expanded.has(inkKey), limit, key: inkKey, filter }) +
+      halfCell(r.dormant, "dormant", { expanded: expanded.has(dorKey), limit, key: dorKey, filter }) +
     `</tr>`;
   }).join("");
+}
+
+/**
+ * Les trois menus de filtre. Chaque valeur annonce ce qui est en vente et ce qui
+ * existe : savoir avant de cliquer qu'un trait n'a aucune machine sur le marché
+ * évite d'aller chercher un tableau vide.
+ */
+export function filterBarHtml(traitFilters, filter) {
+  if (!traitFilters) return "";
+
+  return TRAIT_TYPES.map((type) => {
+    const values = traitFilters[type] ?? [];
+    const options = values.map((v) => {
+      const ticker = v.ticker ? ` — ${v.ticker}` : "";
+      const chosen = filter?.[type] === v.value ? " selected" : "";
+      return `<option value="${esc(v.value)}"${chosen}>${esc(v.value)}${ticker} (${fmtInt(v.listed)} on sale of ${fmtInt(v.total)})</option>`;
+    }).join("");
+    return `<label class="fl"><span class="label">${type}</span>` +
+      `<select data-trait="${type}"><option value="">any</option>${options}</select></label>`;
+  }).join("");
+}
+
+/** Ce que le filtre laisse passer, sur l'ensemble du carnet. Silencieux tant
+ *  qu'aucun filtre n'est posé : un compteur permanent serait du bruit. */
+export function filterSummary(d, filter) {
+  if (!filterIsActive(filter)) return null;
+
+  let matched = 0;
+  let total = 0;
+  for (const r of d.rows) {
+    for (const cell of [r.inked, r.dormant]) {
+      for (const e of cell.entries ?? []) {
+        total++;
+        if (matchesFilter(e.machine, filter)) matched++;
+      }
+    }
+  }
+  const chosen = TRAIT_TYPES.map((t) => filter[t]).filter(Boolean).join(" + ");
+  return `${chosen} — ${fmtInt(matched)} of ${fmtInt(total)} listed machines match.`;
 }
 
 /** Quel couvre-chef trahit quelle classe. Dérivé des données au démarrage, pas
@@ -162,8 +273,8 @@ export function excludedLine(d) {
 }
 
 export function publishedLine(d) {
-  const pf = d.publishedFloor ?? {};
-  return `OpenSea publishes a collection floor of <b>${pf.floor === null || pf.floor === undefined ? "—" : pf.floor.toFixed(4)} ${pf.symbol ?? ""}</b>. ` +
+  const c = d.collection ?? {};
+  return `OpenSea publishes a collection floor of <b>${c.publishedFloor === null || c.publishedFloor === undefined ? "—" : c.publishedFloor.toFixed(4)} ${c.publishedFloorSymbol ?? ""}</b>. ` +
     `It is shown for comparison and <b>enters no computation on this page</b> — on this chain it has been measured at ten times the real book.`;
 }
 
@@ -190,19 +301,62 @@ if (typeof document !== "undefined") {
   const $ = (id) => document.getElementById(id);
   const rowsEl = $("rows");
 
-  // Les cases dépliées vivent ici plutôt que dans le DOM : la table est
-  // reconstruite toutes les quinze secondes, et une case ouverte doit le rester.
+  // Les cases dépliées et le filtre vivent ici plutôt que dans le DOM : la table
+  // est reconstruite toutes les quinze secondes, et ni une case ouverte ni un
+  // filtre posé ne doivent survivre à ça par accident.
   const expanded = new Set();
+  const filter = { ...EMPTY_FILTER };
+  const filtersEl = $("filters");
+  const summaryEl = $("filter-summary");
   let lastData = null;
   let painted = "";
+  let barBuilt = false;
 
   const paint = () => {
     if (!lastData) return;
-    const html = rowsHtml(lastData, { expanded });
-    if (html === painted) return;
-    rowsEl.innerHTML = html;
-    painted = html;
+    const html = rowsHtml(lastData, { expanded, filter });
+    if (html !== painted) {
+      rowsEl.innerHTML = html;
+      painted = html;
+    }
+    const summary = filterSummary(lastData, filter);
+    summaryEl.innerHTML = summary
+      ? `${summary} <button class="clear" type="button">clear</button>`
+      : "";
   };
+
+  /** La barre est construite une fois. Les traits sont scellés, donc la liste
+   *  des valeurs ne bouge jamais ; seuls les compteurs bougent, et on les met à
+   *  jour sur place pour ne pas effacer la sélection en cours. */
+  const paintFilters = (traitFilters) => {
+    if (!traitFilters) return;
+    if (!barBuilt) {
+      filtersEl.innerHTML = filterBarHtml(traitFilters, filter);
+      barBuilt = true;
+      return;
+    }
+    for (const select of filtersEl.querySelectorAll("select")) {
+      const rows = new Map((traitFilters[select.dataset.trait] ?? []).map((v) => [v.value, v]));
+      for (const option of select.options) {
+        const v = rows.get(option.value);
+        if (v) option.textContent = `${v.value}${v.ticker ? ` — ${v.ticker}` : ""} (${v.listed} on sale of ${v.total})`;
+      }
+    }
+  };
+
+  filtersEl.addEventListener("change", (e) => {
+    const select = e.target.closest("select[data-trait]");
+    if (!select) return;
+    filter[select.dataset.trait] = select.value || null;
+    paint();
+  });
+
+  summaryEl.addEventListener("click", (e) => {
+    if (!e.target.closest(".clear")) return;
+    for (const type of TRAIT_TYPES) filter[type] = null;
+    for (const select of filtersEl.querySelectorAll("select")) select.value = "";
+    paint();
+  });
 
   rowsEl.addEventListener("click", (e) => {
     const btn = e.target.closest(".more");
@@ -234,6 +388,7 @@ if (typeof document !== "undefined") {
 
     lastData = v.data;
     $("context").innerHTML = contextHtml(v.data);
+    paintFilters(v.data.traitFilters);
     paint();
     $("legend").innerHTML = legendHtml(v.data.legend);
     $("book-line").innerHTML = bookLine(v.data);

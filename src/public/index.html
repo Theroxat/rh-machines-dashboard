@@ -75,8 +75,10 @@
     vertical-align: 1px;
   }
 
-  .context { display: flex; flex-wrap: wrap; margin-top: 14px; border: 1px solid var(--rule); border-right: 0; }
-  .stat { flex: 1 1 170px; padding: 8px 12px; border-right: 1px solid var(--rule); }
+  /* Sept blocs qui se replient sur deux rangs : le filet du bas ferme chaque
+     rang, celui du conteneur ferme le dernier. */
+  .context { display: flex; flex-wrap: wrap; margin-top: 14px; border: 1px solid var(--rule); border-right: 0; border-bottom: 0; }
+  .stat { flex: 1 1 195px; padding: 8px 12px; border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
   .stat .v { font-size: 15px; font-weight: 600; display: block; margin-top: 2px; }
   .stat .x { color: var(--muted); font-size: 11px; }
   .stat.is-ink .v { color: var(--ink); }
@@ -96,9 +98,43 @@
   }
   .banner.on { display: block; }
 
+  /* ---- filtres par trait ---- */
+
+  .filter-bar { margin-top: 20px; }
+  #filters { display: flex; flex-wrap: wrap; gap: 18px; }
+
+  .fl { display: inline-flex; flex-direction: column; gap: 3px; }
+  .fl select {
+    font-family: inherit;
+    font-size: 12px;
+    color: var(--text);
+    background: var(--paper-2);
+    border: 1px solid var(--rule-2);
+    border-radius: 0;
+    padding: 4px 8px;
+    min-width: 190px;
+    max-width: 320px;
+  }
+  .fl select:hover { border-color: var(--muted); }
+  .fl select:focus-visible { outline: 1px solid var(--ink); outline-offset: 1px; }
+
+  #filter-summary { margin: 10px 0 0; font-size: 11.5px; color: var(--ink); }
+  #filter-summary:empty { display: none; }
+  .clear {
+    font-family: inherit;
+    font-size: 11px;
+    color: var(--muted);
+    background: transparent;
+    border: 1px solid var(--rule-2);
+    padding: 1px 8px;
+    margin-left: 8px;
+    cursor: pointer;
+  }
+  .clear:hover, .clear:focus-visible { color: var(--text); border-color: var(--muted); }
+
   /* ---- la grille : classe, inkées, dormantes ---- */
 
-  .scroll { overflow-x: auto; margin-top: 22px; }
+  .scroll { overflow-x: auto; margin-top: 18px; }
 
   table { border-collapse: collapse; width: 100%; min-width: 820px; }
 
@@ -124,7 +160,17 @@
 
   td.half { width: 46%; }
 
-  .depth { display: block; font-size: 11px; color: var(--muted); }
+  /* Le chiffre qu'on vient chercher : il se perdait parmi huit vignettes de
+     même taille, il ouvre maintenant la case. */
+  .cell-floor { display: block; line-height: 1.15; }
+  .cell-floor .label { margin-right: 9px; }
+  .cell-floor .price { font-size: 23px; font-weight: 700; letter-spacing: -0.025em; }
+  .cell-floor .unit { font-size: 10px; }
+  td.g-ink     .cell-floor .price { color: var(--ink); }
+  td.g-dormant .cell-floor .price { color: var(--dormant); }
+
+  .depth { display: block; font-size: 11px; color: var(--muted); margin-top: 1px; }
+  .depth b { color: var(--text); font-weight: 600; }
   .absent { color: var(--dim); }
 
   /* ---- la bande de machines en vente, la moins chère d'abord ---- */
@@ -194,6 +240,11 @@
   <div class="banner" id="banner" role="status"></div>
 </header>
 
+<section class="filter-bar">
+  <div id="filters"></div>
+  <p id="filter-summary"></p>
+</section>
+
 <div class="scroll">
   <table>
     <caption class="label">Each row is one rarity class, cheapest machine first. A dormant Machine and an inked one are different assets, so each has its own book.</caption>
@@ -220,9 +271,11 @@
   <p id="book-line"></p>
   <p id="excluded-line"></p>
   <p id="published-line"></p>
-  <p>Each cell shows the eight cheapest Machines on sale and says how many more it is holding back. A cell
-    reading <b>no listing</b> has none — it is not a floor of zero. Hover a cell for its peloton and its exact
-    listed share; hover a Machine for its headwear.</p>
+  <p>Each cell states two separate numbers: how many Machines are <b>on sale</b>, and how many exist
+    <b>in this class</b>. It shows the eight cheapest and, when it is holding more back, offers them on a
+    button — so a cell with no button is already showing everything it has. A cell reading <b>no listing</b>
+    has nothing on sale; it is not a floor of zero. Hover a cell for its peloton and its exact listed share;
+    hover a Machine for its headwear.</p>
   <p class="disclaimer"><span class="tag">Unofficial</span><b>An independent tool.</b> It is not built by,
     affiliated with, or endorsed by the RH MACHINES team, and nothing here is an official source. It is
     read-only: it holds no keys, signs nothing, places no orders, and gives no advice. Prices come from
