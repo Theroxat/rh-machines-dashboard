@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   fmtEth, fmtRatio, halfCell, cellKey,
   bannerMessage, excludedLine, publishedLine, rowsHtml, contextHtml, legendHtml,
+  matchesFilter, filterBarHtml, filterSummary,
 } from "../src/public/app.js";
 
 const entry = (tokenId, priceEth, image = `https://img/${tokenId}.webp`) => ({
@@ -171,4 +172,90 @@ test("the context strip survives a protocol read that came back empty", () => {
   assert.match(html, /no second opinion/);
   assert.match(html, /ceiling unreadable/);
   assert.match(html, /\$53\.72/);
+});
+
+// ---- filtres par trait ----
+
+const machineOf = (over = {}) => ({ image: "u", headwear: "Halo", body: "Sky", eyes: "UwU", ticker: "MSFT", ...over });
+const NO_FILTER = { Headwear: null, Body: null, Eyes: null };
+
+test("with no filter set, every machine matches", () => {
+  assert.equal(matchesFilter(machineOf(), NO_FILTER), true);
+  assert.equal(matchesFilter(null, NO_FILTER), true);
+});
+
+test("a filter keeps only the machines that carry that exact trait", () => {
+  assert.equal(matchesFilter(machineOf(), { ...NO_FILTER, Headwear: "Halo" }), true);
+  assert.equal(matchesFilter(machineOf(), { ...NO_FILTER, Headwear: "Blade" }), false);
+  assert.equal(matchesFilter(machineOf(), { ...NO_FILTER, Eyes: "UwU" }), true);
+  assert.equal(matchesFilter(machineOf({ eyes: "Rage" }), { ...NO_FILTER, Eyes: "UwU" }), false);
+});
+
+test("two filters combine, so both must hold", () => {
+  const f = { ...NO_FILTER, Headwear: "Halo", Body: "Sky" };
+  assert.equal(matchesFilter(machineOf(), f), true);
+  assert.equal(matchesFilter(machineOf({ body: "Amber" }), f), false);
+});
+
+// Une machine dont les métadonnées manquent n'a pas de traits connus : la
+// compter comme correspondante ferait apparaître dans un filtre une machine
+// dont on ignore justement si elle correspond.
+test("a machine with no known traits never satisfies an active filter", () => {
+  assert.equal(matchesFilter(null, { ...NO_FILTER, Headwear: "Halo" }), false);
+});
+
+test("a filtered cell shows only matches and says how many of how many", () => {
+  const entries = [
+    { tokenId: 1, priceEth: 0.1, machine: machineOf({ headwear: "Halo" }) },
+    { tokenId: 2, priceEth: 0.2, machine: machineOf({ headwear: "Blade" }) },
+    { tokenId: 3, priceEth: 0.3, machine: machineOf({ headwear: "Halo" }) },
+  ];
+  const html = halfCell(half({ entries, listed: 3, supply: 50 }), "ink", { filter: { ...NO_FILTER, Headwear: "Halo" } });
+  assert.equal(countChips(html), 2);
+  assert.match(html, /2 of 3 listed match/);
+  assert.match(html, /#1/);
+  assert.doesNotMatch(html, /#2/);
+});
+
+test("a cell where nothing matches says so, which is not the same as no listing", () => {
+  const entries = [{ tokenId: 1, priceEth: 0.1, machine: machineOf({ headwear: "Blade" }) }];
+  const html = halfCell(half({ entries, listed: 1, supply: 50 }), "ink", { filter: { ...NO_FILTER, Headwear: "Halo" } });
+  assert.match(html, /no machine matches here/);
+  assert.doesNotMatch(html, /no listing/);
+  assert.equal(countChips(html), 0);
+});
+
+test("the filter bar offers every value with what is on sale and what exists", () => {
+  const html = filterBarHtml({
+    Headwear: [{ value: "Halo", listed: 9, total: 37 }],
+    Body: [{ value: "Sky", listed: 12, total: 501, ticker: "MSFT" }],
+    Eyes: [{ value: "UwU", listed: 3, total: 600 }],
+  }, NO_FILTER);
+  assert.match(html, /data-trait="Headwear"/);
+  assert.match(html, /Halo.*9.*37/);
+  assert.match(html, /Sky.*MSFT/);          // le corps annonce le desk qu'il farme
+  assert.match(html, /UwU/);
+  assert.equal((html.match(/<select/g) ?? []).length, 3);
+});
+
+test("the chosen value is the one marked selected", () => {
+  const html = filterBarHtml(
+    { Headwear: [{ value: "Halo", listed: 1, total: 1 }, { value: "Blade", listed: 1, total: 1 }], Body: [], Eyes: [] },
+    { ...NO_FILTER, Headwear: "Blade" },
+  );
+  assert.match(html, /value="Blade" selected/);
+  assert.doesNotMatch(html, /value="Halo" selected/);
+});
+
+test("the summary counts matches across the whole board, or stays silent", () => {
+  const d = {
+    rows: [{
+      inked:   { entries: [{ tokenId: 1, machine: machineOf({ headwear: "Halo" }) }] },
+      dormant: { entries: [{ tokenId: 2, machine: machineOf({ headwear: "Blade" }) }] },
+    }],
+  };
+  assert.equal(filterSummary(d, NO_FILTER), null);
+  const s = filterSummary(d, { ...NO_FILTER, Headwear: "Halo" });
+  assert.match(s, /Halo/);
+  assert.match(s, /1 of 2 listed machines match/);
 });

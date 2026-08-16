@@ -9,6 +9,7 @@ import { fetchListings, fetchPublishedFloor } from "./opensea.js";
 import { loadTraits } from "./traits.js";
 import { loadMetadata } from "./metadata.js";
 import { deriveHeadwearLegend } from "./rarity.js";
+import { deriveDeskTickers, deriveBodyTickers } from "./desks.js";
 import { readInk } from "./ink.js";
 import { fetchPrinter, fetchEthUsd } from "./prices.js";
 import { readProtocol } from "./protocol.js";
@@ -33,6 +34,7 @@ let ink = new Map();
 let inkMeta = { readAt: null, failures: null };
 let meta = new Map();
 let legend = null;
+let bodyTickers = new Map();
 
 async function sweepInk() {
   const { ink: fresh, failures } = await readInk({ provider, batchSize: cfg.multicallBatchSize });
@@ -55,7 +57,7 @@ async function sweepBook() {
   store.succeed(composeSnapshot({
     grid, printer, eth, protocol, publishedFloor,
     book: { listed: book.listings.size, pages: book.pages, skipped: book.skipped },
-    inkMeta, meta, legend, now: Date.now(),
+    inkMeta, meta, legend, bodyTickers, now: Date.now(),
   }));
   console.log(`book: ${book.listings.size} listings over ${book.pages} pages`);
 }
@@ -126,6 +128,18 @@ const started = async () => {
     console.log(`metadata: ${meta.size} machines (${loaded.source}` +
       (loaded.filled ? `, ${loaded.filled} backfilled one by one` : "") + ")" +
       (amb ? `, ${amb} ambiguous headwear` : ", headwear maps cleanly to class"));
+
+    // Aucun contrat ne dit quel ticker porte le desk 7 : la correspondance se
+    // déduit en appariant les comptages de la chaîne au recensement publié.
+    // Si elle ne tient plus, on le dit et on n'affiche aucun ticker.
+    const desks = deriveDeskTickers(traits);
+    if (desks.ok) {
+      bodyTickers = deriveBodyTickers({ traits, meta, byIndex: desks.byIndex });
+      const named = [...bodyTickers.values()].filter(Boolean).length;
+      console.log(`desks: ${desks.byIndex.size} tickers resolved, ${named}/${bodyTickers.size} body colours named`);
+    } else {
+      console.error(`desks: no ticker mapping — ${desks.reason}`);
+    }
   } catch (e) {
     console.error(`metadata: ${e.message} — the dashboard runs without pictures`);
   }

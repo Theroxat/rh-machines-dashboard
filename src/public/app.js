@@ -67,20 +67,61 @@ function chip(e, isFloor) {
   `</a>`;
 }
 
+export const TRAIT_TYPES = Object.freeze(["Headwear", "Body", "Eyes"]);
+const FIELD = Object.freeze({ Headwear: "headwear", Body: "body", Eyes: "eyes" });
+
+export const EMPTY_FILTER = Object.freeze({ Headwear: null, Body: null, Eyes: null });
+
+export const filterIsActive = (filter) => TRAIT_TYPES.some((t) => filter?.[t]);
+
+/** Une machine dont les métadonnées manquent n'a pas de traits connus. La faire
+ *  passer pour correspondante afficherait dans un filtre une machine dont on
+ *  ignore précisément si elle correspond. */
+export function matchesFilter(machine, filter) {
+  for (const type of TRAIT_TYPES) {
+    const wanted = filter?.[type];
+    if (!wanted) continue;
+    if (!machine || machine[FIELD[type]] !== wanted) return false;
+  }
+  return true;
+}
+
 /**
  * Une moitié de ligne : tout le carnet de cette case, du moins cher au plus
  * cher. Huit machines par défaut, le reste derrière un bouton — la case dit
  * toujours combien elle cache, pour qu'un carnet coupé ne passe jamais pour
  * un carnet complet.
  */
-export function halfCell(half, side, { expanded = false, limit = DEFAULT_LIMIT, key = "" } = {}) {
+export function halfCell(half, side, { expanded = false, limit = DEFAULT_LIMIT, key = "", filter = EMPTY_FILTER } = {}) {
   const g = `g-${side}`;
-  const depth = `${fmtInt(half.listed)} of ${fmtInt(half.supply)} listed`;
+  const active = filterIsActive(filter);
+  const all = half.entries ?? [];
+  const kept = active ? all.filter((e) => matchesFilter(e.machine, filter)) : all;
 
-  if (!half.entries?.length) {
-    return `<td class="${g} edge half" title="Nothing is on sale in this class in this state.">` +
-      `<span class="depth"><span class="absent">no listing</span> · ${depth}</span></td>`;
+  // Filtré, la case compte les correspondances sur ce qui est en vente ; sinon
+  // ce qui est en vente sur ce qui existe. Les deux dénominateurs répondent à
+  // deux questions différentes, et la phrase dit toujours laquelle.
+  const depth = active
+    ? `${fmtInt(kept.length)} of ${fmtInt(all.length)} listed match`
+    : `${fmtInt(half.listed)} of ${fmtInt(half.supply)} listed`;
+
+  if (!kept.length) {
+    // « rien ne correspond ici » et « rien n'est en vente ici » ne sont pas la
+    // même information, et les confondre ferait passer un filtre pour un marché vide.
+    const why = active
+      ? `<span class="absent">no machine matches here</span> · ${depth}`
+      : `<span class="absent">no listing</span> · ${depth}`;
+    const tip = active
+      ? "Nothing on sale in this class and state carries the traits you picked."
+      : "Nothing is on sale in this class in this state.";
+    return `<td class="${g} edge half" title="${esc(tip)}"><span class="depth">${why}</span></td>`;
   }
+
+  const half_ = { ...half, entries: kept };
+  return renderHalf(half_, g, { expanded, limit, key, depth, total: kept.length });
+}
+
+function renderHalf(half, g, { expanded, limit, key, depth }) {
 
   const tip = half.pelotonEth === null
     ? `${half.listed} listings — too few for a peloton, so no median is shown`
@@ -102,7 +143,7 @@ export function halfCell(half, side, { expanded = false, limit = DEFAULT_LIMIT, 
   `</td>`;
 }
 
-export function rowsHtml(d, { expanded = new Set(), limit = DEFAULT_LIMIT } = {}) {
+export function rowsHtml(d, { expanded = new Set(), limit = DEFAULT_LIMIT, filter = EMPTY_FILTER } = {}) {
   return d.rows.map((r) => {
     const census = r.chainCount === r.docCount
       ? `<span class="census">${fmtInt(r.chainCount)} machines</span>`
@@ -113,10 +154,49 @@ export function rowsHtml(d, { expanded = new Set(), limit = DEFAULT_LIMIT } = {}
 
     return `<tr>` +
       `<td class="cls-cell"><span class="cls">${r.classLabel}</span>${census}</td>` +
-      halfCell(r.inked,   "ink",     { expanded: expanded.has(inkKey), limit, key: inkKey }) +
-      halfCell(r.dormant, "dormant", { expanded: expanded.has(dorKey), limit, key: dorKey }) +
+      halfCell(r.inked,   "ink",     { expanded: expanded.has(inkKey), limit, key: inkKey, filter }) +
+      halfCell(r.dormant, "dormant", { expanded: expanded.has(dorKey), limit, key: dorKey, filter }) +
     `</tr>`;
   }).join("");
+}
+
+/**
+ * Les trois menus de filtre. Chaque valeur annonce ce qui est en vente et ce qui
+ * existe : savoir avant de cliquer qu'un trait n'a aucune machine sur le marché
+ * évite d'aller chercher un tableau vide.
+ */
+export function filterBarHtml(traitFilters, filter) {
+  if (!traitFilters) return "";
+
+  return TRAIT_TYPES.map((type) => {
+    const values = traitFilters[type] ?? [];
+    const options = values.map((v) => {
+      const ticker = v.ticker ? ` — ${v.ticker}` : "";
+      const chosen = filter?.[type] === v.value ? " selected" : "";
+      return `<option value="${esc(v.value)}"${chosen}>${esc(v.value)}${ticker} (${fmtInt(v.listed)} on sale of ${fmtInt(v.total)})</option>`;
+    }).join("");
+    return `<label class="fl"><span class="label">${type}</span>` +
+      `<select data-trait="${type}"><option value="">any</option>${options}</select></label>`;
+  }).join("");
+}
+
+/** Ce que le filtre laisse passer, sur l'ensemble du carnet. Silencieux tant
+ *  qu'aucun filtre n'est posé : un compteur permanent serait du bruit. */
+export function filterSummary(d, filter) {
+  if (!filterIsActive(filter)) return null;
+
+  let matched = 0;
+  let total = 0;
+  for (const r of d.rows) {
+    for (const cell of [r.inked, r.dormant]) {
+      for (const e of cell.entries ?? []) {
+        total++;
+        if (matchesFilter(e.machine, filter)) matched++;
+      }
+    }
+  }
+  const chosen = TRAIT_TYPES.map((t) => filter[t]).filter(Boolean).join(" + ");
+  return `${chosen} — ${fmtInt(matched)} of ${fmtInt(total)} listed machines match.`;
 }
 
 /** Quel couvre-chef trahit quelle classe. Dérivé des données au démarrage, pas
@@ -190,19 +270,62 @@ if (typeof document !== "undefined") {
   const $ = (id) => document.getElementById(id);
   const rowsEl = $("rows");
 
-  // Les cases dépliées vivent ici plutôt que dans le DOM : la table est
-  // reconstruite toutes les quinze secondes, et une case ouverte doit le rester.
+  // Les cases dépliées et le filtre vivent ici plutôt que dans le DOM : la table
+  // est reconstruite toutes les quinze secondes, et ni une case ouverte ni un
+  // filtre posé ne doivent survivre à ça par accident.
   const expanded = new Set();
+  const filter = { ...EMPTY_FILTER };
+  const filtersEl = $("filters");
+  const summaryEl = $("filter-summary");
   let lastData = null;
   let painted = "";
+  let barBuilt = false;
 
   const paint = () => {
     if (!lastData) return;
-    const html = rowsHtml(lastData, { expanded });
-    if (html === painted) return;
-    rowsEl.innerHTML = html;
-    painted = html;
+    const html = rowsHtml(lastData, { expanded, filter });
+    if (html !== painted) {
+      rowsEl.innerHTML = html;
+      painted = html;
+    }
+    const summary = filterSummary(lastData, filter);
+    summaryEl.innerHTML = summary
+      ? `${summary} <button class="clear" type="button">clear</button>`
+      : "";
   };
+
+  /** La barre est construite une fois. Les traits sont scellés, donc la liste
+   *  des valeurs ne bouge jamais ; seuls les compteurs bougent, et on les met à
+   *  jour sur place pour ne pas effacer la sélection en cours. */
+  const paintFilters = (traitFilters) => {
+    if (!traitFilters) return;
+    if (!barBuilt) {
+      filtersEl.innerHTML = filterBarHtml(traitFilters, filter);
+      barBuilt = true;
+      return;
+    }
+    for (const select of filtersEl.querySelectorAll("select")) {
+      const rows = new Map((traitFilters[select.dataset.trait] ?? []).map((v) => [v.value, v]));
+      for (const option of select.options) {
+        const v = rows.get(option.value);
+        if (v) option.textContent = `${v.value}${v.ticker ? ` — ${v.ticker}` : ""} (${v.listed} on sale of ${v.total})`;
+      }
+    }
+  };
+
+  filtersEl.addEventListener("change", (e) => {
+    const select = e.target.closest("select[data-trait]");
+    if (!select) return;
+    filter[select.dataset.trait] = select.value || null;
+    paint();
+  });
+
+  summaryEl.addEventListener("click", (e) => {
+    if (!e.target.closest(".clear")) return;
+    for (const type of TRAIT_TYPES) filter[type] = null;
+    for (const select of filtersEl.querySelectorAll("select")) select.value = "";
+    paint();
+  });
 
   rowsEl.addEventListener("click", (e) => {
     const btn = e.target.closest(".more");
@@ -234,6 +357,7 @@ if (typeof document !== "undefined") {
 
     lastData = v.data;
     $("context").innerHTML = contextHtml(v.data);
+    paintFilters(v.data.traitFilters);
     paint();
     $("legend").innerHTML = legendHtml(v.data.legend);
     $("book-line").innerHTML = bookLine(v.data);

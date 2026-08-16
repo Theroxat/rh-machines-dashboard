@@ -2,6 +2,25 @@ import { readFileSync, writeFileSync, renameSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { OPENSEA, ADDRESSES, TOTAL_MACHINES } from "./config.js";
 
+/** Le cache est versionné : une version antérieure ne portait pas Eyes, et la
+ *  relire telle quelle donnerait un filtre qui ne trouve jamais rien, sans la
+ *  moindre erreur. Un changement de forme force la relecture. */
+const CACHE_VERSION = 2;
+
+/** Background vaut « Acid Lime » sur les 10 000 machines : il ne distingue rien
+ *  et n'est donc pas stocké. Les trois autres traits varient. */
+function traitsOf(nft, image) {
+  const t = Object.fromEntries((nft.traits ?? []).map((x) => [x.trait_type, x.value]));
+  return {
+    image,
+    // "None" est la réalité de la classe x6 : 81 machines ne portent rien.
+    // L'écraser en null effacerait la deuxième classe la plus rare.
+    headwear: t.Headwear ?? null,
+    body: t.Body ?? null,
+    eyes: t.Eyes ?? null,
+  };
+}
+
 /** Image et traits de chaque machine. Scellés au mint comme les raretés, donc
  *  lus une fois puis cachés à vie : en régime établi, zéro appel. */
 export async function fetchMetadata({
@@ -31,14 +50,7 @@ export async function fetchMetadata({
       const tokenId = Number(n?.identifier);
       const image = n?.display_image_url || n?.image_url || null;
       if (!Number.isInteger(tokenId) || tokenId <= 0 || !image) { skipped++; continue; }
-      const traits = Object.fromEntries((n.traits ?? []).map((t) => [t.trait_type, t.value]));
-      meta.set(tokenId, {
-        image,
-        // "None" est la réalité de la classe x6 : 81 machines ne portent rien.
-        // L'écraser en null effacerait la deuxième classe la plus rare.
-        headwear: traits.Headwear ?? null,
-        body: traits.Body ?? null,
-      });
+      meta.set(tokenId, traitsOf(n, image));
     }
 
     next = body?.next || null;
@@ -78,8 +90,7 @@ export async function backfillMetadata({
       const n = (await res.json())?.nft;
       const image = n?.display_image_url || n?.image_url || null;
       if (!image) continue;
-      const traits = Object.fromEntries((n.traits ?? []).map((t) => [t.trait_type, t.value]));
-      meta.set(tokenId, { image, headwear: traits.Headwear ?? null, body: traits.Body ?? null });
+      meta.set(tokenId, traitsOf(n, image));
       filled++;
     } catch {
       // Une machine qu'on n'a pas pu relire reste absente. Elle perdra sa
@@ -95,21 +106,26 @@ export function readCache(path) {
   try { raw = readFileSync(path, "utf8"); } catch { return null; }
   let obj;
   try { obj = JSON.parse(raw); } catch { return null; }
-  if (!obj || typeof obj !== "object") return null;
+  if (obj?.version !== CACHE_VERSION || !obj.machines) return null;
   const map = new Map();
-  for (const [id, v] of Object.entries(obj)) {
+  for (const [id, v] of Object.entries(obj.machines)) {
     if (!v?.image) continue;
-    map.set(Number(id), { image: v.image, headwear: v.headwear ?? null, body: v.body ?? null });
+    map.set(Number(id), {
+      image: v.image,
+      headwear: v.headwear ?? null,
+      body: v.body ?? null,
+      eyes: v.eyes ?? null,
+    });
   }
   return map;
 }
 
 export function writeCache(path, meta) {
   mkdirSync(dirname(path), { recursive: true });
-  const obj = {};
-  for (const [id, v] of meta) obj[id] = v;
+  const machines = {};
+  for (const [id, v] of meta) machines[id] = v;
   const tmp = `${path}.tmp`;
-  writeFileSync(tmp, JSON.stringify(obj));
+  writeFileSync(tmp, JSON.stringify({ version: CACHE_VERSION, machines }));
   renameSync(tmp, path);
 }
 

@@ -50,15 +50,28 @@ const withGrid = {
       dormant: { floorEth: null, floorTokenId: null, pelotonEth: null, listed: 0, supply: 4, listedRatio: 0, entries: [] },
     }],
   },
-  meta: new Map([[1253, { image: "https://img/1253.webp", headwear: "Blueberries", body: "Cobalt Stripe" }]]),
+  meta: new Map([[1253, { image: "https://img/1253.webp", headwear: "Blueberries", body: "Cobalt Stripe", eyes: "Rage" }]]),
   legend: { byClass: [], headwearClass: new Map(), ambiguous: [], unpaired: 0 },
 };
 
-test("every machine on sale carries its picture and its headwear", () => {
-  const s = composeSnapshot(withGrid);
+test("every machine on sale carries its picture, its traits and the ticker it farms", () => {
+  const s = composeSnapshot({ ...withGrid, bodyTickers: new Map([["Cobalt Stripe", "GOOGL"]]) });
   assert.deepEqual(s.rows[0].inked.entries[0].machine, {
     image: "https://img/1253.webp", headwear: "Blueberries", body: "Cobalt Stripe",
+    eyes: "Rage", ticker: "GOOGL",
   });
+});
+
+test("a body colour with no resolved desk yields a null ticker, not a missing key", () => {
+  const s = composeSnapshot(withGrid);
+  assert.equal(s.rows[0].inked.entries[0].machine.ticker, null);
+});
+
+test("the trait index counts what is on sale against what exists", () => {
+  const s = composeSnapshot(withGrid);
+  const blueberries = s.traitFilters.Headwear.find((v) => v.value === "Blueberries");
+  assert.equal(blueberries.total, 1);
+  assert.equal(blueberries.listed, 1);   // #1253 is one of the entries
 });
 
 test("a machine with no metadata keeps its price and loses only its picture", () => {
