@@ -387,3 +387,11 @@ test("the filter summary escapes the trait values it repeats", () => {
   assert.doesNotMatch(s, /<img/);
   assert.match(s, /&lt;img/);
 });
+
+// Sur mobile l'en-tête du tableau disparaît et chaque moitié devient une carte
+// empilée : elle doit alors pouvoir annoncer elle-même de quel côté elle parle.
+test("each half names its own state, so it still reads with no column header", () => {
+  assert.match(halfCell(half(), "ink"), /data-state="Inked"/);
+  assert.match(halfCell(half(), "dormant"), /data-state="Dormant"/);
+  assert.match(halfCell(half({ entries: [], listed: 0 }), "ink"), /data-state="Inked"/);
+});

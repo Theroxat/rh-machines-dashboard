@@ -115,6 +115,9 @@ export function matchesFilter(machine, filter) {
  */
 export function halfCell(half, side, { expanded = false, limit = DEFAULT_LIMIT, key = "", filter = EMPTY_FILTER } = {}) {
   const g = `g-${side}`;
+  // Sur mobile l'en-tête du tableau disparaît : la case doit alors annoncer
+  // elle-même de quel côté elle parle.
+  const state = side === "ink" ? "Inked" : "Dormant";
   const active = filterIsActive(filter);
   const all = half.entries ?? [];
   const kept = active ? all.filter((e) => matchesFilter(e.machine, filter)) : all;
@@ -136,14 +139,14 @@ export function halfCell(half, side, { expanded = false, limit = DEFAULT_LIMIT, 
     const tip = active
       ? "Nothing on sale in this class and state carries the traits you picked."
       : "Nothing is on sale in this class in this state.";
-    return `<td class="${g} edge half" title="${esc(tip)}"><span class="depth">${why}</span></td>`;
+    return `<td class="${g} edge half" data-state="${state}" title="${esc(tip)}"><span class="depth">${why}</span></td>`;
   }
 
   const half_ = { ...half, entries: kept };
-  return renderHalf(half_, g, { expanded, limit, key, depth, floorLabel: active ? "cheapest match" : "floor price" });
+  return renderHalf(half_, g, { expanded, limit, key, depth, state, floorLabel: active ? "cheapest match" : "floor price" });
 }
 
-function renderHalf(half, g, { expanded, limit, key, depth, floorLabel }) {
+function renderHalf(half, g, { expanded, limit, key, depth, state, floorLabel }) {
 
   const tip = half.pelotonEth === null
     ? `${half.listed} listings — too few for a peloton, so no median is shown`
@@ -166,7 +169,7 @@ function renderHalf(half, g, { expanded, limit, key, depth, floorLabel }) {
     `<span class="label">${floorLabel}</span>` +
     `<span class="price">${fmtEth(floor.priceEth)}</span> <span class="unit">ETH</span></span>`;
 
-  return `<td class="${g} edge half" title="${esc(tip)}">` +
+  return `<td class="${g} edge half" data-state="${state}" title="${esc(tip)}">` +
     head +
     `<span class="depth">${depth}</span>` +
     `<span class="strip">${shown.map((e, i) => chip(e, i === 0)).join("")}</span>` +
