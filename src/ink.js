@@ -4,6 +4,7 @@ import { readUintMap, multicallOf } from "./multicall.js";
 
 const MINE_ABI = new ethers.Interface([
   "function inkBurned(uint256) view returns (uint256)",
+  "function weightOf(uint256) view returns (uint256)",
 ]);
 
 /** L'encre ne change qu'à l'activation ou au ré-encrage, donc cette lecture
@@ -12,8 +13,15 @@ const MINE_ABI = new ethers.Interface([
 export async function readInk({ provider, batchSize, total = TOTAL_MACHINES }) {
   const aggregate3 = multicallOf(provider, ADDRESSES.MULTICALL3);
   const ids = Array.from({ length: total }, (_, i) => i + 1);
-  const { values, failures } = await readUintMap({
+
+  const burned = await readUintMap({
     aggregate3, iface: MINE_ABI, target: ADDRESSES.MINE, fn: "inkBurned", ids, batchSize,
   });
-  return { ink: values, failures };
+  // Le poids effectif se lit plutôt qu'il ne se recalcule : c'est le contrat qui
+  // applique √(ink/4250) et le plafond, et c'est lui la référence pour les gains.
+  const weight = await readUintMap({
+    aggregate3, iface: MINE_ABI, target: ADDRESSES.MINE, fn: "weightOf", ids, batchSize,
+  });
+
+  return { ink: burned.values, weights: weight.values, failures: burned.failures + weight.failures };
 }

@@ -104,9 +104,19 @@ function chip(e, isFloor) {
   const img = e.machine?.image
     ? `<img src="${esc(e.machine.image)}" alt="Machine #${e.tokenId}" loading="lazy" width="40" height="40">`
     : `<span class="noimg" aria-hidden="true"></span>`;
+
+  // Une machine re-inkée pèse plus que ne le dit sa ligne : c'est la seule
+  // chose qu'une vignette doit crier, et elle ne concerne qu'un listing sur
+  // cent. Le badge porte le poids effectif, dans la notation du site officiel.
+  const reinked = e.inkMult > 1.0001 && e.weight;
+  const badge = reinked ? `<span class="reink">${e.weight / 100}x</span>` : "";
+  const inkStory = reinked
+    ? ` · re-inked ×${e.inkMult.toFixed(2)} — ${fmtInt(e.inkPrinter)} $PRINTER burned · weight ${e.weight / 100}x`
+    : "";
+
   return `<a class="chip${isFloor ? " floor" : ""}" href="${itemUrl(e.tokenId)}" target="_blank" rel="noopener"` +
-    ` title="${esc(`#${e.tokenId}${hw}`)}">` +
-    img +
+    ` title="${esc(`#${e.tokenId}${hw}${inkStory}`)}">` +
+    img + badge +
     `<span class="price">${fmtEth(e.priceEth)}</span>` +
     `<span class="tok">#${e.tokenId}</span>` +
   `</a>`;
@@ -179,10 +189,15 @@ function renderHalf(half, g, { expanded, limit, key, depth, state, floorLabel })
   const shown = expanded ? half.entries : half.entries.slice(0, limit);
   const hidden = half.entries.length - shown.length;
 
+  // Une machine re-inkée repliée dans le « + N more » est justement celle qu'on
+  // voulait voir : la case dit ce qu'elle cache plutôt que de le cacher deux fois.
+  const hiddenReinked = half.entries.slice(shown.length).filter((e) => e.inkMult > 1.0001 && e.weight).length;
+  const note = hiddenReinked ? `, ${fmtInt(hiddenReinked)} re-inked` : "";
+
   const more = expanded
     ? `<button class="more" type="button" data-key="${esc(key)}">▴ show fewer</button>`
     : (hidden > 0
-        ? `<button class="more" type="button" data-key="${esc(key)}">+ ${fmtInt(hidden)} more ▾</button>`
+        ? `<button class="more" type="button" data-key="${esc(key)}">+ ${fmtInt(hidden)} more${note} ▾</button>`
         : "");
 
   // Le floor en tête, en grand et nommé : c'est le chiffre qu'on vient chercher.

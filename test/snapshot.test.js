@@ -146,3 +146,41 @@ test("the published floor still rides along, still labelled as uncomputed-with",
   assert.equal(s.collection.publishedFloor, 0.0869);
   assert.equal(s.collection.publishedFloorUsedInComputation, false);
 });
+
+// ---- poids effectif et re-encrage ----
+
+const withWeights = {
+  ...withStats,
+  ink: new Map([[1253, 17000n * 10n ** 18n], [999, 4250n * 10n ** 18n]]),
+  weights: new Map([[1253, 2000n], [999, 1000n]]),
+};
+
+test("every machine on sale carries the weight the contract computes for it", () => {
+  const s = composeSnapshot(withWeights);
+  const [a, b] = s.rows[0].inked.entries;
+  assert.equal(a.weight, 2000);
+  assert.equal(b.weight, 1000);
+});
+
+// Le multiplicateur d'encre est ce qui distingue une x10 re-inkée d'une x10
+// ordinaire : même classe, poids double, et rien ne le disait.
+test("a re-inked machine reports how far past activation it went", () => {
+  const s = composeSnapshot(withWeights);
+  const [a, b] = s.rows[0].inked.entries;
+  assert.equal(a.inkMult, 2);          // 2000 / classe 1000
+  assert.equal(a.inkPrinter, 17000);
+  assert.equal(b.inkMult, 1);          // à l'activation, rien de plus
+  assert.equal(b.inkPrinter, 4250);
+});
+
+test("a machine whose weight was never read reports null, not a weight of zero", () => {
+  const s = composeSnapshot({ ...withWeights, weights: new Map() });
+  assert.equal(s.rows[0].inked.entries[0].weight, null);
+  assert.equal(s.rows[0].inked.entries[0].inkMult, null);
+});
+
+test("a dormant machine has no ink multiplier to report", () => {
+  const s = composeSnapshot({ ...withWeights, weights: new Map([[1253, 0n]]), ink: new Map([[1253, 0n]]) });
+  assert.equal(s.rows[0].inked.entries[0].weight, 0);
+  assert.equal(s.rows[0].inked.entries[0].inkMult, null);
+});

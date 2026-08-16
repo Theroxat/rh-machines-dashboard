@@ -465,3 +465,62 @@ test("with no legend the boost still renders, just without its traits", () => {
   assert.match(html, /class="cls"/);
   assert.doesNotMatch(html, /class="grants"/);
 });
+
+// ---- machines re-inkées ----
+
+const inked = (over = {}) => ({
+  tokenId: 2248, priceEth: 0.8999, machine: machineOf({ headwear: "None" }),
+  weight: 600, inkMult: 1, inkPrinter: 4250, ...over,
+});
+
+test("a machine inked to activation carries no badge — there is nothing to flag", () => {
+  const html = halfCell(half({ entries: [inked()] }), "ink");
+  assert.doesNotMatch(html, /class="reink"/);
+});
+
+// 1% du carnet seulement, mais ce 1% pèse le double de ce que sa ligne annonce.
+test("a re-inked machine is badged with the weight it actually carries", () => {
+  const html = halfCell(half({ entries: [inked({ weight: 1200, inkMult: 2, inkPrinter: 17000 })] }), "ink");
+  assert.match(html, /class="reink"[^>]*>12x</);
+});
+
+test("the badge spells the whole story on hover", () => {
+  const html = halfCell(half({ entries: [inked({ weight: 1200, inkMult: 2, inkPrinter: 17000 })] }), "ink");
+  assert.match(html, /re-inked ×2\.00/);
+  assert.match(html, /17,000 \$PRINTER burned/);
+  assert.match(html, /weight 12x/);
+});
+
+test("a machine whose weight was never read is not badged on a guess", () => {
+  const html = halfCell(half({ entries: [inked({ weight: null, inkMult: null, inkPrinter: null })] }), "ink");
+  assert.doesNotMatch(html, /class="reink"/);
+});
+
+test("a dormant machine carries no badge either", () => {
+  const html = halfCell(half({ entries: [inked({ weight: 0, inkMult: null, inkPrinter: 0 })] }), "dormant");
+  assert.doesNotMatch(html, /class="reink"/);
+});
+
+// Cinq des sept machines re-inkées en vente tombaient hors des huit moins
+// chères : leur badge existait mais personne ne le voyait sans déplier.
+test("the expander says when it is hiding a re-inked machine", () => {
+  const plain = manyEntries(20).map((e) => ({ ...e, weight: 100, inkMult: 1 }));
+  plain[15] = { ...plain[15], weight: 200, inkMult: 2 };
+  plain[18] = { ...plain[18], weight: 200, inkMult: 2 };
+  const html = halfCell(half({ entries: plain, listed: 20 }), "ink", { limit: 8, key: "100:ink" });
+  assert.match(html, /\+ 12 more, 2 re-inked/);
+});
+
+test("an expander hiding nothing special stays plain", () => {
+  const plain = manyEntries(20).map((e) => ({ ...e, weight: 100, inkMult: 1 }));
+  const html = halfCell(half({ entries: plain, listed: 20 }), "ink", { limit: 8, key: "100:ink" });
+  assert.match(html, /\+ 12 more/);
+  assert.doesNotMatch(html, /re-inked/);
+});
+
+test("once expanded there is nothing left hidden to announce", () => {
+  const plain = manyEntries(20).map((e) => ({ ...e, weight: 200, inkMult: 2 }));
+  const html = halfCell(half({ entries: plain, listed: 20 }), "ink", { limit: 8, expanded: true, key: "100:ink" });
+  assert.match(html, /show fewer/);
+  assert.doesNotMatch(html, /re-inked</);
+});
