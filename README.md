@@ -1,4 +1,11 @@
-# RH MACHINES — market dashboard
+# Unofficial RH MACHINES market dashboard
+
+> **This is not an official RH MACHINES tool.** It is an independent project, not
+> built by, affiliated with, or endorsed by the RH MACHINES team, and nothing it
+> shows is an official source. It is read-only: it holds no keys, signs nothing,
+> places no orders, and gives no advice. Prices come from public OpenSea listings
+> and public Robinhood Chain state, and can be wrong or stale — verify every price
+> on OpenSea before buying.
 
 A read-only dashboard for the [`rh-machines`](https://opensea.io/collection/rh-machines)
 collection on Robinhood Chain. It answers one question: **what does each rarity
