@@ -140,10 +140,10 @@ export function halfCell(half, side, { expanded = false, limit = DEFAULT_LIMIT, 
   }
 
   const half_ = { ...half, entries: kept };
-  return renderHalf(half_, g, { expanded, limit, key, depth, total: kept.length });
+  return renderHalf(half_, g, { expanded, limit, key, depth, floorLabel: active ? "cheapest match" : "floor price" });
 }
 
-function renderHalf(half, g, { expanded, limit, key, depth }) {
+function renderHalf(half, g, { expanded, limit, key, depth, floorLabel }) {
 
   const tip = half.pelotonEth === null
     ? `${half.listed} listings — too few for a peloton, so no median is shown`
@@ -158,11 +158,13 @@ function renderHalf(half, g, { expanded, limit, key, depth }) {
         ? `<button class="more" type="button" data-key="${esc(key)}">+ ${fmtInt(hidden)} more ▾</button>`
         : "");
 
-  // Le floor en tête, en grand : c'est le chiffre qu'on vient chercher, et il se
-  // perdait parmi huit vignettes de même taille.
+  // Le floor en tête, en grand et nommé : c'est le chiffre qu'on vient chercher.
+  // Sous un filtre ce n'est plus le floor de la classe mais le moins cher de la
+  // sélection, et l'étiquette le dit plutôt que de laisser croire au premier.
   const floor = half.entries[0];
-  const head = `<span class="cell-floor"><span class="price">${fmtEth(floor.priceEth)}</span>` +
-    ` <span class="unit">ETH</span></span>`;
+  const head = `<span class="cell-floor">` +
+    `<span class="label">${floorLabel}</span>` +
+    `<span class="price">${fmtEth(floor.priceEth)}</span> <span class="unit">ETH</span></span>`;
 
   return `<td class="${g} edge half" title="${esc(tip)}">` +
     head +

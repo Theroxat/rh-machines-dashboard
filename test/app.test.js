@@ -347,3 +347,18 @@ test("missing collection numbers leave dashes, never zeroes", () => {
   assert.doesNotMatch(html, /\$0\.00/);
   assert.match(html, /—/);
 });
+
+test("the headline number says what it is, so it cannot be mistaken for something else", () => {
+  const plain = halfCell(half({ entries: [entry(9, 0.0980)] }), "ink");
+  assert.match(plain, /floor price/);
+  assert.ok(plain.indexOf("floor price") < plain.indexOf("0.0980"), "the label comes before the number");
+
+  // Sous un filtre ce n'est plus le floor de la classe : l'étiquette change.
+  const entries = [
+    { tokenId: 1, priceEth: 0.10, machine: machineOf({ headwear: "Blade" }) },
+    { tokenId: 2, priceEth: 0.30, machine: machineOf({ headwear: "Halo" }) },
+  ];
+  const filtered = halfCell(half({ entries }), "ink", { filter: { ...NO_FILTER, Headwear: "Halo" } });
+  assert.match(filtered, /cheapest match/);
+  assert.doesNotMatch(filtered, /floor price/);
+});
