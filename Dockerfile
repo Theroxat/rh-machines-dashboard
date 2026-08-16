@@ -8,6 +8,12 @@ RUN npm ci --omit=dev
 COPY config.json ./
 COPY src ./src
 
+# Le service lit du réseau et écrit deux fichiers de cache : il n'a aucun besoin
+# de root. L'utilisateur `node` porte l'uid 1000, celui du propriétaire de ./data
+# sur l'hôte, donc le montage reste inscriptible.
+RUN mkdir -p /app/data && chown -R node:node /app/data
+USER node
+
 ENV NODE_ENV=production
 EXPOSE 3050
 

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { assetHash, assetPath, stampPage, cacheHeaders } from "../src/http.js";
+import { assetHash, assetPath, stampPage, cacheHeaders, securityHeaders, etagOf } from "../src/http.js";
 
 test("the asset path changes whenever the asset does", () => {
   const a = assetHash("console.log(1)");
@@ -31,10 +31,6 @@ test("the page always revalidates, so a new script is picked up at once", () => 
   assert.match(cacheHeaders("page")["cache-control"], /no-cache/);
 });
 
-test("the api is never stored by anything in the path", () => {
-  assert.match(cacheHeaders("api")["cache-control"], /no-store/);
-});
-
 test("the hashed asset may be cached forever, because its URL is its content", () => {
   const cc = cacheHeaders("asset")["cache-control"];
   assert.match(cc, /max-age=\d{7,}/);
@@ -47,4 +43,44 @@ test("the unhashed fallback script is never cached, since its URL cannot change"
 
 test("an unknown kind refuses to guess a caching policy", () => {
   assert.throws(() => cacheHeaders("something-else"), /unknown/i);
+});
+
+// ---- en-têtes de sécurité ----
+
+test("the page forbids everything it does not need", () => {
+  const csp = securityHeaders()["content-security-policy"];
+  assert.match(csp, /default-src 'none'/);
+  assert.match(csp, /script-src 'self'/);
+  assert.doesNotMatch(csp, /script-src[^;]*unsafe-inline/);   // aucun script en ligne : rien à autoriser
+  assert.match(csp, /img-src https:\/\/i2c\.seadn\.io/);
+  assert.match(csp, /connect-src 'self'/);
+});
+
+// Le tampon UNOFFICIAL ne protège de rien si la page peut être encadrée dans un
+// site qui, lui, se présente comme officiel.
+test("the page cannot be framed by anyone", () => {
+  const h = securityHeaders();
+  assert.match(h["content-security-policy"], /frame-ancestors 'none'/);
+  assert.equal(h["x-frame-options"], "DENY");
+});
+
+test("the browser is told not to sniff types, and not to leak where it came from", () => {
+  const h = securityHeaders();
+  assert.equal(h["x-content-type-options"], "nosniff");
+  assert.match(h["referrer-policy"], /no-referrer/);
+});
+
+// ---- revalidation de l'API ----
+
+test("the api revalidates rather than refusing to be stored, so a 304 is possible", () => {
+  const cc = cacheHeaders("api")["cache-control"];
+  assert.match(cc, /no-cache/);
+  assert.doesNotMatch(cc, /no-store/);
+});
+
+test("an etag identifies a snapshot, and changes only when the snapshot does", () => {
+  const a = etagOf('{"at":1000}');
+  assert.equal(etagOf('{"at":1000}'), a);
+  assert.notEqual(etagOf('{"at":2000}'), a);
+  assert.match(a, /^"[0-9a-f]+"$/);   // guillemets : la syntaxe qu'exige If-None-Match
 });
