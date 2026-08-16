@@ -422,3 +422,46 @@ test("large token amounts are compacted without a currency sign", () => {
   assert.equal(fmtCompact(4250), "4,250");
   assert.equal(fmtCompact(null), "—");
 });
+
+// ---- le boost et le trait qui le donne ----
+
+const LEGEND = { byClass: [
+  { classValue: 1000, classLabel: "x10", headwear: ["Blueberries"], count: 37 },
+  { classValue: 400,  classLabel: "x4",  headwear: ["Bitcoin Aura", "Ordinals"], count: 429 },
+  { classValue: 600,  classLabel: "x6",  headwear: ["None"], count: 81 },
+  { classValue: 100,  classLabel: "x1",  headwear: ["Alert","Bad Day","Black Spikes","Blaze","Bowler","Confused","Devil Horns","Fez","Fire Mohawk","Green Mohawk","Halo","Ivory Horns","Smitten","Straw Hat"], count: 7131 },
+], ambiguous: [], unpaired: 0 };
+
+const rowFor = (v) => ({ classValue: v, classLabel: "x", docCount: 1, chainCount: 1, inked: half(), dormant: half() });
+
+test("the boost column names the trait that grants it", () => {
+  const html = rowsHtml({ rows: [rowFor(1000)], legend: LEGEND });
+  assert.match(html, /Blueberries/);
+});
+
+test("a boost granted by several traits lists them all when they are few", () => {
+  const html = rowsHtml({ rows: [rowFor(400)], legend: LEGEND });
+  assert.match(html, /Bitcoin Aura/);
+  assert.match(html, /Ordinals/);
+});
+
+test("wearing nothing is spelled out, since it is what grants the x6", () => {
+  const html = rowsHtml({ rows: [rowFor(600)], legend: LEGEND });
+  assert.match(html, /no headwear/i);
+  assert.doesNotMatch(html, />None</);
+});
+
+// Le x1 rassemble quinze couvre-chefs : les lister remplirait la colonne d'un
+// bruit que personne ne lit. Le compte suffit, la liste va dans l'infobulle.
+test("a boost granted by many traits is summarised, with the full list on hover", () => {
+  const html = rowsHtml({ rows: [rowFor(100)], legend: LEGEND });
+  assert.match(html, /14 headwears/);
+  assert.doesNotMatch(html, /Straw Hat<\/span>/);
+  assert.match(html, /title="[^"]*Straw Hat/);
+});
+
+test("with no legend the boost still renders, just without its traits", () => {
+  const html = rowsHtml({ rows: [rowFor(1000)] });
+  assert.match(html, /class="cls"/);
+  assert.doesNotMatch(html, /class="grants"/);
+});

@@ -201,6 +201,18 @@ function renderHalf(half, g, { expanded, limit, key, depth, state, floorLabel })
   `</td>`;
 }
 
+/** Le trait qui accorde le boost, dans la colonne du boost. Au-delà de quatre
+ *  valeurs — le x1 en rassemble quinze — la liste devient du bruit que personne
+ *  ne lit : on annonce le compte et on garde la liste dans l'infobulle. */
+function boostTraits(legend, classValue) {
+  const row = legend?.byClass?.find((c) => c.classValue === classValue);
+  const names = row?.headwear ?? [];
+  if (!names.length) return "";
+  const full = names.map(headwearLabel).join(", ");
+  const shown = names.length <= 4 ? full : `${names.length} headwears`;
+  return `<span class="grants" title="${esc(full)}">${esc(shown)}</span>`;
+}
+
 export function rowsHtml(d, { expanded = new Set(), limit = DEFAULT_LIMIT, filter = EMPTY_FILTER } = {}) {
   return d.rows.map((r) => {
     const census = r.chainCount === r.docCount
@@ -211,7 +223,7 @@ export function rowsHtml(d, { expanded = new Set(), limit = DEFAULT_LIMIT, filte
     const dorKey = cellKey(r.classValue, "dormant");
 
     return `<tr>` +
-      `<td class="cls-cell"><span class="cls">${r.classLabel}</span>${census}</td>` +
+      `<td class="cls-cell"><span class="cls">${r.classLabel}</span>${boostTraits(d.legend, r.classValue)}${census}</td>` +
       halfCell(r.inked,   "ink",     { expanded: expanded.has(inkKey), limit, key: inkKey, filter }) +
       halfCell(r.dormant, "dormant", { expanded: expanded.has(dorKey), limit, key: dorKey, filter }) +
     `</tr>`;
