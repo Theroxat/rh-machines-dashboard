@@ -184,6 +184,27 @@ Chain: Robinhood Chain, id 4663, RPC `https://rpc.mainnet.chain.robinhood.com`.
 is the sealed class (100…1000), on MINE it is the effective weight including ink.
 This dashboard reads the sealed class from TRAITS only.
 
+## Caching, and why the script URL has a hash in it
+
+Behind a CDN, an origin that sends no cache headers does not get "no caching" —
+it gets the CDN's defaults. Measured on 2026-08-16 behind Cloudflare: `/` and
+`/api/snapshot` passed through as `DYNAMIC` while `/app.js` was cached for
+**four hours**. A browser ended up running a script one version old against a
+current snapshot. The new snapshot files pictures under `entries[]`; the old code
+looked for them under `half.machine`, found nothing, and drew a silently wrong
+table — no thumbnails, and a column that had been deleted. Nothing crashed and
+nothing warned.
+
+Asking a CDN not to cache is the weak fix. The script's URL is instead derived
+from its content — `/app.<hash>.js` — so a changed script is a changed address
+and no cache anywhere can serve the old one in its place. That asset is then
+safe to cache for a year. The page itself carries `no-cache` so it always
+revalidates and always hands out the current address, and `/api/snapshot` carries
+`no-store`.
+
+A deploy therefore needs no cache purge. `/app.js` without a hash is still served
+for anything holding an old page, always uncached.
+
 ## Cadences
 
 The listings book, prices and protocol state refresh every **60 seconds**. Ink
