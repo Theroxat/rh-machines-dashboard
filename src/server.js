@@ -15,11 +15,15 @@ import { readProtocol } from "./protocol.js";
 import { buildGrid } from "./floors.js";
 import { composeSnapshot } from "./snapshot.js";
 import { createStore } from "./store.js";
+import { assetHash, assetPath, stampPage, cacheHeaders } from "./http.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const cfg = loadConfig(process.env, JSON.parse(readFileSync(join(here, "..", "config.json"), "utf8")));
-const page = readFileSync(join(here, "public", "index.html"), "utf8");
 const app = readFileSync(join(here, "public", "app.js"), "utf8");
+const appHash = assetHash(app);
+const appPath = assetPath(appHash);
+// La page part avec l'adresse du script qu'elle a été construite pour exécuter.
+const page = stampPage(readFileSync(join(here, "public", "index.html"), "utf8"), appHash);
 
 const provider = new ethers.JsonRpcProvider(RPC_URL, CHAIN_ID, { staticNetwork: true });
 const store = createStore({ staleAfterMs: cfg.bookPollIntervalMs * 3 });
@@ -74,17 +78,22 @@ function loop(name, fn, intervalMs, { runNow = true } = {}) {
 const server = createServer((req, res) => {
   if (req.url === "/api/snapshot") {
     const v = store.get();
-    res.writeHead(v.data ? 200 : 503, { "content-type": "application/json" });
+    res.writeHead(v.data ? 200 : 503, { "content-type": "application/json", ...cacheHeaders("api") });
     res.end(JSON.stringify(v));
     return;
   }
+  if (req.url === appPath) {
+    res.writeHead(200, { "content-type": "text/javascript; charset=utf-8", ...cacheHeaders("asset") });
+    res.end(app);
+    return;
+  }
   if (req.url === "/app.js") {
-    res.writeHead(200, { "content-type": "text/javascript; charset=utf-8" });
+    res.writeHead(200, { "content-type": "text/javascript; charset=utf-8", ...cacheHeaders("asset-unversioned") });
     res.end(app);
     return;
   }
   if (req.url === "/" || req.url === "/index.html") {
-    res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8", ...cacheHeaders("page") });
     res.end(page);
     return;
   }
@@ -126,7 +135,7 @@ const started = async () => {
   loop("book", sweepBook, cfg.bookPollIntervalMs);
   loop("ink", sweepInk, cfg.inkPollIntervalMs, { runNow: false });
 
-  server.listen(cfg.port, () => console.log(`dashboard on :${cfg.port}`));
+  server.listen(cfg.port, () => console.log(`dashboard on :${cfg.port}, serving ${appPath}`));
 };
 
 started().catch((e) => { console.error(e); process.exit(1); });
