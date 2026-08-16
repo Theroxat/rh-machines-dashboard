@@ -17,6 +17,7 @@ import { createStore } from "./store.js";
 const here = dirname(fileURLToPath(import.meta.url));
 const cfg = loadConfig(process.env, JSON.parse(readFileSync(join(here, "..", "config.json"), "utf8")));
 const page = readFileSync(join(here, "public", "index.html"), "utf8");
+const app = readFileSync(join(here, "public", "app.js"), "utf8");
 
 const provider = new ethers.JsonRpcProvider(RPC_URL, CHAIN_ID, { staticNetwork: true });
 const store = createStore({ staleAfterMs: cfg.bookPollIntervalMs * 3 });
@@ -71,6 +72,11 @@ const server = createServer((req, res) => {
     const v = store.get();
     res.writeHead(v.data ? 200 : 503, { "content-type": "application/json" });
     res.end(JSON.stringify(v));
+    return;
+  }
+  if (req.url === "/app.js") {
+    res.writeHead(200, { "content-type": "text/javascript; charset=utf-8" });
+    res.end(app);
     return;
   }
   if (req.url === "/" || req.url === "/index.html") {
