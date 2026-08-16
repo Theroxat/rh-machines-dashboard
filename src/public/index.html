@@ -231,6 +231,81 @@
   footer b { color: var(--text); font-weight: 600; }
 
   a:focus-visible, .more:focus-visible { outline: 1px solid var(--ink); outline-offset: 2px; }
+
+  /* ---- mobile ----
+     Trois colonnes côte à côte n'ont pas de sens sur 390 px, et un tableau qu'on
+     fait défiler latéralement au doigt n'est pas une réponse. Chaque classe
+     devient une carte : son nom en en-tête, puis l'inkée, puis la dormante,
+     empilées. L'en-tête du tableau disparaît, donc chaque moitié annonce
+     elle-même de quel côté elle parle. */
+  @media (max-width: 760px) {
+    body { padding: 14px 12px 48px; font-size: 13px; }
+
+    h1 { font-size: 17px; }
+    .stat { flex: 1 1 47%; }
+
+    .fl { width: 100%; }
+    .fl select { width: 100%; min-width: 0; max-width: none; }
+    #filters { gap: 10px; }
+
+    /* Plus rien à faire défiler : la table se déplie en blocs. */
+    .scroll { overflow-x: visible; margin-top: 14px; }
+    table { min-width: 0; }
+    thead { display: none; }
+    table, tbody, tr, td { display: block; width: auto; }
+    /* Le caption garde sinon son `display: table-caption` dans un conteneur
+       devenu bloc : il se retrouve dans une boîte de largeur minimale et son
+       texte descend en colonne, un mot par ligne. */
+    caption { display: block; padding-bottom: 10px; }
+
+    tbody tr {
+      border: 1px solid var(--rule-2);
+      margin-bottom: 16px;
+      background: transparent;
+    }
+    tbody tr:nth-child(even) { background: transparent; }
+
+    td, th { padding: 11px 12px; }
+    td:first-child { padding-left: 12px; }
+
+    .cls-cell {
+      width: auto;
+      background: var(--paper-2);
+      border-bottom: 1px solid var(--rule-2);
+      padding: 8px 12px;
+    }
+    .cls { display: inline; font-size: 19px; margin-right: 9px; }
+
+    /* Le filet vertical séparait des colonnes qui n'existent plus. */
+    .edge { border-left: 0; }
+    /* `td.half { width: 46% }` du desktop est plus spécifique que la règle
+       groupée ci-dessus : sans ce rappel, chaque moitié garde 46% de la carte
+       et la bande de vignettes tombe à deux par rangée. */
+    td.half { width: auto; border-top: 1px solid var(--rule); }
+    /* La moitié qui suit directement l'en-tête de carte : son filet ferait
+       doublon avec celui de l'en-tête. */
+    .cls-cell + td.half { border-top: 0; }
+
+    td.half::before {
+      content: attr(data-state);
+      display: block;
+      margin-bottom: 7px;
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+    td.g-ink::before     { color: var(--ink); }
+    td.g-dormant::before { color: var(--dormant); }
+
+    .lg-row { gap: 10px; }
+    .lg-class { width: 38px; }
+  }
+
+  @media (max-width: 420px) {
+    .stat { flex: 1 1 100%; }
+    .chip, .chip img, .chip .noimg { width: 48px; }
+    .chip img, .chip .noimg { height: 48px; }
+  }
 </style>
 
 <header>
