@@ -1,0 +1,205 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RH MACHINES — floors by class and ink</title>
+
+<style>
+  /* Palette. L'ambre est l'encre ; le bleu froid est le papier non imprimé.
+     Rien ici n'est décoratif : chaque couleur classe quelque chose. */
+  :root {
+    --paper:    #0a0a0b;
+    --paper-2:  #101013;
+    --rule:     #23232a;
+    --rule-2:   #33333d;
+    --text:     #e6e4e0;
+    --muted:    #75757f;
+    --dim:      #4d4d56;
+    --ink:      #f0a41c;
+    --dormant:  #6b8ba4;
+    --alarm:    #d9564b;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", "DejaVu Sans Mono", Menlo, Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { background: var(--paper); }
+
+  body {
+    margin: 0;
+    padding: 18px 20px 60px;
+    background: var(--paper);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.45;
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Une seule famille sur toute la page : la hiérarchie vient de la graisse,
+     du corps et de l'interlettrage, comme un bon de travail composé machine. */
+  .label {
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 400;
+  }
+
+  /* ---- bandeau-titre ---- */
+
+  header { border-bottom: 1px solid var(--rule-2); padding-bottom: 14px; }
+
+  h1 { margin: 0; font-size: 19px; font-weight: 700; letter-spacing: -0.01em; }
+  h1 .sep { color: var(--dim); font-weight: 400; }
+  h1 .sub { color: var(--muted); font-weight: 400; }
+
+  .context {
+    display: flex;
+    flex-wrap: wrap;
+    margin-top: 14px;
+    border: 1px solid var(--rule);
+    border-right: 0;
+  }
+
+  .stat { flex: 1 1 170px; padding: 8px 12px; border-right: 1px solid var(--rule); }
+  .stat .v { font-size: 15px; font-weight: 600; display: block; margin-top: 2px; }
+  .stat .x { color: var(--muted); font-size: 11px; }
+  .stat.is-ink .v { color: var(--ink); }
+  .up   { color: var(--ink); }
+  .down { color: var(--dormant); }
+
+  /* ---- bandeau d'alerte ---- */
+
+  .banner {
+    display: none;
+    margin-top: 14px;
+    padding: 7px 12px;
+    border-top: 1px solid var(--alarm);
+    border-bottom: 1px solid var(--alarm);
+    color: var(--alarm);
+    font-size: 12px;
+  }
+  .banner.on { display: block; }
+
+  /* ---- la grille ---- */
+
+  .scroll { overflow-x: auto; margin-top: 22px; }
+
+  table { border-collapse: collapse; width: 100%; min-width: 1060px; }
+
+  caption { caption-side: top; text-align: left; padding-bottom: 8px; }
+
+  th, td { padding: 6px 10px; text-align: right; white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; padding-left: 0; }
+
+  thead th { font-weight: 400; border-bottom: 1px solid var(--rule-2); }
+
+  thead tr.groups th { padding-bottom: 3px; }
+  thead tr.groups th.g-ink     { color: var(--ink);     border-bottom: 1px solid var(--ink); }
+  thead tr.groups th.g-dormant { color: var(--dormant); border-bottom: 1px solid var(--dormant); }
+
+  tbody tr { border-bottom: 1px solid var(--rule); }
+  tbody tr:nth-child(even) { background: var(--paper-2); }
+
+  /* La frontière entre groupes est un filet, pas un aplat : elle sépare sans crier. */
+  .edge { border-left: 1px solid var(--rule-2); }
+
+  .cls { font-weight: 700; font-size: 14px; }
+  .census { color: var(--dim); font-weight: 400; font-size: 11px; }
+  .census.mismatch { color: var(--alarm); }
+
+  .price { font-weight: 600; }
+  .tok { display: block; font-size: 10px; color: var(--dim); }
+  .tok a { color: var(--dim); text-decoration: none; border-bottom: 1px solid transparent; }
+  .tok a:hover, .tok a:focus-visible { color: var(--text); border-bottom-color: var(--rule-2); }
+
+  .absent { color: var(--dim); font-weight: 400; }
+
+  td.g-ink .price     { color: var(--ink); }
+  td.g-dormant .price { color: var(--dormant); }
+
+  /* ---- signature : la jauge d'écart ----
+     Zéro au centre, une barre jusqu'à l'écart mesuré, et un repère là où l'encre
+     coûte. Une barre qui n'atteint pas le repère, c'est un marché qui vend
+     l'activation moins cher qu'elle ne coûte. */
+
+  td.gauge-cell { width: 200px; padding-right: 0; }
+
+  .gauge { position: relative; display: inline-block; height: 18px; width: 150px; vertical-align: middle; }
+  .gauge .axis { position: absolute; top: 8px; left: 0; right: 0; height: 1px; background: var(--rule-2); }
+  .gauge .zero { position: absolute; top: 2px; bottom: 2px; width: 1px; background: var(--rule-2); }
+  .gauge .bar  { position: absolute; top: 5px; height: 7px; min-width: 1px; }
+  .gauge .bar.pos   { background: var(--ink); }
+  .gauge .bar.neg   { background: var(--dormant); }
+  .gauge .bar.short { background: repeating-linear-gradient(90deg, var(--ink) 0 2px, transparent 2px 4px); }
+  .gauge .tick { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--ink); opacity: 0.85; }
+  .gauge .tick::after {
+    content: ""; position: absolute; top: -1px; left: -2px;
+    border-left: 2px solid transparent; border-right: 2px solid transparent;
+    border-top: 3px solid var(--ink);
+  }
+
+  .spread-v { font-size: 12px; margin-right: 10px; }
+  .spread-v.pos { color: var(--ink); }
+  .spread-v.neg { color: var(--dormant); }
+
+  /* ---- pied ---- */
+
+  footer { margin-top: 26px; border-top: 1px solid var(--rule); padding-top: 12px; }
+  footer p { margin: 0 0 6px; color: var(--muted); font-size: 11.5px; max-width: 82ch; }
+  footer b { color: var(--text); font-weight: 600; }
+  .legend { display: flex; flex-wrap: wrap; gap: 18px; margin-bottom: 10px; }
+  .swatch { width: 9px; height: 9px; display: inline-block; margin-right: 6px; }
+  .sw-ink { background: var(--ink); }
+  .sw-dormant { background: var(--dormant); }
+
+  /* L'encre qui frappe le papier : un chiffre qui change clignote une fois.
+     C'est fonctionnel sur un instrument en direct — ça dit ce qui a bougé. */
+  @keyframes strike { from { background: rgba(240, 164, 28, 0.28); } to { background: transparent; } }
+  .struck { animation: strike 700ms ease-out; }
+
+  @media (prefers-reduced-motion: reduce) { .struck { animation: none; } }
+
+  a:focus-visible { outline: 1px solid var(--ink); outline-offset: 2px; }
+</style>
+
+<header>
+  <h1>RH MACHINES <span class="sep">/</span> <span class="sub">floors by class and ink state</span></h1>
+  <div class="context" id="context"></div>
+  <div class="banner" id="banner" role="status"></div>
+</header>
+
+<div class="scroll">
+  <table>
+    <caption class="label">Every floor is one class in one ink state. A dormant Machine and an inked one are different assets.</caption>
+    <thead>
+      <tr class="groups">
+        <th></th>
+        <th class="g-ink edge" colspan="5">Inked</th>
+        <th class="g-dormant edge" colspan="5">Dormant</th>
+        <th class="edge"></th>
+      </tr>
+      <tr class="label">
+        <th>Class</th>
+        <th class="edge">Floor</th><th>Peloton</th><th>Listed</th><th>Supply</th><th>Listed&nbsp;%</th>
+        <th class="edge">Floor</th><th>Peloton</th><th>Listed</th><th>Supply</th><th>Listed&nbsp;%</th>
+        <th class="edge">Spread vs cost of ink</th>
+      </tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+</div>
+
+<footer>
+  <div class="legend label">
+    <span><i class="swatch sw-ink"></i>Inked — carries burned $PRINTER</span>
+    <span><i class="swatch sw-dormant"></i>Dormant — never activated</span>
+    <span>▲ marks what ink costs right now</span>
+  </div>
+  <p id="book-line"></p>
+  <p id="excluded-line"></p>
+  <p id="published-line"></p>
+  <p>A cell reading <b>no listing</b> has none — it is not a floor of zero. A cell reading <b>no peloton</b> has too few listings for a median to mean anything, and shows how many it has instead.</p>
+</footer>
+
+<script type="module" src="/app.js"></script>

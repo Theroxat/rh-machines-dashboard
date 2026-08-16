@@ -1,0 +1,8 @@
+{
+  "port": 3050,
+  "bookPollIntervalMs": 60000,
+  "inkPollIntervalMs": 600000,
+  "pelotonSize": 5,
+  "multicallBatchSize": 500,
+  "maxBookPages": 200
+}

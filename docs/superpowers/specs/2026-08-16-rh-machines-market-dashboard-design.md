@@ -62,7 +62,21 @@ Explicitly out of scope, and why:
 | Ink | `MINE.inkBurned(id)` via Multicall3 | 10,000 reads, refreshed on its own slow loop. |
 | Protocol state | `MINE` — `currentEpoch`, `multiplierCeiling`, `totalInkBurned`, `activeMachines`, `totalWeight`, `nextGate`, `ACTIVATION_INK` | |
 | $PRINTER price | DexScreener API, pair `robinhood/0xf6c9…f47b` | PRINTER/USDG, Uniswap v4. |
-| ETH/USD | DexScreener pair `0x2FeB1D4b3ef4d52d6ab60E96c159681c9cA1aADE` (USDG/WETH, Robinhood Chain, ~$110M liquidity) | Cross-checked against CoinGecko; both values and their spread are displayed. |
+| ETH/USD | DexScreener pair `0x52e65B17fB6E5BA00Ed806f37Afcd2DaA50271Ca` (USDG/WETH, Uniswap v3, ~$8.7M liquidity) | Cross-checked against CoinGecko; both values and their spread are displayed. |
+
+**Two different tokens on this chain both call themselves USDG.** The canonical
+one, quoted against $PRINTER and used by the protocol, is
+`0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168`. A second,
+`0x63575aA902DE35ef2dc3a3D32355233bbb44CDa7`, sits in the deepest USDG/WETH pool
+on the chain (~$110M) and prices ETH at **$1786** against the canonical pool's
+**$1883** and CoinGecko's **$1884** — 5% wrong, with no error anywhere. Picking a
+pool by liquidity alone lands on the impostor.
+
+Two guards, because this number scales the entire ink axis:
+
+- The pair's `baseToken.address` and `quoteToken.address` are checked against the
+  expected addresses on every read. A mismatch is a failure, not a fallback.
+- USDG's own `priceUsd` must stay within 3% of $1. The impostor sat at $1.053.
 
 Chain: Robinhood Chain, id **4663**, RPC `https://rpc.mainnet.chain.robinhood.com`.
 
