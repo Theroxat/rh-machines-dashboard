@@ -14,7 +14,6 @@
     --muted:    #75757f;
     --dim:      #4d4d56;
     --ink:      #f0a41c;
-    --ink-dim:  #8a6220;
     --dormant:  #6b8ba4;
     --alarm:    #d9564b;
     --mono: ui-monospace, "SF Mono", "JetBrains Mono", "DejaVu Sans Mono", Menlo, Consolas, monospace;
@@ -75,15 +74,15 @@
   }
   .banner.on { display: block; }
 
-  /* ---- la grille : quatre colonnes ---- */
+  /* ---- la grille : classe, inkées, dormantes ---- */
 
   .scroll { overflow-x: auto; margin-top: 22px; }
 
-  table { border-collapse: collapse; width: 100%; min-width: 860px; }
+  table { border-collapse: collapse; width: 100%; min-width: 820px; }
 
   caption { caption-side: top; text-align: left; padding-bottom: 8px; }
 
-  th, td { padding: 10px 14px; text-align: left; vertical-align: top; }
+  th, td { padding: 12px 14px; text-align: left; vertical-align: top; }
   th:first-child, td:first-child { padding-left: 0; }
 
   thead th { font-weight: 400; border-bottom: 1px solid var(--rule-2); padding-bottom: 5px; }
@@ -96,68 +95,51 @@
   /* La frontière entre colonnes est un filet, pas un aplat : elle sépare sans crier. */
   .edge { border-left: 1px solid var(--rule-2); }
 
-  .cls-cell { width: 110px; white-space: nowrap; }
-  .cls { font-size: 20px; font-weight: 700; display: block; letter-spacing: -0.02em; }
+  .cls-cell { width: 108px; white-space: nowrap; }
+  .cls { font-size: 22px; font-weight: 700; display: block; letter-spacing: -0.02em; line-height: 1.1; }
   .census { color: var(--dim); font-size: 10.5px; }
   .census.mismatch { color: var(--alarm); }
 
-  /* ---- une moitié : vignette + prix + profondeur ---- */
+  td.half { width: 46%; }
 
-  td.half { white-space: nowrap; }
+  .depth { display: block; font-size: 11px; color: var(--muted); }
+  .absent { color: var(--dim); }
 
-  .thumb {
-    float: left;
-    margin-right: 11px;
+  /* ---- la bande de machines en vente, la moins chère d'abord ---- */
+
+  .strip { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 8px; }
+
+  .chip { display: block; width: 54px; text-decoration: none; color: inherit; }
+  .chip img, .chip .noimg {
     display: block;
-    width: 46px; height: 46px;
+    width: 54px; height: 54px;
     border: 1px solid var(--rule-2);
     background: var(--paper-2);
+    object-fit: cover;
   }
-  .thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
-  .thumb:hover, .thumb:focus-visible { border-color: var(--text); }
+  .chip .noimg { background: repeating-linear-gradient(45deg, var(--paper-2) 0 4px, var(--paper) 4px 8px); }
+  .chip .price { display: block; font-size: 11px; font-weight: 600; margin-top: 3px; }
+  .chip .tok   { display: block; font-size: 9.5px; color: var(--dim); }
+  .chip:hover img, .chip:focus-visible img, .chip:hover .noimg { border-color: var(--text); }
 
-  .half-body { display: block; overflow: hidden; }
-  .price { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
-  .unit { font-size: 10px; color: var(--muted); }
-  .meta  { display: block; font-size: 11px; color: var(--muted); margin-top: 1px; }
-  .depth { display: block; font-size: 11px; color: var(--dim); }
-  .meta a { color: var(--muted); text-decoration: none; border-bottom: 1px solid transparent; }
-  .meta a:hover, .meta a:focus-visible { color: var(--text); border-bottom-color: var(--rule-2); }
+  /* La moins chère est la seule que le tableau désignait avant : elle garde un
+     repère, pour qu'on la retrouve dans la bande. */
+  .chip.floor img, .chip.floor .noimg { border-color: currentColor; }
+  td.g-ink     .chip .price, td.g-ink     .chip.floor { color: var(--ink); }
+  td.g-dormant .chip .price, td.g-dormant .chip.floor { color: var(--dormant); }
 
-  td.g-ink .price     { color: var(--ink); }
-  td.g-dormant .price { color: var(--dormant); }
-
-  .absent { color: var(--dim); font-weight: 400; }
-  td.half .absent { font-size: 14px; }
-  .depth .absent { font-size: 11px; }
-
-  /* ---- la colonne du verdict ---- */
-
-  td.act { width: 34%; min-width: 260px; }
-
-  .verdict { display: block; font-size: 13px; font-weight: 600; line-height: 1.35; }
-  .verdict.v-loss    { color: var(--dormant); }
-  .verdict.v-short   { color: var(--ink-dim); }
-  .verdict.v-paid    { color: var(--ink); }
-  .verdict.v-none, .verdict.v-unknown { color: var(--dim); font-weight: 400; }
-  .verdict-detail { display: block; font-size: 11px; color: var(--muted); margin-top: 2px; }
-
-  /* La jauge : zéro au centre, une barre jusqu'à l'écart mesuré, un repère là
-     où l'encre coûte. Une barre qui n'atteint pas le repère, c'est un marché
-     qui vend l'activation moins cher qu'elle ne coûte. */
-  .gauge { position: relative; display: block; height: 14px; width: 100%; max-width: 230px; margin-top: 7px; }
-  .gauge .axis { position: absolute; top: 6px; left: 0; right: 0; height: 1px; background: var(--rule-2); }
-  .gauge .zero { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--rule-2); }
-  .gauge .bar  { position: absolute; top: 4px; height: 6px; min-width: 1px; }
-  .gauge .bar.pos   { background: var(--ink); }
-  .gauge .bar.neg   { background: var(--dormant); }
-  .gauge .bar.short { background: repeating-linear-gradient(90deg, var(--ink) 0 2px, transparent 2px 4px); }
-  .gauge .tick { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--ink); }
-  .gauge .tick::after {
-    content: ""; position: absolute; top: -1px; left: -2px;
-    border-left: 2px solid transparent; border-right: 2px solid transparent;
-    border-top: 3px solid var(--ink);
+  .more {
+    display: inline-block;
+    margin-top: 9px;
+    padding: 3px 9px;
+    font-family: inherit;
+    font-size: 11px;
+    color: var(--muted);
+    background: transparent;
+    border: 1px solid var(--rule-2);
+    cursor: pointer;
   }
+  .more:hover, .more:focus-visible { color: var(--text); border-color: var(--muted); }
 
   /* ---- la légende des raretés ---- */
 
@@ -180,13 +162,7 @@
   footer p { margin: 0 0 6px; color: var(--muted); font-size: 11.5px; max-width: 82ch; }
   footer b { color: var(--text); font-weight: 600; }
 
-  /* L'encre qui frappe le papier : un chiffre qui change clignote une fois. */
-  @keyframes strike { from { background: rgba(240, 164, 28, 0.28); } to { background: transparent; } }
-  .struck { animation: strike 700ms ease-out; }
-
-  @media (prefers-reduced-motion: reduce) { .struck { animation: none; } }
-
-  a:focus-visible { outline: 1px solid var(--ink); outline-offset: 2px; }
+  a:focus-visible, .more:focus-visible { outline: 1px solid var(--ink); outline-offset: 2px; }
 </style>
 
 <header>
@@ -197,13 +173,12 @@
 
 <div class="scroll">
   <table>
-    <caption class="label">Each row is one rarity class. A dormant Machine and an inked one are different assets, so each has its own floor.</caption>
+    <caption class="label">Each row is one rarity class, cheapest machine first. A dormant Machine and an inked one are different assets, so each has its own book.</caption>
     <thead>
       <tr class="label">
         <th>Class</th>
         <th class="g-ink edge">Inked — carries burned $PRINTER</th>
         <th class="g-dormant edge">Dormant — never activated</th>
-        <th class="edge">What the market pays for activation</th>
       </tr>
     </thead>
     <tbody id="rows"></tbody>
@@ -222,8 +197,9 @@
   <p id="book-line"></p>
   <p id="excluded-line"></p>
   <p id="published-line"></p>
-  <p>A cell reading <b>no listing</b> has none — it is not a floor of zero. A cell reading <b>no peloton</b> has too
-    few listings for a median to mean anything. Hover any cell for its peloton and exact listed share.</p>
+  <p>Each cell shows the eight cheapest Machines on sale and says how many more it is holding back. A cell
+    reading <b>no listing</b> has none — it is not a floor of zero. Hover a cell for its peloton and its exact
+    listed share; hover a Machine for its headwear.</p>
 </footer>
 
 <script type="module" src="/app.js"></script>

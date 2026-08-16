@@ -9,7 +9,7 @@ export function median(values) {
 
 const EMPTY = () => ({
   floorEth: null, floorTokenId: null, pelotonEth: null,
-  listed: 0, supply: 0, listedRatio: null,
+  listed: 0, supply: 0, listedRatio: null, entries: [],
 });
 
 function buildCell(entries, supply, pelotonSize) {
@@ -22,6 +22,9 @@ function buildCell(entries, supply, pelotonSize) {
   // Le prix d'abord, puis l'identifiant : deux listings au même prix doivent
   // toujours produire le même floor, d'une exécution à l'autre.
   const sorted = [...entries].sort((a, b) => a.priceEth - b.priceEth || a.tokenId - b.tokenId);
+  // Le carnet entier de cette case, du moins cher au plus cher. La page en
+  // montre huit et déplie le reste ; le floor est simplement le premier.
+  cell.entries = sorted.map((e) => ({ tokenId: e.tokenId, priceEth: e.priceEth }));
   cell.floorEth = sorted[0].priceEth;
   cell.floorTokenId = sorted[0].tokenId;
   cell.pelotonEth = sorted.length >= pelotonSize

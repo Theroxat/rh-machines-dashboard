@@ -43,28 +43,37 @@ const withGrid = {
     ...base.grid,
     rows: [{
       classLabel: "x10", classValue: 1000, docCount: 37, chainCount: 37, spreadEth: -0.5,
-      inked:   { floorEth: 2.0, floorTokenId: 1253, pelotonEth: 2.25, listed: 9, supply: 33, listedRatio: 0.27 },
-      dormant: { floorEth: 2.5, floorTokenId: null, pelotonEth: null, listed: 0, supply: 4, listedRatio: 0 },
+      inked: {
+        floorEth: 2.0, floorTokenId: 1253, pelotonEth: 2.25, listed: 2, supply: 33, listedRatio: 0.06,
+        entries: [{ tokenId: 1253, priceEth: 2.0 }, { tokenId: 999, priceEth: 2.4 }],
+      },
+      dormant: { floorEth: null, floorTokenId: null, pelotonEth: null, listed: 0, supply: 4, listedRatio: 0, entries: [] },
     }],
   },
   meta: new Map([[1253, { image: "https://img/1253.webp", headwear: "Blueberries", body: "Cobalt Stripe" }]]),
   legend: { byClass: [], headwearClass: new Map(), ambiguous: [], unpaired: 0 },
 };
 
-test("the machine that sets a floor carries its picture and its headwear", () => {
+test("every machine on sale carries its picture and its headwear", () => {
   const s = composeSnapshot(withGrid);
-  assert.deepEqual(s.rows[0].inked.machine, {
+  assert.deepEqual(s.rows[0].inked.entries[0].machine, {
     image: "https://img/1253.webp", headwear: "Blueberries", body: "Cobalt Stripe",
   });
 });
 
-test("a cell with no floor gets no machine, and one with no metadata gets null", () => {
+test("a machine with no metadata keeps its price and loses only its picture", () => {
   const s = composeSnapshot(withGrid);
-  assert.equal(s.rows[0].dormant.machine, null);
+  assert.equal(s.rows[0].inked.entries[1].machine, null);   // #999 is not in the meta map
+  assert.equal(s.rows[0].inked.entries[1].priceEth, 2.4);
 
   const missing = composeSnapshot({ ...withGrid, meta: new Map() });
-  assert.equal(missing.rows[0].inked.machine, null);
-  assert.equal(missing.rows[0].inked.floorEth, 2.0);   // a missing picture costs no price
+  assert.equal(missing.rows[0].inked.entries[0].machine, null);
+  assert.equal(missing.rows[0].inked.floorEth, 2.0);
+});
+
+test("an empty cell composes to an empty book, never to a missing one", () => {
+  const s = composeSnapshot(withGrid);
+  assert.deepEqual(s.rows[0].dormant.entries, []);
 });
 
 test("the rarity legend travels with the snapshot", () => {
