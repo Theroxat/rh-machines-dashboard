@@ -1,9 +1,10 @@
 import { buildTraitIndex } from "./traitindex.js";
+import { TOTAL_MACHINES } from "./config.js";
 
 /** Assemblage pur de tout ce dont la page a besoin. Une dérivation qui
  *  diviserait par une valeur non lue produit null plutôt qu'un zéro confiant. */
 export function composeSnapshot({
-  grid, printer, eth, protocol, publishedFloor, book, inkMeta, meta, legend, bodyTickers, now,
+  grid, printer, eth, protocol, stats, book, inkMeta, meta, legend, bodyTickers, now,
 }) {
   const activationPrinter = protocol?.activationInk
     ? Number(BigInt(protocol.activationInk) / 10n ** 15n) / 1000
@@ -40,6 +41,33 @@ export function composeSnapshot({
     for (const e of r.dormant.entries) listed.add(e.tokenId);
   }
 
+  // Le floor de la collection est le moins cher de nos quatorze cases, pas le
+  // chiffre publié par OpenSea : il vient du même carnet que tout le reste de
+  // la page, donc il ne peut pas la contredire.
+  const floors = rows.flatMap((r) => [r.inked.floorEth, r.dormant.floorEth]).filter((v) => v !== null && v !== undefined);
+  const floorEth = floors.length ? Math.min(...floors) : null;
+  const inEth = (v) => (v !== null && v !== undefined && eth?.usd ? v * eth.usd : null);
+
+  const collection = {
+    floorEth,
+    floorUsd: inEth(floorEth),
+    // Convention du marché NFT : floor x supply. C'est une valorisation
+    // théorique, pas une somme observée — l'étiquette le dit sur la page.
+    machines: TOTAL_MACHINES,
+    marketCapEth: floorEth === null ? null : floorEth * TOTAL_MACHINES,
+    marketCapUsd: inEth(floorEth === null ? null : floorEth * TOTAL_MACHINES),
+    volumeEth: stats?.volume ?? null,
+    volumeUsd: inEth(stats?.volume),
+    sales: stats?.sales ?? null,
+    volume24hEth: stats?.volume24h ?? null,
+    volume24hUsd: inEth(stats?.volume24h),
+    sales24h: stats?.sales24h ?? null,
+    owners: stats?.owners ?? null,
+    publishedFloor: stats?.floor ?? null,
+    publishedFloorSymbol: stats?.symbol ?? null,
+    publishedFloorUsedInComputation: false,
+  };
+
   return {
     at: now,
     rows,
@@ -58,6 +86,6 @@ export function composeSnapshot({
     },
     protocol,
     book,
-    publishedFloor: { ...publishedFloor, usedInComputation: false },
+    collection,
   };
 }

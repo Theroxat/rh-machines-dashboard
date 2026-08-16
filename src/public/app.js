@@ -29,11 +29,22 @@ function statBlock(label, value, extra, isInk) {
   `</div>`;
 }
 
+/** Les grands nombres se lisent mieux abrégés : $1,772,000 demande un effort
+ *  que $1.8M ne demande pas, et la précision au dollar près n'apporte rien. */
+export function fmtBig(v) {
+  if (v === null || v === undefined) return "—";
+  if (Math.abs(v) >= 1e9) return `$${(v / 1e9).toFixed(2)}B`;
+  if (Math.abs(v) >= 1e6) return `$${(v / 1e6).toFixed(1)}M`;
+  if (Math.abs(v) >= 1e3) return `$${Math.round(v / 1e3)}k`;
+  return fmtUsd(v);
+}
+
 export function contextHtml(d) {
   const p = d.printer ?? {};
   const e = d.eth ?? {};
   const ink = d.ink ?? {};
   const pr = d.protocol ?? {};
+  const c = d.collection ?? {};
 
   const chg = p.change24h === null || p.change24h === undefined
     ? ""
@@ -44,9 +55,19 @@ export function contextHtml(d) {
     : "pool · no second opinion";
 
   return [
-    statBlock("$PRINTER", fmtUsd(p.usd, 5), chg + (p.liquidityUsd ? ` · ${fmtUsd(p.liquidityUsd, 0)} liquidity` : "")),
+    statBlock("$PRINTER", fmtUsd(p.usd, 5),
+      [chg, `${fmtBig(p.marketCap)} mkt cap`, p.liquidityUsd ? `${fmtBig(p.liquidityUsd)} liquidity` : null]
+        .filter(Boolean).join(" · ")),
     statBlock("ETH", fmtUsd(e.local, 2), ethExtra),
     statBlock("Cost of ink", fmtUsd(ink.activationUsd), `${fmtInt(ink.activationPrinter)} $PRINTER · ${fmtEth(ink.activationEth)} ETH`, true),
+    // Le floor vient de notre carnet, pas du chiffre publié : c'est le même
+    // nombre que la case la moins chère du tableau, il ne peut pas la contredire.
+    statBlock("Collection floor", `${fmtEth(c.floorEth)} ETH`,
+      `${c.floorUsd === null || c.floorUsd === undefined ? "—" : fmtUsd(c.floorUsd, 0)} · ` +
+      `${fmtBig(c.marketCapUsd)} at floor × ${fmtInt(c.machines)}`),
+    statBlock("Volume traded", `${c.volumeEth === null || c.volumeEth === undefined ? "—" : c.volumeEth.toFixed(1)} ETH`,
+      `${fmtBig(c.volumeUsd)} · ${fmtInt(c.sales)} sales · ` +
+      `${c.volume24hEth === null || c.volume24hEth === undefined ? "—" : c.volume24hEth.toFixed(1)} ETH 24h`),
     statBlock("Machines", `${fmtInt(d.totals?.inked)} inked`, `${fmtInt(d.totals?.dormant)} dormant · ${fmtInt(d.totals?.listed)} listed`),
     statBlock("Epoch", pr.epoch ?? "—", pr.ceiling ? `ceiling ${Number(pr.ceiling) / 100}x` : "ceiling unreadable"),
   ].join("");
@@ -137,7 +158,14 @@ function renderHalf(half, g, { expanded, limit, key, depth }) {
         ? `<button class="more" type="button" data-key="${esc(key)}">+ ${fmtInt(hidden)} more ▾</button>`
         : "");
 
+  // Le floor en tête, en grand : c'est le chiffre qu'on vient chercher, et il se
+  // perdait parmi huit vignettes de même taille.
+  const floor = half.entries[0];
+  const head = `<span class="cell-floor"><span class="price">${fmtEth(floor.priceEth)}</span>` +
+    ` <span class="unit">ETH</span></span>`;
+
   return `<td class="${g} edge half" title="${esc(tip)}">` +
+    head +
     `<span class="depth">${depth}</span>` +
     `<span class="strip">${shown.map((e, i) => chip(e, i === 0)).join("")}</span>` +
     more +
@@ -243,8 +271,8 @@ export function excludedLine(d) {
 }
 
 export function publishedLine(d) {
-  const pf = d.publishedFloor ?? {};
-  return `OpenSea publishes a collection floor of <b>${pf.floor === null || pf.floor === undefined ? "—" : pf.floor.toFixed(4)} ${pf.symbol ?? ""}</b>. ` +
+  const c = d.collection ?? {};
+  return `OpenSea publishes a collection floor of <b>${c.publishedFloor === null || c.publishedFloor === undefined ? "—" : c.publishedFloor.toFixed(4)} ${c.publishedFloorSymbol ?? ""}</b>. ` +
     `It is shown for comparison and <b>enters no computation on this page</b> — on this chain it has been measured at ten times the real book.`;
 }
 

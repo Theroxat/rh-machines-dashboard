@@ -59,17 +59,30 @@ export async function fetchListings({ apiKey, slug = OPENSEA.slug, fetchImpl = f
   return { listings: cheapest, pages, skipped };
 }
 
-/** Affiché à titre de comparaison seulement. Mesuré sur cette chaîne à ~10x le
- *  carnet réel, donc il ne doit alimenter aucun calcul. */
-export async function fetchPublishedFloor({ apiKey, slug = OPENSEA.slug, fetchImpl = fetch }) {
+const numOrNull = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+
+/**
+ * Les statistiques publiées de la collection. Le `floor_price` d'OpenSea est
+ * affiché à titre de comparaison seulement — mesuré sur cette chaîne à ~10x le
+ * carnet réel — mais le volume et le nombre de ventes n'ont pas d'équivalent
+ * calculable depuis le carnet : ils ne décrivent pas ce qui est en vente, mais
+ * ce qui s'est échangé, et rien d'autre ne le sait.
+ */
+export async function fetchCollectionStats({ apiKey, slug = OPENSEA.slug, fetchImpl = fetch }) {
   const res = await fetchImpl(`${OPENSEA.base}/collections/${slug}/stats`, {
     headers: { "x-api-key": apiKey, accept: "application/json" },
   });
   if (!res.ok) throw new Error(`OpenSea stats returned ${res.status}`);
   const body = await res.json();
-  const floor = body?.total?.floor_price;
+  const day = (body?.intervals ?? []).find((i) => i?.interval === "one_day");
+
   return {
-    floor: typeof floor === "number" ? floor : null,
+    floor: numOrNull(body?.total?.floor_price),
     symbol: body?.total?.floor_price_symbol ?? null,
+    volume: numOrNull(body?.total?.volume),
+    sales: numOrNull(body?.total?.sales),
+    owners: numOrNull(body?.total?.num_owners),
+    volume24h: numOrNull(day?.volume),
+    sales24h: numOrNull(day?.sales),
   };
 }

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { weiToEth, priceEthOf, fetchListings } from "../src/opensea.js";
+import { weiToEth, priceEthOf, fetchListings, fetchCollectionStats } from "../src/opensea.js";
 
 const listing = (id, wei, currency = "ETH") => ({
   order_hash: `0x${id}`,
@@ -97,4 +97,33 @@ test("unreadable and foreign-currency listings are skipped and counted", async (
   assert.equal(res.listings.size, 1);
   assert.equal(res.skipped.foreignCurrency, 1);
   assert.equal(res.skipped.unreadable, 1);
+});
+
+test("collection stats carry volume and sales, not only the published floor", async () => {
+  const stats = await fetchCollectionStats({
+    apiKey: "k",
+    fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({
+      total: { volume: 425.576, sales: 18124, num_owners: 2624, floor_price: 0.0889891, floor_price_symbol: "ETH" },
+      intervals: [
+        { interval: "one_day", volume: 136.67, sales: 1896 },
+        { interval: "seven_day", volume: 425.576, sales: 18124 },
+      ],
+    }) }),
+  });
+  assert.equal(stats.volume, 425.576);
+  assert.equal(stats.sales, 18124);
+  assert.equal(stats.volume24h, 136.67);
+  assert.equal(stats.sales24h, 1896);
+  assert.equal(stats.floor, 0.0889891);
+});
+
+test("a stat that is absent or unreadable is null, never zero", async () => {
+  const stats = await fetchCollectionStats({
+    apiKey: "k",
+    fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({ total: { volume: "425.576" } }) }),
+  });
+  assert.equal(stats.volume, null);      // une chaîne n'est pas un nombre lu
+  assert.equal(stats.sales, null);
+  assert.equal(stats.volume24h, null);   // pas d'intervalle d'un jour dans la réponse
+  assert.equal(stats.floor, null);
 });

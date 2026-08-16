@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 import { ethers } from "ethers";
 
 import { loadConfig, RPC_URL, CHAIN_ID } from "./config.js";
-import { fetchListings, fetchPublishedFloor } from "./opensea.js";
+import { fetchListings, fetchCollectionStats } from "./opensea.js";
 import { loadTraits } from "./traits.js";
 import { loadMetadata } from "./metadata.js";
 import { deriveHeadwearLegend } from "./rarity.js";
@@ -44,18 +44,18 @@ async function sweepInk() {
 }
 
 async function sweepBook() {
-  const [book, printer, eth, protocol, publishedFloor] = await Promise.all([
+  const [book, printer, eth, protocol, stats] = await Promise.all([
     fetchListings({ apiKey: cfg.openseaApiKey, maxPages: cfg.maxBookPages }),
     fetchPrinter(),
     fetchEthUsd(),
     readProtocol({ provider }),
-    fetchPublishedFloor({ apiKey: cfg.openseaApiKey }),
+    fetchCollectionStats({ apiKey: cfg.openseaApiKey }),
   ]);
 
   const grid = buildGrid({ listings: book.listings, traits, ink, pelotonSize: cfg.pelotonSize });
 
   store.succeed(composeSnapshot({
-    grid, printer, eth, protocol, publishedFloor,
+    grid, printer, eth, protocol, stats,
     book: { listed: book.listings.size, pages: book.pages, skipped: book.skipped },
     inkMeta, meta, legend, bodyTickers, now: Date.now(),
   }));

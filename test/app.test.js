@@ -128,8 +128,8 @@ test("a clean read is reported as a clean read, and exclusions are itemised", ()
 });
 
 test("the published floor is always labelled as uncomputed-with", () => {
-  assert.match(publishedLine({ publishedFloor: { floor: 0.0869, symbol: "ETH" } }), /enters no computation/);
-  assert.match(publishedLine({ publishedFloor: { floor: null, symbol: null } }), /—/);
+  assert.match(publishedLine({ collection: { publishedFloor: 0.0869, publishedFloorSymbol: "ETH" } }), /enters no computation/);
+  assert.match(publishedLine({ collection: { publishedFloor: null, publishedFloorSymbol: null } }), /—/);
 });
 
 test("each half of each row gets its own expansion key", () => {
@@ -270,4 +270,80 @@ test("depth states two separate facts, and cannot be read as a truncation", () =
   assert.match(html, /249 in this class/);
   assert.doesNotMatch(html, /5 of 249/);
   assert.doesNotMatch(html, /more/);        // rien n'est caché, donc rien à proposer
+});
+
+// ---- le floor mis en avant ----
+
+test("a cell leads with its floor price, not with a row of equal-sized chips", () => {
+  const html = halfCell(half({ entries: [entry(9, 0.0940), entry(8, 0.5)] }), "ink");
+  const floor = html.match(/class="cell-floor">(.*?)<\/span><\/span>/s);
+  assert.ok(floor, "the cell must state a floor of its own");
+  assert.match(html, /class="cell-floor"/);
+  assert.ok(html.indexOf("cell-floor") < html.indexOf("strip"), "the floor comes before the pictures");
+  assert.match(html.slice(html.indexOf("cell-floor"), html.indexOf("strip")), /0\.0940/);
+});
+
+test("under a filter the headline floor is the cheapest machine that matches", () => {
+  const entries = [
+    { tokenId: 1, priceEth: 0.10, machine: machineOf({ headwear: "Blade" }) },
+    { tokenId: 2, priceEth: 0.30, machine: machineOf({ headwear: "Halo" }) },
+  ];
+  const html = halfCell(half({ entries }), "ink", { filter: { ...NO_FILTER, Headwear: "Halo" } });
+  const head = html.slice(html.indexOf("cell-floor"), html.indexOf("strip"));
+  assert.match(head, /0\.3000/);
+  assert.doesNotMatch(head, /0\.1000/);
+});
+
+test("a cell with nothing to show states no floor rather than an empty one", () => {
+  const html = halfCell(half({ entries: [], listed: 0, supply: 4 }), "ink");
+  assert.doesNotMatch(html, /cell-floor/);
+});
+
+// ---- le bandeau de contexte ----
+
+const CTX = {
+  printer: { usd: 0.01771, change24h: 563, liquidityUsd: 470199, marketCap: 3043000 },
+  eth: { local: 1885.48, coingecko: 1883.79, spreadPct: 0.09 },
+  ink: { activationUsd: 75.27, activationPrinter: 4250, activationEth: 0.0399 },
+  totals: { inked: 6216, dormant: 3784, listed: 680 },
+  protocol: { epoch: "1", ceiling: "200" },
+  collection: {
+    floorEth: 0.094, floorUsd: 177.2, machines: 10000,
+    marketCapEth: 940, marketCapUsd: 1772000,
+    volumeEth: 425.576, volumeUsd: 802200, sales: 18124,
+    volume24hEth: 136.67, volume24hUsd: 257700, sales24h: 1896,
+    publishedFloor: 0.0869, publishedFloorSymbol: "ETH",
+  },
+};
+
+test("the bar states the collection floor from our own book", () => {
+  const html = contextHtml(CTX);
+  assert.match(html, /Floor/i);
+  assert.match(html, /0\.0940/);
+  assert.match(html, /\$177/);
+});
+
+test("the bar states traded volume and how many sales made it", () => {
+  const html = contextHtml(CTX);
+  assert.match(html, /Volume/i);
+  assert.match(html, /425/);
+  assert.match(html, /18,124/);
+});
+
+test("market cap appears for the token and for the collection, each labelled", () => {
+  const html = contextHtml(CTX);
+  assert.match(html, /\$3\.0M|3,043,000/);       // le token
+  assert.match(html, /940.*ETH|\$1\.8M|1,772,000/); // la collection, floor x 10,000
+  assert.match(html, /floor .{0,3} 10,000/i);     // et l'aveu que c'est une convention
+});
+
+test("missing collection numbers leave dashes, never zeroes", () => {
+  const html = contextHtml({
+    ...CTX,
+    collection: { floorEth: null, floorUsd: null, machines: 10000, marketCapEth: null,
+      marketCapUsd: null, volumeEth: null, volumeUsd: null, sales: null,
+      volume24hEth: null, volume24hUsd: null, sales24h: null, publishedFloor: null },
+  });
+  assert.doesNotMatch(html, /\$0\.00/);
+  assert.match(html, /—/);
 });
