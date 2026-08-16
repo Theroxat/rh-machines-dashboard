@@ -41,3 +41,12 @@ test("the full statement disclaims affiliation, endorsement, and advice", () => 
   assert.match(footer, /gives no advice/);
   assert.match(footer, /verify every price/i);
 });
+
+// Le tableau est déplié en blocs sous 760 px. Tout élément resté en display
+// table dans ce conteneur se retrouve dans une boîte de largeur minimale : le
+// caption y descendait en colonne, un mot par ligne. Rien d'autre ne l'attrape.
+test("nothing keeps a table display inside the blockified mobile table", () => {
+  const mobile = flat.slice(flat.indexOf("@media (max-width: 760px)"));
+  assert.match(mobile, /table, tbody, tr, td \{ display: block/);
+  assert.match(mobile, /caption \{ display: block/);
+});

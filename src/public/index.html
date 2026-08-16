@@ -253,6 +253,10 @@
     table { min-width: 0; }
     thead { display: none; }
     table, tbody, tr, td { display: block; width: auto; }
+    /* Le caption garde sinon son `display: table-caption` dans un conteneur
+       devenu bloc : il se retrouve dans une boîte de largeur minimale et son
+       texte descend en colonne, un mot par ligne. */
+    caption { display: block; padding-bottom: 10px; }
 
     tbody tr {
       border: 1px solid var(--rule-2);
