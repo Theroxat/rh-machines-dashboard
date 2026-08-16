@@ -278,7 +278,10 @@
 
     /* Le filet vertical séparait des colonnes qui n'existent plus. */
     .edge { border-left: 0; }
-    td.half { border-top: 1px solid var(--rule); }
+    /* `td.half { width: 46% }` du desktop est plus spécifique que la règle
+       groupée ci-dessus : sans ce rappel, chaque moitié garde 46% de la carte
+       et la bande de vignettes tombe à deux par rangée. */
+    td.half { width: auto; border-top: 1px solid var(--rule); }
     /* La moitié qui suit directement l'en-tête de carte : son filet ferait
        doublon avec celui de l'en-tête. */
     .cls-cell + td.half { border-top: 0; }
