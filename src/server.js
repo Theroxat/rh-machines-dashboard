@@ -16,7 +16,7 @@ import { readProtocol } from "./protocol.js";
 import { buildGrid } from "./floors.js";
 import { composeSnapshot } from "./snapshot.js";
 import { createStore } from "./store.js";
-import { assetHash, assetPath, stampPage, cacheHeaders } from "./http.js";
+import { assetHash, assetPath, stampPage, cacheHeaders, securityHeaders, etagOf } from "./http.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const cfg = loadConfig(process.env, JSON.parse(readFileSync(join(here, "..", "config.json"), "utf8")));
@@ -27,7 +27,33 @@ const appPath = assetPath(appHash);
 const page = stampPage(readFileSync(join(here, "public", "index.html"), "utf8"), appHash);
 
 const provider = new ethers.JsonRpcProvider(RPC_URL, CHAIN_ID, { staticNetwork: true });
-const store = createStore({ staleAfterMs: cfg.bookPollIntervalMs * 3 });
+const STALE_AFTER_MS = cfg.bookPollIntervalMs * 3;
+const store = createStore({ staleAfterMs: STALE_AFTER_MS });
+
+/**
+ * Le corps de l'API est sérialisé une fois par snapshot, pas une fois par
+ * requête : il pèse 174 Ko, le carnet ne bouge qu'une fois par minute, et deux
+ * cents visiteurs le redemandent huit cents fois dans le même temps.
+ *
+ * L'âge et la péremption ne sont volontairement plus dans le corps : ils
+ * changeaient à chaque requête, ce qui aurait donné un ETag différent à chaque
+ * fois et annulé tout l'intérêt. La page les recalcule depuis `at` et l'en-tête
+ * `Date` de la réponse — deux horloges du serveur, donc immunisé au décalage de
+ * celle du visiteur.
+ */
+let cachedPayload = { key: null, body: null, etag: null, has: false };
+
+function apiPayload() {
+  const v = store.get();
+  const key = `${v.at}|${v.lastError}`;
+  if (cachedPayload.key !== key) {
+    const body = JSON.stringify({
+      data: v.data, at: v.at, lastError: v.lastError, staleAfterMs: STALE_AFTER_MS,
+    });
+    cachedPayload = { key, body, etag: etagOf(body), has: v.data !== null };
+  }
+  return cachedPayload;
+}
 
 let traits = new Map();
 let ink = new Map();
@@ -79,23 +105,34 @@ function loop(name, fn, intervalMs, { runNow = true } = {}) {
 
 const server = createServer((req, res) => {
   if (req.url === "/api/snapshot") {
-    const v = store.get();
-    res.writeHead(v.data ? 200 : 503, { "content-type": "application/json", ...cacheHeaders("api") });
-    res.end(JSON.stringify(v));
+    const p = apiPayload();
+    const headers = {
+      "content-type": "application/json",
+      etag: p.etag,
+      ...cacheHeaders("api"),
+      ...securityHeaders(),
+    };
+    if (p.has && req.headers["if-none-match"] === p.etag) {
+      res.writeHead(304, headers);
+      res.end();
+      return;
+    }
+    res.writeHead(p.has ? 200 : 503, headers);
+    res.end(p.body);
     return;
   }
   if (req.url === appPath) {
-    res.writeHead(200, { "content-type": "text/javascript; charset=utf-8", ...cacheHeaders("asset") });
+    res.writeHead(200, { "content-type": "text/javascript; charset=utf-8", ...cacheHeaders("asset"), ...securityHeaders() });
     res.end(app);
     return;
   }
   if (req.url === "/app.js") {
-    res.writeHead(200, { "content-type": "text/javascript; charset=utf-8", ...cacheHeaders("asset-unversioned") });
+    res.writeHead(200, { "content-type": "text/javascript; charset=utf-8", ...cacheHeaders("asset-unversioned"), ...securityHeaders() });
     res.end(app);
     return;
   }
   if (req.url === "/" || req.url === "/index.html") {
-    res.writeHead(200, { "content-type": "text/html; charset=utf-8", ...cacheHeaders("page") });
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8", ...cacheHeaders("page"), ...securityHeaders() });
     res.end(page);
     return;
   }

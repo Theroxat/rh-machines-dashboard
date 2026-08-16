@@ -226,7 +226,7 @@ export function filterSummary(d, filter) {
       }
     }
   }
-  const chosen = TRAIT_TYPES.map((t) => filter[t]).filter(Boolean).join(" + ");
+  const chosen = esc(TRAIT_TYPES.map((t) => filter[t]).filter(Boolean).join(" + "));
   return `${chosen} — ${fmtInt(matched)} of ${fmtInt(total)} listed machines match.`;
 }
 
@@ -276,6 +276,18 @@ export function publishedLine(d) {
   const c = d.collection ?? {};
   return `OpenSea publishes a collection floor of <b>${c.publishedFloor === null || c.publishedFloor === undefined ? "—" : c.publishedFloor.toFixed(4)} ${c.publishedFloorSymbol ?? ""}</b>. ` +
     `It is shown for comparison and <b>enters no computation on this page</b> — on this chain it has been measured at ten times the real book.`;
+}
+
+/**
+ * L'âge du snapshot, mesuré entre deux horloges du serveur : `at`, posé au
+ * moment du calcul, et l'heure de la réponse. L'horloge du visiteur n'entre pas
+ * dans le calcul — la sienne peut être fausse de plusieurs heures et le bandeau
+ * annoncerait alors une péremption qui n'existe pas.
+ */
+export function freshness({ at, staleAfterMs }, serverNow) {
+  if (at === null || at === undefined) return { ageMs: null, stale: true };
+  const ageMs = Math.max(0, serverNow - at);
+  return { ageMs, stale: ageMs > (staleAfterMs ?? Infinity) };
 }
 
 /** Le message de bandeau, ou null quand tout va bien. */
@@ -377,7 +389,10 @@ if (typeof document !== "undefined") {
     let v;
     try {
       const res = await fetch("/api/snapshot");
-      v = await res.json();
+      const body = await res.json();
+      // L'en-tête Date vient du serveur, comme `at` : les comparer est sûr.
+      const serverNow = Date.parse(res.headers.get("date")) || Date.now();
+      v = { ...body, ...freshness(body, serverNow) };
     } catch {
       showBanner("Cannot reach the service. The numbers below are the last ones it served.");
       return;

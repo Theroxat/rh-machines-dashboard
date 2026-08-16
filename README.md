@@ -189,6 +189,33 @@ Chain: Robinhood Chain, id 4663, RPC `https://rpc.mainnet.chain.robinhood.com`.
 is the sealed class (100…1000), on MINE it is the effective weight including ink.
 This dashboard reads the sealed class from TRAITS only.
 
+## Security posture
+
+The service holds no private key, signs nothing, and has no write path — the
+HTTP method is never even read, and the five routes are exact string matches, so
+there is no file serving by path to traverse. The OpenSea key is passed as an
+environment variable, never baked into the image, and appears in none of the
+three served routes.
+
+Beyond that:
+
+- **The container runs as `node`, not root.** It reads from the network and
+  writes two cache files; nothing about that needs uid 0.
+- **The origin listens on the LAN address only** (`192.168.0.11:3050`), never on
+  `0.0.0.0`. Public access is through the tunnel and nowhere else.
+- **A strict CSP.** `default-src 'none'`, `script-src 'self'` with no
+  `unsafe-inline` — possible because the page carries no inline script at all —
+  images allowed from `i2c.seadn.io` and nowhere else, and `connect-src 'self'`.
+  Any HTML injection that ever slipped through would still execute nothing.
+- **`frame-ancestors 'none'` and `X-Frame-Options: DENY`.** This one is not
+  boilerplate: the "unofficial" stamp protects nobody if the page can be framed
+  inside a site that presents itself as official.
+- **`Referrer-Policy: no-referrer`**, which also stops every thumbnail from
+  telling OpenSea's CDN where the visitor came from.
+
+What is *not* covered here: rate limiting, which belongs at the CDN rather than
+in this process.
+
 ## Caching, and why the script URL has a hash in it
 
 Behind a CDN, an origin that sends no cache headers does not get "no caching" —
@@ -209,6 +236,19 @@ revalidates and always hands out the current address, and `/api/snapshot` carrie
 
 A deploy therefore needs no cache purge. `/app.js` without a hash is still served
 for anything holding an old page, always uncached.
+
+`/api/snapshot` carries `no-cache` and an ETag rather than `no-store`. Both force
+revalidation on every request, so freshness is identical — but an ETag allows a
+`304` with no body. The book changes once a minute and the page polls every
+fifteen seconds, so three polls in four have nothing new to carry: 172 KB
+becomes 0. At two hundred concurrent visitors that is the difference between
+18.6 Mbit/s and a trickle.
+
+This is why the response body no longer carries the snapshot's age. It changed
+on every request, which would have changed the ETag on every request and made
+the whole thing pointless. The page recomputes age from `at` and the response's
+`Date` header — two server clocks, so a visitor whose own clock is wrong does
+not see a phantom staleness warning.
 
 ## Cadences
 

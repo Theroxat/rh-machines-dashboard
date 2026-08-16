@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   fmtEth, fmtRatio, halfCell, cellKey,
   bannerMessage, excludedLine, publishedLine, rowsHtml, contextHtml, legendHtml,
-  matchesFilter, filterBarHtml, filterSummary,
+  matchesFilter, filterBarHtml, filterSummary, freshness,
 } from "../src/public/app.js";
 
 const entry = (tokenId, priceEth, image = `https://img/${tokenId}.webp`) => ({
@@ -361,4 +361,29 @@ test("the headline number says what it is, so it cannot be mistaken for somethin
   const filtered = halfCell(half({ entries }), "ink", { filter: { ...NO_FILTER, Headwear: "Halo" } });
   assert.match(filtered, /cheapest match/);
   assert.doesNotMatch(filtered, /floor price/);
+});
+
+// ---- fraîcheur calculée côté page ----
+
+// L'âge quittait le corps de la réponse parce qu'il changeait à chaque requête
+// et rendait tout ETag inutile. Il se recalcule ici depuis `at` et l'heure du
+// serveur — jamais depuis l'horloge du visiteur, qui peut être fausse.
+test("age is measured between two server clocks, never against the visitor's", () => {
+  assert.deepEqual(freshness({ at: 1000, staleAfterMs: 5000 }, 3000), { ageMs: 2000, stale: false });
+  assert.deepEqual(freshness({ at: 1000, staleAfterMs: 5000 }, 9000), { ageMs: 8000, stale: true });
+});
+
+test("a snapshot that never arrived has no age and counts as stale", () => {
+  assert.deepEqual(freshness({ at: null, staleAfterMs: 5000 }, 3000), { ageMs: null, stale: true });
+});
+
+test("a clock that runs backwards yields no negative age", () => {
+  assert.equal(freshness({ at: 5000, staleAfterMs: 5000 }, 1000).ageMs, 0);
+});
+
+test("the filter summary escapes the trait values it repeats", () => {
+  const d = { rows: [{ inked: { entries: [] }, dormant: { entries: [] } }] };
+  const s = filterSummary(d, { Headwear: '<img src=x onerror=alert(1)>', Body: null, Eyes: null });
+  assert.doesNotMatch(s, /<img/);
+  assert.match(s, /&lt;img/);
 });
