@@ -8,16 +8,18 @@ export function composeSnapshot({ grid, printer, eth, protocol, publishedFloor, 
   const activationUsd = activationPrinter !== null && printer?.usd ? activationPrinter * printer.usd : null;
   const activationEth = activationUsd !== null && eth?.usd ? activationUsd / eth.usd : null;
 
-  // La machine qui fixe un floor porte sa photo et son couvre-chef. Une photo
+  // Chaque machine en vente porte sa photo et son couvre-chef. Une photo
   // absente laisse `machine: null` et ne touche à aucun prix : on n'a pas
   // trouvé l'image, pas perdu le marché.
-  const machineOf = (tokenId) =>
-    (tokenId === null || tokenId === undefined) ? null : (meta?.get(tokenId) ?? null);
+  const withMachines = (cell) => ({
+    ...cell,
+    entries: cell.entries.map((e) => ({ ...e, machine: meta?.get(e.tokenId) ?? null })),
+  });
 
   const rows = grid.rows.map((r) => ({
     ...r,
-    inked:   { ...r.inked,   machine: machineOf(r.inked.floorTokenId) },
-    dormant: { ...r.dormant, machine: machineOf(r.dormant.floorTokenId) },
+    inked: withMachines(r.inked),
+    dormant: withMachines(r.dormant),
   }));
 
   return {

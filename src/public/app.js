@@ -2,14 +2,18 @@
 // tout ce qui fabrique du balisage est une fonction pure qui rend une chaîne,
 // et le seul câblage au DOM est en bas de fichier, derrière un garde.
 
-export const fmtEth    = (v) => v === null || v === undefined ? "—" : v.toFixed(4);
-export const fmtSpread = (v) => v === null || v === undefined ? "—" : (v >= 0 ? "+" : "") + v.toFixed(4);
-export const fmtRatio  = (v) => v === null || v === undefined ? "—" : (v * 100).toFixed(1) + "%";
-export const fmtUsd    = (v, d = 2) => v === null || v === undefined ? "—" : "$" + v.toFixed(d);
-export const fmtInt    = (v) => v === null || v === undefined ? "—" : v.toLocaleString("en-US");
+export const fmtEth   = (v) => v === null || v === undefined ? "—" : v.toFixed(4);
+export const fmtRatio = (v) => v === null || v === undefined ? "—" : (v * 100).toFixed(1) + "%";
+export const fmtUsd   = (v, d = 2) => v === null || v === undefined ? "—" : "$" + v.toFixed(d);
+export const fmtInt   = (v) => v === null || v === undefined ? "—" : v.toLocaleString("en-US");
 
 const MACHINES = "0xb509e195bcb3e4461e235ff152c68d66915f67b5";
 export const itemUrl = (id) => `https://opensea.io/assets/robinhood/${MACHINES}/${id}`;
+
+/** Combien de machines une case montre avant de proposer le reste. */
+export const DEFAULT_LIMIT = 8;
+
+export const cellKey = (classValue, side) => `${classValue}:${side}`;
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
@@ -48,104 +52,69 @@ export function contextHtml(d) {
   ].join("");
 }
 
-/** Une moitié de ligne, dans une seule cellule : la photo de la machine qui fixe
- *  le floor, son prix, son couvre-chef, et la profondeur en toutes lettres.
- *  Le peloton et le ratio exact partent dans l'infobulle — toujours lisibles,
- *  mais ils ne pèsent plus sur l'œil. */
-export function halfCell(half, side) {
+/** Une machine en vente : sa photo, son prix, son numéro. Sans photo elle garde
+ *  son prix et son lien — on a perdu une image, pas une offre. */
+function chip(e, isFloor) {
+  const hw = e.machine?.headwear ? ` · ${headwearLabel(e.machine.headwear)}` : "";
+  const img = e.machine?.image
+    ? `<img src="${esc(e.machine.image)}" alt="Machine #${e.tokenId}" loading="lazy" width="40" height="40">`
+    : `<span class="noimg" aria-hidden="true"></span>`;
+  return `<a class="chip${isFloor ? " floor" : ""}" href="${itemUrl(e.tokenId)}" target="_blank" rel="noopener"` +
+    ` title="${esc(`#${e.tokenId}${hw}`)}">` +
+    img +
+    `<span class="price">${fmtEth(e.priceEth)}</span>` +
+    `<span class="tok">#${e.tokenId}</span>` +
+  `</a>`;
+}
+
+/**
+ * Une moitié de ligne : tout le carnet de cette case, du moins cher au plus
+ * cher. Huit machines par défaut, le reste derrière un bouton — la case dit
+ * toujours combien elle cache, pour qu'un carnet coupé ne passe jamais pour
+ * un carnet complet.
+ */
+export function halfCell(half, side, { expanded = false, limit = DEFAULT_LIMIT, key = "" } = {}) {
   const g = `g-${side}`;
   const depth = `${fmtInt(half.listed)} of ${fmtInt(half.supply)} listed`;
 
-  if (half.listed === 0) {
+  if (!half.entries?.length) {
     return `<td class="${g} edge half" title="Nothing is on sale in this class in this state.">` +
-      `<span class="half-body"><span class="absent">no listing</span>` +
-      `<span class="depth">${depth}</span></span></td>`;
+      `<span class="depth"><span class="absent">no listing</span> · ${depth}</span></td>`;
   }
 
   const tip = half.pelotonEth === null
     ? `${half.listed} listings — too few for a peloton, so no median is shown`
     : `peloton ${fmtEth(half.pelotonEth)} ETH · ${fmtRatio(half.listedRatio)} of this class is listed`;
 
-  const thumb = half.machine?.image
-    ? `<a class="thumb" href="${itemUrl(half.floorTokenId)}" target="_blank" rel="noopener">` +
-      `<img src="${esc(half.machine.image)}" alt="Machine #${half.floorTokenId}" loading="lazy" width="46" height="46"></a>`
-    : "";
+  const shown = expanded ? half.entries : half.entries.slice(0, limit);
+  const hidden = half.entries.length - shown.length;
 
-  const hw = half.machine?.headwear ? ` · ${esc(headwearLabel(half.machine.headwear))}` : "";
+  const more = expanded
+    ? `<button class="more" type="button" data-key="${esc(key)}">▴ show fewer</button>`
+    : (hidden > 0
+        ? `<button class="more" type="button" data-key="${esc(key)}">+ ${fmtInt(hidden)} more ▾</button>`
+        : "");
 
   return `<td class="${g} edge half" title="${esc(tip)}">` +
-    thumb +
-    `<span class="half-body">` +
-      `<span class="price">${fmtEth(half.floorEth)}</span> <span class="unit">ETH</span>` +
-      `<span class="meta"><a href="${itemUrl(half.floorTokenId)}" target="_blank" rel="noopener">#${half.floorTokenId}</a>${hw}</span>` +
-      `<span class="depth">${depth}${half.pelotonEth === null ? ` · <span class="absent">no peloton</span>` : ""}</span>` +
-    `</span></td>`;
+    `<span class="depth">${depth}</span>` +
+    `<span class="strip">${shown.map((e, i) => chip(e, i === 0)).join("")}</span>` +
+    more +
+  `</td>`;
 }
 
-/** Le verdict en toutes lettres avant le verdict en chiffres. Un écart de
- *  -0.5000 ne dit rien tant qu'on ne sait pas ce que coûte l'encre. */
-export function activationVerdict(spreadEth, inkEth) {
-  if (spreadEth === null || spreadEth === undefined) {
-    return { tone: "none", headline: "Only one side of this class has a floor.", detail: "There is nothing to subtract." };
-  }
-  if (inkEth === null || inkEth === undefined) {
-    return { tone: "unknown", headline: `The gap is ${fmtSpread(spreadEth)} ETH.`, detail: "The cost of ink could not be read, so there is nothing to measure it against." };
-  }
-  const against = `${fmtSpread(spreadEth)} ETH against ${fmtEth(inkEth)} ETH of burned $PRINTER`;
-  if (spreadEth < 0) {
-    return { tone: "loss", headline: "An activated machine sells for less than a dormant one.", detail: against };
-  }
-  if (spreadEth < inkEth) {
-    return { tone: "short", headline: "The market pays less than the ink costs.", detail: against };
-  }
-  return { tone: "paid", headline: `The market pays ${(spreadEth / inkEth).toFixed(1)}× the ink.`, detail: against };
-}
-
-/** L'échelle de la jauge tient le plus grand écart et le coût de l'encre, pour
- *  que le repère soit toujours dans le cadre. */
-export function gaugeScale(rows, inkEth) {
-  const magnitudes = rows.map((r) => Math.abs(r.spreadEth ?? 0));
-  if (inkEth) magnitudes.push(Math.abs(inkEth));
-  return Math.max(0.01, ...magnitudes) * 1.15;
-}
-
-export function gaugeCell(row, inkEth, scale) {
-  const v = activationVerdict(row.spreadEth, inkEth);
-  const head = `<span class="verdict v-${v.tone}">${esc(v.headline)}</span><span class="verdict-detail">${esc(v.detail)}</span>`;
-
-  if (v.tone === "none" || v.tone === "unknown") {
-    return `<td class="edge act">${head}</td>`;
-  }
-
-  const s = row.spreadEth;
-  const clamp = (x) => Math.max(0, Math.min(100, x));
-  const pct = (x) => clamp(50 + (x / scale) * 50);
-  const zero = 50;
-  const end = pct(s);
-  const left = Math.min(zero, end);
-  const width = Math.abs(end - zero);
-  const barClass = s < 0 ? "neg" : (v.tone === "short" ? "short" : "pos");
-
-  return `<td class="edge act">` + head +
-    `<span class="gauge">` +
-      `<span class="axis"></span><span class="zero" style="left:${zero}%"></span>` +
-      `<span class="bar ${barClass}" style="left:${left}%;width:${width}%"></span>` +
-      `<span class="tick" style="left:${pct(inkEth)}%" title="what ink costs"></span>` +
-    `</span></td>`;
-}
-
-export function rowsHtml(d) {
-  const inkEth = d.ink?.activationEth ?? null;
-  const scale = gaugeScale(d.rows, inkEth);
+export function rowsHtml(d, { expanded = new Set(), limit = DEFAULT_LIMIT } = {}) {
   return d.rows.map((r) => {
     const census = r.chainCount === r.docCount
       ? `<span class="census">${fmtInt(r.chainCount)} machines</span>`
       : `<span class="census mismatch" title="The chain returned ${r.chainCount}; the documentation says ${r.docCount}.">${fmtInt(r.chainCount)} ≠ ${fmtInt(r.docCount)}</span>`;
+
+    const inkKey = cellKey(r.classValue, "ink");
+    const dorKey = cellKey(r.classValue, "dormant");
+
     return `<tr>` +
       `<td class="cls-cell"><span class="cls">${r.classLabel}</span>${census}</td>` +
-      halfCell(r.inked, "ink") +
-      halfCell(r.dormant, "dormant") +
-      gaugeCell(r, inkEth, scale) +
+      halfCell(r.inked,   "ink",     { expanded: expanded.has(inkKey), limit, key: inkKey }) +
+      halfCell(r.dormant, "dormant", { expanded: expanded.has(dorKey), limit, key: dorKey }) +
     `</tr>`;
   }).join("");
 }
@@ -219,6 +188,29 @@ export function bannerMessage(v) {
 
 if (typeof document !== "undefined") {
   const $ = (id) => document.getElementById(id);
+  const rowsEl = $("rows");
+
+  // Les cases dépliées vivent ici plutôt que dans le DOM : la table est
+  // reconstruite toutes les quinze secondes, et une case ouverte doit le rester.
+  const expanded = new Set();
+  let lastData = null;
+  let painted = "";
+
+  const paint = () => {
+    if (!lastData) return;
+    const html = rowsHtml(lastData, { expanded });
+    if (html === painted) return;
+    rowsEl.innerHTML = html;
+    painted = html;
+  };
+
+  rowsEl.addEventListener("click", (e) => {
+    const btn = e.target.closest(".more");
+    if (!btn) return;
+    const key = btn.dataset.key;
+    if (expanded.has(key)) expanded.delete(key); else expanded.add(key);
+    paint();
+  });
 
   const showBanner = (msg) => {
     const el = $("banner");
@@ -226,8 +218,6 @@ if (typeof document !== "undefined") {
     el.textContent = msg;
     el.classList.add("on");
   };
-
-  let previousRows = "";
 
   const refresh = async () => {
     let v;
@@ -242,22 +232,9 @@ if (typeof document !== "undefined") {
     showBanner(bannerMessage(v));
     if (!v.data) return;
 
+    lastData = v.data;
     $("context").innerHTML = contextHtml(v.data);
-
-    // L'encre qui frappe le papier : quand une ligne bouge, elle clignote une
-    // fois. Sur un instrument en direct, ça dit ce qui a changé sans le guetter.
-    const html = rowsHtml(v.data);
-    if (html !== previousRows) {
-      $("rows").innerHTML = html;
-      if (previousRows) {
-        for (const tr of $("rows").children) {
-          tr.classList.add("struck");
-          tr.addEventListener("animationend", () => tr.classList.remove("struck"), { once: true });
-        }
-      }
-      previousRows = html;
-    }
-
+    paint();
     $("legend").innerHTML = legendHtml(v.data.legend);
     $("book-line").innerHTML = bookLine(v.data);
     $("excluded-line").innerHTML = excludedLine(v.data);

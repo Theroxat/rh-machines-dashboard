@@ -1,108 +1,92 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  fmtEth, fmtSpread, fmtRatio, halfCell, gaugeScale, gaugeCell, activationVerdict,
+  fmtEth, fmtRatio, halfCell, cellKey,
   bannerMessage, excludedLine, publishedLine, rowsHtml, contextHtml, legendHtml,
 } from "../src/public/app.js";
 
-const machine = (over = {}) => ({ image: "https://img/1253.webp", headwear: "Blueberries", body: "Sky", ...over });
-
-const half = (over = {}) => ({
-  floorEth: 0.0869, floorTokenId: 1234, pelotonEth: 0.09,
-  listed: 12, supply: 100, listedRatio: 0.12, machine: machine(), ...over,
+const entry = (tokenId, priceEth, image = `https://img/${tokenId}.webp`) => ({
+  tokenId, priceEth,
+  machine: image ? { image, headwear: "Blueberries", body: "Sky" } : null,
 });
+
+const half = (over = {}) => {
+  const entries = over.entries ?? [entry(1234, 0.0869), entry(77, 0.0900)];
+  return {
+    floorEth: entries[0]?.priceEth ?? null,
+    floorTokenId: entries[0]?.tokenId ?? null,
+    pelotonEth: 0.09, listed: entries.length, supply: 100,
+    listedRatio: entries.length / 100, ...over, entries,
+  };
+};
+
+const manyEntries = (n) => Array.from({ length: n }, (_, i) => entry(100 + i, 0.08 + i / 1000));
+const countChips = (html) => (html.match(/class="chip/g) ?? []).length;
 
 test("an absent number renders as an em dash, never as zero", () => {
   assert.equal(fmtEth(null), "—");
   assert.equal(fmtRatio(null), "—");
-  assert.equal(fmtSpread(null), "—");
-  assert.equal(fmtSpread(0.05), "+0.0500");
-  assert.equal(fmtSpread(-0.5), "-0.5000");
 });
 
-test("a cell shows the picture of the exact machine that sets its floor", () => {
-  const html = halfCell(half({ floorTokenId: 1253 }), "ink");
-  assert.match(html, /src="https:\/\/img\/1253\.webp"/);
-  assert.match(html, /#1253/);
-  assert.match(html, /Blueberries/);
-  assert.match(html, /assets\/robinhood\/0xb509e195bcb3e4461e235ff152c68d66915f67b5\/1253/);
+test("a cell shows the machines on sale, cheapest first", () => {
+  const html = halfCell(half({ entries: [entry(5504, 0.0825), entry(7773, 0.0850)] }), "ink");
+  assert.ok(html.indexOf("#5504") < html.indexOf("#7773"), "the cheapest machine must come first");
+  assert.match(html, /src="https:\/\/img\/5504\.webp"/);
+  assert.match(html, /0\.0825/);
+  assert.match(html, /0\.0850/);
+  assert.match(html, /assets\/robinhood\/0xb509e195bcb3e4461e235ff152c68d66915f67b5\/5504/);
 });
 
-test("a missing picture costs the cell its thumbnail, not its price", () => {
-  const html = halfCell(half({ machine: null }), "ink");
-  assert.doesNotMatch(html, /<img/);
-  assert.match(html, /0\.0869/);
-  assert.match(html, /#1234/);
+test("the machine setting the floor is marked as such", () => {
+  const html = halfCell(half({ entries: [entry(1, 0.1), entry(2, 0.2)] }), "ink");
+  assert.match(html, /class="chip floor"/);
+  assert.equal((html.match(/class="chip floor"/g) ?? []).length, 1);
+});
+
+test("a long book is cut to the limit and offers the rest", () => {
+  const html = halfCell(half({ entries: manyEntries(191), supply: 4388 }), "ink", { limit: 8, key: "100:ink" });
+  assert.equal(countChips(html), 8);
+  assert.match(html, /\+ 183 more/);
+  assert.match(html, /data-key="100:ink"/);
+});
+
+test("an expanded cell shows every machine and offers the way back", () => {
+  const html = halfCell(half({ entries: manyEntries(191), supply: 4388 }), "ink", { limit: 8, expanded: true, key: "100:ink" });
+  assert.equal(countChips(html), 191);
+  assert.match(html, /show fewer/);
+  assert.doesNotMatch(html, /more<\/button>/);
+});
+
+test("a book that fits under the limit offers nothing to expand", () => {
+  const html = halfCell(half({ entries: manyEntries(8) }), "ink", { limit: 8 });
+  assert.equal(countChips(html), 8);
+  assert.doesNotMatch(html, /more/);
+  assert.doesNotMatch(html, /show fewer/);
 });
 
 test("depth reads as a sentence, not as a percentage to decode", () => {
-  const html = halfCell(half({ listed: 9, supply: 33 }), "ink");
+  const html = halfCell(half({ entries: manyEntries(9), supply: 33 }), "ink");
   assert.match(html, /9 of 33 listed/);
 });
 
+test("a machine with no picture keeps its price and its link", () => {
+  const html = halfCell(half({ entries: [entry(42, 0.5, null)] }), "ink");
+  assert.doesNotMatch(html, /<img/);
+  assert.match(html, /0\.5000/);
+  assert.match(html, /#42/);
+});
+
 test("a cell with no listing says so instead of printing a price", () => {
-  const html = halfCell(half({ listed: 0, floorEth: null, floorTokenId: null, pelotonEth: null, listedRatio: 0, machine: null }), "ink");
+  const html = halfCell(half({ entries: [], listed: 0, floorEth: null, floorTokenId: null, listedRatio: 0 }), "ink");
   assert.match(html, /no listing/);
   assert.doesNotMatch(html, /0\.0000/);
-  assert.match(html, /0 of 100/);
+  assert.match(html, /0 of 100 listed/);
+  assert.equal(countChips(html), 0);
 });
 
 test("the peloton survives the simplification, demoted to the cell's tooltip", () => {
-  const shown = halfCell(half({ pelotonEth: 0.09 }), "ink");
-  assert.match(shown, /peloton 0\.0900/);
-
-  const thin = halfCell(half({ listed: 3, pelotonEth: null }), "dormant");
-  assert.match(thin, /no peloton/);
-  assert.match(thin, /0\.0869/);   // the floor is still actionable
-});
-
-test("activation is judged in words before it is judged in digits", () => {
-  const loss = activationVerdict(-0.5, 0.0285);
-  assert.equal(loss.tone, "loss");
-  assert.match(loss.headline, /less than a dormant one/i);
-
-  const short = activationVerdict(0.01, 0.0285);
-  assert.equal(short.tone, "short");
-  assert.match(short.headline, /less than the ink costs/i);
-
-  const paid = activationVerdict(0.11, 0.0285);
-  assert.equal(paid.tone, "paid");
-  assert.match(paid.headline, /3\.9. the ink/);
-
-  const none = activationVerdict(null, 0.0285);
-  assert.equal(none.tone, "none");
-  assert.match(none.headline, /only one side/i);
-});
-
-test("with no cost of ink there is no verdict to give, and none is invented", () => {
-  const v = activationVerdict(0.11, null);
-  assert.equal(v.tone, "unknown");
-  assert.match(v.detail, /cost of ink/i);
-});
-
-test("the gauge scale always keeps the ink tick inside the frame", () => {
-  const rows = [{ spreadEth: -0.5 }, { spreadEth: 0.11 }, { spreadEth: null }];
-  const scale = gaugeScale(rows, 0.0285);
-  assert.ok(scale > 0.5 && scale < 0.7);
-  assert.ok(gaugeScale([{ spreadEth: null }], 0.0285) >= 0.0285);
-});
-
-test("a negative spread draws left of zero in the dormant colour", () => {
-  const html = gaugeCell({ spreadEth: -0.5 }, 0.0285, gaugeScale([{ spreadEth: -0.5 }], 0.0285));
-  const left = Number(html.match(/bar neg" style="left:([\d.]+)%/)[1]);
-  assert.ok(left < 50, `expected the bar to start left of zero, got ${left}`);
-  assert.match(html, /-0\.5000/);
-});
-
-test("a spread that clears the cost of ink is drawn solid, one that falls short is dashed", () => {
-  assert.match(gaugeCell({ spreadEth: 0.2 }, 0.0285, gaugeScale([{ spreadEth: 0.2 }], 0.0285)), /bar pos/);
-  assert.match(gaugeCell({ spreadEth: 0.01 }, 0.0285, gaugeScale([{ spreadEth: 0.01 }], 0.0285)), /bar short/);
-});
-
-test("a class missing one half has no gauge and says why", () => {
-  const html = gaugeCell({ spreadEth: null }, 0.0285, 0.5);
-  assert.match(html, /only one side/i);
-  assert.doesNotMatch(html, /class="bar/);
+  assert.match(halfCell(half({ pelotonEth: 0.09 }), "ink"), /peloton 0\.0900/);
+  assert.match(halfCell(half({ pelotonEth: null }), "dormant"), /too few for a peloton/);
 });
 
 test("the legend names what to look at on a machine to know its class", () => {
@@ -112,19 +96,17 @@ test("the legend names what to look at on a machine to know its class", () => {
       { classLabel: "x6", headwear: ["None"], count: 81 },
       { classLabel: "x1", headwear: [], count: 0 },
     ],
-    ambiguous: [],
-    unpaired: 0,
+    ambiguous: [], unpaired: 0,
   });
   assert.match(html, /Blueberries/);
-  assert.match(html, /no headwear at all/i);   // "None" is spelled out, not printed raw
+  assert.match(html, /no headwear at all/i);
   assert.doesNotMatch(html, />None</);
 });
 
 test("an ambiguous headwear is announced, never filed away quietly", () => {
   const html = legendHtml({
     byClass: [{ classLabel: "x1", headwear: ["Halo"], count: 1 }],
-    ambiguous: [{ headwear: "Bowler", classes: ["x1", "x2"] }],
-    unpaired: 0,
+    ambiguous: [{ headwear: "Bowler", classes: ["x1", "x2"] }], unpaired: 0,
   });
   assert.match(html, /Bowler/);
   assert.match(html, /x1 and x2/);
@@ -148,15 +130,34 @@ test("the published floor is always labelled as uncomputed-with", () => {
   assert.match(publishedLine({ publishedFloor: { floor: null, symbol: null } }), /—/);
 });
 
-test("a full grid renders one row per class, both halves, a verdict and a gauge", () => {
-  const row = (label, over = {}) => ({
-    classLabel: label, classValue: 100, docCount: 7131, chainCount: 7131,
-    inked: half(), dormant: half(), spreadEth: -0.01, ...over,
+test("each half of each row gets its own expansion key", () => {
+  assert.equal(cellKey(1000, "ink"), "1000:ink");
+  assert.notEqual(cellKey(1000, "ink"), cellKey(1000, "dormant"));
+});
+
+test("only the cells asked to expand do so", () => {
+  const row = (classValue, classLabel) => ({
+    classValue, classLabel, docCount: 7131, chainCount: 7131,
+    inked: half({ entries: manyEntries(20) }),
+    dormant: half({ entries: manyEntries(20) }),
   });
-  const html = rowsHtml({ rows: [row("x1"), row("x10", { chainCount: 36, docCount: 37 })], ink: { activationEth: 0.0285 } });
+  const html = rowsHtml({ rows: [row(100, "x1"), row(1000, "x10")] },
+    { expanded: new Set(["100:ink"]), limit: 8 });
+
   assert.equal(html.match(/<tr>/g).length, 2);
+  assert.equal(countChips(html), 20 + 8 + 8 + 8);   // one cell expanded, three cut
+  assert.match(html, /\+ 12 more/);                 // the cut cells still offer the rest
+});
+
+test("a census that disagrees with the documentation is shown, not hidden", () => {
+  const html = rowsHtml({
+    rows: [{
+      classValue: 1000, classLabel: "x10", docCount: 37, chainCount: 36,
+      inked: half(), dormant: half(),
+    }],
+  });
   assert.match(html, /36 ≠ 37/);
-  assert.match(html, /less than a dormant one/i);
+  assert.match(html, /The chain returned 36/);
 });
 
 test("the context strip survives a protocol read that came back empty", () => {

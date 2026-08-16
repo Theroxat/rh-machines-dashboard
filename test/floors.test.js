@@ -69,6 +69,27 @@ test("the peloton is the median of the cheapest N, immune to one dust listing", 
   assert.equal(x1.inked.pelotonEth, 0.11);  // et elle ne déplace pas le niveau de marché
 });
 
+test("a cell carries its whole book, cheapest first, not only its floor", () => {
+  const grid = buildGrid({
+    traits: traitsOf([[1, 100], [2, 100], [3, 100]]),
+    ink: inkOf([[1, 1], [2, 1], [3, 1]]),
+    listings: listingsOf([[2, 0.30], [3, 0.10], [1, 0.20]]),
+    pelotonSize: 5,
+  });
+  const cell = rowOf(grid, "x1").inked;
+  assert.deepEqual(cell.entries.map((e) => e.tokenId), [3, 1, 2]);
+  assert.deepEqual(cell.entries.map((e) => e.priceEth), [0.1, 0.2, 0.3]);
+  assert.equal(cell.entries[0].tokenId, cell.floorTokenId);
+  assert.equal(cell.entries.length, cell.listed);
+});
+
+test("a cell with nothing on sale carries an empty book, not a missing one", () => {
+  const grid = buildGrid({
+    traits: traitsOf([[1, 600]]), ink: inkOf([[1, 0]]), listings: listingsOf([]), pelotonSize: 5,
+  });
+  assert.deepEqual(rowOf(grid, "x6").dormant.entries, []);
+});
+
 test("ties at the same price resolve to the lowest token id, deterministically", () => {
   const grid = buildGrid({
     traits: traitsOf([[9, 300], [4, 300]]),

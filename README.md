@@ -1,4 +1,11 @@
-# RH MACHINES — market dashboard
+# Unofficial RH MACHINES market dashboard
+
+> **This is not an official RH MACHINES tool.** It is an independent project, not
+> built by, affiliated with, or endorsed by the RH MACHINES team, and nothing it
+> shows is an official source. It is read-only: it holds no keys, signs nothing,
+> places no orders, and gives no advice. Prices come from public OpenSea listings
+> and public Robinhood Chain state, and can be wrong or stale — verify every price
+> on OpenSea before buying.
 
 A read-only dashboard for the [`rh-machines`](https://opensea.io/collection/rh-machines)
 collection on Robinhood Chain. It answers one question: **what does each rarity
@@ -60,21 +67,26 @@ To run without Docker: `npm install`, then
 Seven rows, one per sealed rarity class, each split into an **inked** half and a
 **dormant** half. A Machine is inked when its `inkBurned` is above zero.
 
-| Column | What it is |
-|---|---|
-| **Floor** | The cheapest live listing, linked to the exact Machine that sets it. This is the actionable price: what it costs to buy right now. |
-| **Peloton** | The median of the five cheapest listings — the market level, unmoved by a single dust or fat-finger listing. |
-| **Listed** | How many distinct Machines are on sale in that cell. |
-| **Supply** | How many Machines exist in that class in that ink state, listed or not. |
-| **Listed %** | Listed ÷ supply. This is what gives the floor its meaning: x6 at 0.70 ETH with 3 of 46 on sale is not the same market as 40 of 46. |
-| **What the market pays for activation** | `floor(inked) − floor(dormant)`, stated in words first, then drawn as a bar from zero with a ▲ marking what ink costs. A bar that stops short of the ▲ is a market paying less for activation than activation costs. |
+Each half shows that book as pictures, cheapest Machine first, with its price
+and its `#id` under each. The cheapest one — the floor — is outlined, since that
+is the price you can actually buy at right now.
 
-Each half shows the picture of the exact Machine that sets that floor, with its
-`#id` and its headwear. Hover any half for its peloton and its exact listed share.
+A cell shows its **eight cheapest** and states how many it is holding back:
+`+ 182 more`. Clicking that opens the whole book in place; clicking again closes
+it. A cut book always says it is cut, so a partial view can never be mistaken for
+a complete one, and an open cell stays open through the fifteen-second refresh.
 
-Floor and peloton are shown side by side on purpose. When they diverge sharply,
-the divergence is itself the signal — an isolated anomaly is sitting at the
-bottom of that book.
+Above the pictures, each half states its depth in words — `190 of 4,388 listed`.
+That ratio is what gives a floor its meaning: x6 at 0.70 ETH with 3 of 47 on sale
+is not the same market as 40 of 47.
+
+Hover a cell for its **peloton** — the median of its five cheapest listings, the
+market level unmoved by a single dust or fat-finger listing — and its exact
+listed share. Hover a Machine for its headwear.
+
+The **cost of ink** sits in the header bar rather than in the table: it is the
+premise of the whole inked/dormant split, and it is the same number for every
+row.
 
 ## What the page will not do
 
