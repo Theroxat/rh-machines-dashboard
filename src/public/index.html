@@ -159,6 +159,7 @@
   td.half { width: 46%; }
 
   .depth { display: block; font-size: 11px; color: var(--muted); }
+  .depth b { color: var(--text); font-weight: 600; }
   .absent { color: var(--dim); }
 
   /* ---- la bande de machines en vente, la moins chère d'abord ---- */
@@ -259,9 +260,11 @@
   <p id="book-line"></p>
   <p id="excluded-line"></p>
   <p id="published-line"></p>
-  <p>Each cell shows the eight cheapest Machines on sale and says how many more it is holding back. A cell
-    reading <b>no listing</b> has none — it is not a floor of zero. Hover a cell for its peloton and its exact
-    listed share; hover a Machine for its headwear.</p>
+  <p>Each cell states two separate numbers: how many Machines are <b>on sale</b>, and how many exist
+    <b>in this class</b>. It shows the eight cheapest and, when it is holding more back, offers them on a
+    button — so a cell with no button is already showing everything it has. A cell reading <b>no listing</b>
+    has nothing on sale; it is not a floor of zero. Hover a cell for its peloton and its exact listed share;
+    hover a Machine for its headwear.</p>
   <p class="disclaimer"><span class="tag">Unofficial</span><b>An independent tool.</b> It is not built by,
     affiliated with, or endorsed by the RH MACHINES team, and nothing here is an official source. It is
     read-only: it holds no keys, signs nothing, places no orders, and gives no advice. Prices come from

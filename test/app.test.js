@@ -67,7 +67,8 @@ test("a book that fits under the limit offers nothing to expand", () => {
 
 test("depth reads as a sentence, not as a percentage to decode", () => {
   const html = halfCell(half({ entries: manyEntries(9), supply: 33 }), "ink");
-  assert.match(html, /9 of 33 listed/);
+  assert.match(html, /9 on sale/);
+  assert.match(html, /33 in this class/);
 });
 
 test("a machine with no picture keeps its price and its link", () => {
@@ -81,7 +82,7 @@ test("a cell with no listing says so instead of printing a price", () => {
   const html = halfCell(half({ entries: [], listed: 0, floorEth: null, floorTokenId: null, listedRatio: 0 }), "ink");
   assert.match(html, /no listing/);
   assert.doesNotMatch(html, /0\.0000/);
-  assert.match(html, /0 of 100 listed/);
+  assert.match(html, /100 in this class/);
   assert.equal(countChips(html), 0);
 });
 
@@ -212,7 +213,7 @@ test("a filtered cell shows only matches and says how many of how many", () => {
   ];
   const html = halfCell(half({ entries, listed: 3, supply: 50 }), "ink", { filter: { ...NO_FILTER, Headwear: "Halo" } });
   assert.equal(countChips(html), 2);
-  assert.match(html, /2 of 3 listed match/);
+  assert.match(html, /2 of 3 on sale match/);
   assert.match(html, /#1/);
   assert.doesNotMatch(html, /#2/);
 });
@@ -258,4 +259,15 @@ test("the summary counts matches across the whole board, or stays silent", () =>
   const s = filterSummary(d, { ...NO_FILTER, Headwear: "Halo" });
   assert.match(s, /Halo/);
   assert.match(s, /1 of 2 listed machines match/);
+});
+
+// « 5 of 249 listed » se lisait « 5 affichées sur 249 disponibles » et faisait
+// croire à un bouton de dépliage manquant, alors que les 249 sont le nombre de
+// machines qui existent et que les 5 en vente étaient toutes déjà là.
+test("depth states two separate facts, and cannot be read as a truncation", () => {
+  const html = halfCell(half({ entries: manyEntries(5), listed: 5, supply: 249 }), "ink", { limit: 8 });
+  assert.match(html, /5 on sale/);
+  assert.match(html, /249 in this class/);
+  assert.doesNotMatch(html, /5 of 249/);
+  assert.doesNotMatch(html, /more/);        // rien n'est caché, donc rien à proposer
 });

@@ -98,19 +98,20 @@ export function halfCell(half, side, { expanded = false, limit = DEFAULT_LIMIT, 
   const all = half.entries ?? [];
   const kept = active ? all.filter((e) => matchesFilter(e.machine, filter)) : all;
 
-  // Filtré, la case compte les correspondances sur ce qui est en vente ; sinon
-  // ce qui est en vente sur ce qui existe. Les deux dénominateurs répondent à
-  // deux questions différentes, et la phrase dit toujours laquelle.
+  // Deux faits distincts, énoncés séparément. « 5 of 249 listed » se lisait
+  // « 5 affichées sur 249 disponibles » et faisait chercher un bouton de
+  // dépliage qui n'avait pas lieu d'être : les 249 sont les machines qui
+  // existent, et les 5 en vente étaient déjà toutes là.
   const depth = active
-    ? `${fmtInt(kept.length)} of ${fmtInt(all.length)} listed match`
-    : `${fmtInt(half.listed)} of ${fmtInt(half.supply)} listed`;
+    ? `${fmtInt(kept.length)} of ${fmtInt(all.length)} on sale match`
+    : `<b>${fmtInt(half.listed)} on sale</b> · ${fmtInt(half.supply)} in this class`;
 
   if (!kept.length) {
     // « rien ne correspond ici » et « rien n'est en vente ici » ne sont pas la
     // même information, et les confondre ferait passer un filtre pour un marché vide.
     const why = active
-      ? `<span class="absent">no machine matches here</span> · ${depth}`
-      : `<span class="absent">no listing</span> · ${depth}`;
+      ? `<span class="absent">no machine matches here</span> · ${fmtInt(all.length)} on sale`
+      : `<span class="absent">no listing</span> · ${fmtInt(half.supply)} in this class`;
     const tip = active
       ? "Nothing on sale in this class and state carries the traits you picked."
       : "Nothing is on sale in this class in this state.";
