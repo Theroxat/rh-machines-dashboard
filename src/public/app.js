@@ -13,6 +13,10 @@ export const itemUrl = (id) => `https://opensea.io/assets/robinhood/${MACHINES}/
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
+/** "None" est une vraie valeur de couvre-chef, et c'est la classe x6. Écrite
+ *  telle quelle sur la page, elle se lirait comme une donnée manquante. */
+const headwearLabel = (hw) => hw === "None" ? "no headwear at all" : hw;
+
 function statBlock(label, value, extra, isInk) {
   return `<div class="stat${isInk ? " is-ink" : ""}">` +
     `<span class="label">${label}</span>` +
@@ -44,26 +48,57 @@ export function contextHtml(d) {
   ].join("");
 }
 
-/** Une moitié de ligne. Zéro listing ne rend jamais un prix : il rend son absence. */
-export function halfCells(half, side) {
+/** Une moitié de ligne, dans une seule cellule : la photo de la machine qui fixe
+ *  le floor, son prix, son couvre-chef, et la profondeur en toutes lettres.
+ *  Le peloton et le ratio exact partent dans l'infobulle — toujours lisibles,
+ *  mais ils ne pèsent plus sur l'œil. */
+export function halfCell(half, side) {
   const g = `g-${side}`;
+  const depth = `${fmtInt(half.listed)} of ${fmtInt(half.supply)} listed`;
+
   if (half.listed === 0) {
-    return `<td class="${g} edge absent">no listing</td>` +
-           `<td class="${g} absent">—</td>` +
-           `<td class="${g}">0</td>` +
-           `<td class="${g}">${fmtInt(half.supply)}</td>` +
-           `<td class="${g} absent">${fmtRatio(half.listedRatio)}</td>`;
+    return `<td class="${g} edge half" title="Nothing is on sale in this class in this state.">` +
+      `<span class="half-body"><span class="absent">no listing</span>` +
+      `<span class="depth">${depth}</span></span></td>`;
   }
-  const floor = `<span class="price">${fmtEth(half.floorEth)}</span>` +
-    `<span class="tok"><a href="${itemUrl(half.floorTokenId)}" target="_blank" rel="noopener">#${half.floorTokenId}</a></span>`;
-  const peloton = half.pelotonEth === null
-    ? `<span class="absent" title="Only ${half.listed} listings. A median over fewer than 5 would not be a median.">no peloton</span>`
-    : `<span class="price">${fmtEth(half.pelotonEth)}</span>`;
-  return `<td class="${g} edge">${floor}</td>` +
-         `<td class="${g}">${peloton}</td>` +
-         `<td class="${g}">${fmtInt(half.listed)}</td>` +
-         `<td class="${g}">${fmtInt(half.supply)}</td>` +
-         `<td class="${g}">${fmtRatio(half.listedRatio)}</td>`;
+
+  const tip = half.pelotonEth === null
+    ? `${half.listed} listings — too few for a peloton, so no median is shown`
+    : `peloton ${fmtEth(half.pelotonEth)} ETH · ${fmtRatio(half.listedRatio)} of this class is listed`;
+
+  const thumb = half.machine?.image
+    ? `<a class="thumb" href="${itemUrl(half.floorTokenId)}" target="_blank" rel="noopener">` +
+      `<img src="${esc(half.machine.image)}" alt="Machine #${half.floorTokenId}" loading="lazy" width="46" height="46"></a>`
+    : "";
+
+  const hw = half.machine?.headwear ? ` · ${esc(headwearLabel(half.machine.headwear))}` : "";
+
+  return `<td class="${g} edge half" title="${esc(tip)}">` +
+    thumb +
+    `<span class="half-body">` +
+      `<span class="price">${fmtEth(half.floorEth)}</span> <span class="unit">ETH</span>` +
+      `<span class="meta"><a href="${itemUrl(half.floorTokenId)}" target="_blank" rel="noopener">#${half.floorTokenId}</a>${hw}</span>` +
+      `<span class="depth">${depth}${half.pelotonEth === null ? ` · <span class="absent">no peloton</span>` : ""}</span>` +
+    `</span></td>`;
+}
+
+/** Le verdict en toutes lettres avant le verdict en chiffres. Un écart de
+ *  -0.5000 ne dit rien tant qu'on ne sait pas ce que coûte l'encre. */
+export function activationVerdict(spreadEth, inkEth) {
+  if (spreadEth === null || spreadEth === undefined) {
+    return { tone: "none", headline: "Only one side of this class has a floor.", detail: "There is nothing to subtract." };
+  }
+  if (inkEth === null || inkEth === undefined) {
+    return { tone: "unknown", headline: `The gap is ${fmtSpread(spreadEth)} ETH.`, detail: "The cost of ink could not be read, so there is nothing to measure it against." };
+  }
+  const against = `${fmtSpread(spreadEth)} ETH against ${fmtEth(inkEth)} ETH of burned $PRINTER`;
+  if (spreadEth < 0) {
+    return { tone: "loss", headline: "An activated machine sells for less than a dormant one.", detail: against };
+  }
+  if (spreadEth < inkEth) {
+    return { tone: "short", headline: "The market pays less than the ink costs.", detail: against };
+  }
+  return { tone: "paid", headline: `The market pays ${(spreadEth / inkEth).toFixed(1)}× the ink.`, detail: against };
 }
 
 /** L'échelle de la jauge tient le plus grand écart et le coût de l'encre, pour
@@ -75,33 +110,28 @@ export function gaugeScale(rows, inkEth) {
 }
 
 export function gaugeCell(row, inkEth, scale) {
-  const s = row.spreadEth;
-  if (s === null || s === undefined) {
-    return `<td class="edge gauge-cell absent" title="One half of this class has no floor, so there is nothing to subtract.">—</td>`;
+  const v = activationVerdict(row.spreadEth, inkEth);
+  const head = `<span class="verdict v-${v.tone}">${esc(v.headline)}</span><span class="verdict-detail">${esc(v.detail)}</span>`;
+
+  if (v.tone === "none" || v.tone === "unknown") {
+    return `<td class="edge act">${head}</td>`;
   }
-  const clamp = (v) => Math.max(0, Math.min(100, v));
-  const pct = (v) => clamp(50 + (v / scale) * 50);
+
+  const s = row.spreadEth;
+  const clamp = (x) => Math.max(0, Math.min(100, x));
+  const pct = (x) => clamp(50 + (x / scale) * 50);
   const zero = 50;
   const end = pct(s);
   const left = Math.min(zero, end);
   const width = Math.abs(end - zero);
+  const barClass = s < 0 ? "neg" : (v.tone === "short" ? "short" : "pos");
 
-  const below = inkEth !== null && inkEth !== undefined && s < inkEth;
-  const barClass = s < 0 ? "neg" : (below ? "short" : "pos");
-  const tick = inkEth === null || inkEth === undefined ? "" : `<span class="tick" style="left:${pct(inkEth)}%"></span>`;
-
-  const title = below
-    ? `Activation adds ${fmtEth(inkEth)} ETH of burned $PRINTER, but the market pays ${fmtSpread(s)} ETH for it.`
-    : `The market pays ${fmtSpread(s)} ETH for activation, which costs ${fmtEth(inkEth)} ETH.`;
-
-  return `<td class="edge gauge-cell" title="${esc(title)}">` +
-    `<span class="spread-v ${s < 0 ? "neg" : "pos"}">${fmtSpread(s)}</span>` +
+  return `<td class="edge act">` + head +
     `<span class="gauge">` +
       `<span class="axis"></span><span class="zero" style="left:${zero}%"></span>` +
       `<span class="bar ${barClass}" style="left:${left}%;width:${width}%"></span>` +
-      tick +
-    `</span>` +
-  `</td>`;
+      `<span class="tick" style="left:${pct(inkEth)}%" title="what ink costs"></span>` +
+    `</span></td>`;
 }
 
 export function rowsHtml(d) {
@@ -109,15 +139,39 @@ export function rowsHtml(d) {
   const scale = gaugeScale(d.rows, inkEth);
   return d.rows.map((r) => {
     const census = r.chainCount === r.docCount
-      ? `<span class="census">${fmtInt(r.chainCount)}</span>`
+      ? `<span class="census">${fmtInt(r.chainCount)} machines</span>`
       : `<span class="census mismatch" title="The chain returned ${r.chainCount}; the documentation says ${r.docCount}.">${fmtInt(r.chainCount)} ≠ ${fmtInt(r.docCount)}</span>`;
     return `<tr>` +
-      `<td><span class="cls">${r.classLabel}</span> ${census}</td>` +
-      halfCells(r.inked, "ink") +
-      halfCells(r.dormant, "dormant") +
+      `<td class="cls-cell"><span class="cls">${r.classLabel}</span>${census}</td>` +
+      halfCell(r.inked, "ink") +
+      halfCell(r.dormant, "dormant") +
       gaugeCell(r, inkEth, scale) +
     `</tr>`;
   }).join("");
+}
+
+/** Quel couvre-chef trahit quelle classe. Dérivé des données au démarrage, pas
+ *  écrit en dur : si un couvre-chef devenait ambigu, il est annoncé plutôt que
+ *  rangé de force dans une classe. */
+export function legendHtml(legend) {
+  if (!legend) return "";
+
+  const rows = legend.byClass.map((c) => {
+    const names = c.headwear.length
+      ? c.headwear.map((h) => `<span class="hw">${esc(headwearLabel(h))}</span>`).join(" ")
+      : `<span class="absent">nothing observed</span>`;
+    return `<div class="lg-row"><span class="lg-class">${esc(c.classLabel)}</span>` +
+      `<span class="lg-hw">${names}</span>` +
+      `<span class="lg-n">${fmtInt(c.count)}</span></div>`;
+  }).join("");
+
+  const warn = legend.ambiguous?.length
+    ? `<p class="lg-warn">` + legend.ambiguous.map((a) =>
+        `<b>${esc(a.headwear)}</b> appears in ${esc(a.classes.join(" and "))} — it is filed under neither.`
+      ).join(" ") + `</p>`
+    : "";
+
+  return `<div class="lg">${rows}</div>${warn}`;
 }
 
 export function bookLine(d) {
@@ -144,10 +198,9 @@ export function publishedLine(d) {
     `It is shown for comparison and <b>enters no computation on this page</b> — on this chain it has been measured at ten times the real book.`;
 }
 
-/** Le message de bandeau, ou null quand tout va bien. Séparé du DOM pour que la
- *  règle « périmé ou en erreur => on le dit » soit vérifiable. */
+/** Le message de bandeau, ou null quand tout va bien. */
 export function bannerMessage(v) {
-  // Une erreur connue passe devant le récit du démarrage : dire « still reading
+  // Une cause connue passe devant le récit du démarrage : dire « still reading
   // the chain » quand la vraie cause est un 401 envoie chercher au mauvais endroit.
   if (!v.data) {
     return v.lastError
@@ -205,6 +258,7 @@ if (typeof document !== "undefined") {
       previousRows = html;
     }
 
+    $("legend").innerHTML = legendHtml(v.data.legend);
     $("book-line").innerHTML = bookLine(v.data);
     $("excluded-line").innerHTML = excludedLine(v.data);
     $("published-line").innerHTML = publishedLine(v.data);

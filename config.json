@@ -4,5 +4,6 @@
   "inkPollIntervalMs": 600000,
   "pelotonSize": 5,
   "multicallBatchSize": 500,
-  "maxBookPages": 200
+  "maxBookPages": 200,
+  "maxMetadataPages": 80
 }

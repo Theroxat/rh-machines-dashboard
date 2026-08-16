@@ -43,11 +43,14 @@ The dashboard is at **http://192.168.0.11:3050**. The compose file publishes the
 container's port only on the host's `192.168.0.11` address — it is not reachable
 on `0.0.0.0`, and not on `localhost` from the host itself.
 
-Two files persist under `./data`:
+Two files persist under `./data`, both caching things that are sealed at mint and
+never change, so there is no staleness risk. Delete either and the next boot
+rebuilds it.
 
-- `traits.json` — the 10,000 sealed rarities, read once from chain (about 20
-  seconds) and cached forever. They are sealed at mint and never change, so
-  there is no staleness risk. Delete it and the next boot re-reads them.
+- `traits.json` — the 10,000 sealed rarities, read once from chain (about 20 s).
+- `metadata.json` — each Machine's picture and traits, read once from OpenSea in
+  50 calls (about a minute). Losing it costs the thumbnails and the headwear
+  legend on the next boot until it is rebuilt; it costs no price and no floor.
 
 To run without Docker: `npm install`, then
 `set -a && . ./.env && set +a && npm start`. Tests: `npm test`.
@@ -64,7 +67,10 @@ Seven rows, one per sealed rarity class, each split into an **inked** half and a
 | **Listed** | How many distinct Machines are on sale in that cell. |
 | **Supply** | How many Machines exist in that class in that ink state, listed or not. |
 | **Listed %** | Listed ÷ supply. This is what gives the floor its meaning: x6 at 0.70 ETH with 3 of 46 on sale is not the same market as 40 of 46. |
-| **Spread vs cost of ink** | `floor(inked) − floor(dormant)`, drawn as a bar from zero, with a ▲ marking what ink costs. A bar that stops short of the ▲ is a market paying less for activation than activation costs. |
+| **What the market pays for activation** | `floor(inked) − floor(dormant)`, stated in words first, then drawn as a bar from zero with a ▲ marking what ink costs. A bar that stops short of the ▲ is a market paying less for activation than activation costs. |
+
+Each half shows the picture of the exact Machine that sets that floor, with its
+`#id` and its headwear. Hover any half for its peloton and its exact listed share.
 
 Floor and peloton are shown side by side on purpose. When they diverge sharply,
 the divergence is itself the signal — an isolated anomaly is sitting at the
@@ -93,6 +99,43 @@ A wrong dashboard is worse than no dashboard. These are enforced, not aspiration
 - **Listings are deduplicated by Machine.** The API returns the same token more
   than once; without dedup, listing counts and the peloton are inflated.
 
+## Headwear is the class
+
+The rarity class is sealed on chain, but it is also written on the Machine's
+face: the **Headwear** trait determines it exactly. Measured across all 10,000
+Machines, 25 distinct headwear values each map to exactly one class, with no
+ambiguity, and the resulting per-class counts reproduce the published census
+(7,131 / 407 / 1,356 / 559 / 429 / 81 / 37) precisely.
+
+| Class | Headwear |
+|---|---|
+| x10 | Blueberries |
+| x6 | **None — no headwear at all** |
+| x4 | Bitcoin Aura, Ordinals |
+| x3 | All-Seeing Eye, Crown of Thorns |
+| x2 | Beep Boop, Blade, Cursed Flame, Glitch Spark |
+| x1.5 | Watcher Rings |
+| x1 | Alert, Bad Day, Black Spikes, Blaze, Bowler, Confused, Devil Horns, Fez, Fire Mohawk, Green Mohawk, Halo, Ivory Horns, Smitten, Straw Hat |
+
+The counter-intuitive one is x6: the second-rarest tier is the Machines wearing
+**nothing at all**. Community weight lists circulating in Discord name six traits;
+the collection has 25, and omits Blade, Glitch Spark, Beep Boop, Watcher Rings and
+the bare-headed x6 tier entirely.
+
+The page derives this table from the collection on every boot rather than
+hard-coding it. A hard-coded table that went stale would keep displaying a wrong
+mapping with full confidence; a derived one surfaces any headwear that starts
+appearing in two classes, and files it under neither.
+
+## One Machine the bulk pages drop
+
+OpenSea's paginated NFT endpoint returned 9,999 of the 10,000 Machines: token
+**#765** is absent from all 50 pages while answering perfectly on its own
+endpoint. So after the bulk pass, anything still missing is fetched one by one
+(bounded, so a real outage cannot turn into a hammering loop), and the cache is
+rewritten. The backfill also runs against an accepted cache — otherwise a cache
+written at 9,999 would sit just inside the tolerance and stay incomplete forever.
+
 ## Two tokens called USDG
 
 Robinhood Chain carries two tokens with the symbol `USDG`. The canonical one,
@@ -116,6 +159,7 @@ information, not something to average away.
 | What | Source |
 |---|---|
 | Listings | OpenSea v2, `/listings/collection/rh-machines/all`, cursor-paginated |
+| Pictures and traits | OpenSea v2, `/chain/robinhood/contract/{addr}/nfts`, 200 per page, cached forever |
 | Sealed rarity and desk | `TRAITS.weightOf` / `TRAITS.sectorOf` via Multicall3 |
 | Ink | `MINE.inkBurned` via Multicall3, all 10,000 Machines |
 | Protocol state | `MINE` — epoch, multiplier ceiling, total burned, active Machines |

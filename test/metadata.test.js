@@ -1,0 +1,153 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fetchMetadata, readCache, writeCache, backfillMetadata } from "../src/metadata.js";
+
+const tmp = () => join(mkdtempSync(join(tmpdir(), "rh-meta-")), "metadata.json");
+
+const nft = (id, headwear, over = {}) => ({
+  identifier: String(id),
+  display_image_url: `https://img/${id}.webp`,
+  image_url: `https://fallback/${id}.webp`,
+  traits: [
+    { trait_type: "Body", value: "Sky" },
+    { trait_type: "Headwear", value: headwear },
+    { trait_type: "Eyes", value: "Rage" },
+  ],
+  ...over,
+});
+
+const fakeFetch = (pages) => {
+  let call = 0;
+  return async () => {
+    const page = pages[call++];
+    if (!page) throw new Error("fetched more pages than the test provided");
+    return { ok: true, status: 200, json: async () => page };
+  };
+};
+
+test("each machine keeps its image, its headwear and its body", async () => {
+  const { meta } = await fetchMetadata({
+    apiKey: "k", maxPages: 5,
+    fetchImpl: fakeFetch([{ nfts: [nft(1253, "Blueberries")], next: null }]),
+  });
+  assert.deepEqual(meta.get(1253), {
+    image: "https://img/1253.webp",
+    headwear: "Blueberries",
+    body: "Sky",
+  });
+});
+
+test("the cursor is followed to the end of the collection", async () => {
+  const { meta, pages } = await fetchMetadata({
+    apiKey: "k", maxPages: 5,
+    fetchImpl: fakeFetch([
+      { nfts: [nft(1, "Bowler")], next: "p2" },
+      { nfts: [nft(2, "Blade")], next: null },
+    ]),
+  });
+  assert.equal(pages, 2);
+  assert.equal(meta.size, 2);
+});
+
+test("a collection that outruns maxPages throws rather than caching a partial map", async () => {
+  await assert.rejects(
+    fetchMetadata({ apiKey: "k", maxPages: 1, fetchImpl: fakeFetch([{ nfts: [nft(1, "Halo")], next: "more" }]) }),
+    /not exhausted/,
+  );
+});
+
+test("an HTTP error is raised, never swallowed into an empty map", async () => {
+  await assert.rejects(
+    fetchMetadata({ apiKey: "k", maxPages: 5, fetchImpl: async () => ({ ok: false, status: 429, json: async () => ({}) }) }),
+    /429/,
+  );
+});
+
+test("display_image_url wins, but image_url is used when it is missing", async () => {
+  const { meta } = await fetchMetadata({
+    apiKey: "k", maxPages: 5,
+    fetchImpl: fakeFetch([{ nfts: [nft(7, "Fez", { display_image_url: null })], next: null }]),
+  });
+  assert.equal(meta.get(7).image, "https://fallback/7.webp");
+});
+
+test("a machine with no headwear is recorded as bare-headed, not as unknown", async () => {
+  // "None" is the on-chain reality of the x6 class: 81 machines wear nothing.
+  // Collapsing it to null would erase the second-rarest tier.
+  const { meta } = await fetchMetadata({
+    apiKey: "k", maxPages: 5,
+    fetchImpl: fakeFetch([{ nfts: [nft(4599, "None")], next: null }]),
+  });
+  assert.equal(meta.get(4599).headwear, "None");
+});
+
+test("an entry with no usable image is skipped and counted, never half-stored", async () => {
+  const { meta, skipped } = await fetchMetadata({
+    apiKey: "k", maxPages: 5,
+    fetchImpl: fakeFetch([{
+      nfts: [nft(1, "Halo"), nft(2, "Halo", { display_image_url: null, image_url: null }), { identifier: "abc" }],
+      next: null,
+    }]),
+  });
+  assert.equal(meta.size, 1);
+  assert.equal(skipped, 2);
+});
+
+// La pagination en lot d'OpenSea a réellement perdu le token 765 sur les 10 000
+// le 2026-08-16 : présent sur l'endpoint individuel, absent des 50 pages.
+// Un trou qu'on sait combler ne reste pas un trou.
+test("machines the bulk pages dropped are fetched one by one", async () => {
+  const meta = new Map([[1, { image: "u", headwear: "Fez", body: "Sky" }]]);
+  const asked = [];
+  const filled = await backfillMetadata({
+    apiKey: "k", meta, wanted: [1, 765], limit: 50,
+    fetchImpl: async (url) => {
+      asked.push(String(url).split("/").pop());
+      return { ok: true, status: 200, json: async () => ({
+        nft: { identifier: "765", display_image_url: "https://img/765.webp",
+               traits: [{ trait_type: "Headwear", value: "Fez" }, { trait_type: "Body", value: "Cobalt" }] },
+      }) };
+    },
+  });
+  assert.deepEqual(asked, ["765"]);          // le 1 déjà connu n'est pas redemandé
+  assert.equal(filled, 1);
+  assert.deepEqual(meta.get(765), { image: "https://img/765.webp", headwear: "Fez", body: "Cobalt" });
+});
+
+test("a backfill that fails leaves the map alone rather than poisoning it", async () => {
+  const meta = new Map();
+  const filled = await backfillMetadata({
+    apiKey: "k", meta, wanted: [765], limit: 50,
+    fetchImpl: async () => ({ ok: false, status: 500, json: async () => ({}) }),
+  });
+  assert.equal(filled, 0);
+  assert.equal(meta.has(765), false);
+});
+
+test("a backfill refuses to hammer the API when the gap is not a gap but a failure", async () => {
+  const meta = new Map();
+  let calls = 0;
+  const filled = await backfillMetadata({
+    apiKey: "k", meta, wanted: [1, 2, 3, 4, 5], limit: 2,
+    fetchImpl: async () => { calls++; return { ok: true, status: 200, json: async () => ({
+      nft: { identifier: String(calls), display_image_url: "u", traits: [] } }) }; },
+  });
+  assert.equal(calls, 2);
+  assert.equal(filled, 2);
+});
+
+test("a written cache reads back as the same map", () => {
+  const path = tmp();
+  writeCache(path, new Map([[1, { image: "u", headwear: "Halo", body: "Sky" }]]));
+  assert.deepEqual(readCache(path).get(1), { image: "u", headwear: "Halo", body: "Sky" });
+});
+
+test("a corrupt or missing cache is treated as absent, never half-trusted", () => {
+  const path = tmp();
+  writeFileSync(path, "{ not json");
+  assert.equal(readCache(path), null);
+  assert.equal(readCache(join(tmpdir(), "absent-rh-metadata.json")), null);
+});

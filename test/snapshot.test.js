@@ -36,3 +36,38 @@ test("the published floor rides along but is marked as uncomputed-with", () => {
   assert.equal(s.publishedFloor.floor, 0.0889891);
   assert.equal(s.publishedFloor.usedInComputation, false);
 });
+
+const withGrid = {
+  ...base,
+  grid: {
+    ...base.grid,
+    rows: [{
+      classLabel: "x10", classValue: 1000, docCount: 37, chainCount: 37, spreadEth: -0.5,
+      inked:   { floorEth: 2.0, floorTokenId: 1253, pelotonEth: 2.25, listed: 9, supply: 33, listedRatio: 0.27 },
+      dormant: { floorEth: 2.5, floorTokenId: null, pelotonEth: null, listed: 0, supply: 4, listedRatio: 0 },
+    }],
+  },
+  meta: new Map([[1253, { image: "https://img/1253.webp", headwear: "Blueberries", body: "Cobalt Stripe" }]]),
+  legend: { byClass: [], headwearClass: new Map(), ambiguous: [], unpaired: 0 },
+};
+
+test("the machine that sets a floor carries its picture and its headwear", () => {
+  const s = composeSnapshot(withGrid);
+  assert.deepEqual(s.rows[0].inked.machine, {
+    image: "https://img/1253.webp", headwear: "Blueberries", body: "Cobalt Stripe",
+  });
+});
+
+test("a cell with no floor gets no machine, and one with no metadata gets null", () => {
+  const s = composeSnapshot(withGrid);
+  assert.equal(s.rows[0].dormant.machine, null);
+
+  const missing = composeSnapshot({ ...withGrid, meta: new Map() });
+  assert.equal(missing.rows[0].inked.machine, null);
+  assert.equal(missing.rows[0].inked.floorEth, 2.0);   // a missing picture costs no price
+});
+
+test("the rarity legend travels with the snapshot", () => {
+  const s = composeSnapshot(withGrid);
+  assert.deepEqual(s.legend, withGrid.legend);
+});

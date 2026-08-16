@@ -66,5 +66,6 @@ export function loadConfig(env, raw) {
     pelotonSize:         num("pelotonSize", 3, 50),
     multicallBatchSize:  num("multicallBatchSize", 50, 1000),
     maxBookPages:        num("maxBookPages", 1, 5000),
+    maxMetadataPages:    num("maxMetadataPages", 1, 1000),
   });
 }
