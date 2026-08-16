@@ -39,6 +39,30 @@ export function fmtBig(v) {
   return fmtUsd(v);
 }
 
+/** Des jetons, pas des dollars : mêmes abréviations, sans signe monétaire. */
+export function fmtCompact(v) {
+  if (v === null || v === undefined) return "—";
+  if (Math.abs(v) >= 1e9) return `${(v / 1e9).toFixed(1)}B`;
+  if (Math.abs(v) >= 1e6) return `${(v / 1e6).toFixed(1)}M`;
+  return fmtInt(Math.round(v));
+}
+
+/**
+ * Le plafond et la classe sont deux multiplicateurs sans rapport : la classe est
+ * la rareté scellée au mint, que rien ne plafonne, tandis que le plafond limite
+ * ce que l'encre fait gagner en plus — `√(ink/4250)`. Les afficher tous deux en
+ * « x » sans dire lequel est lequel faisait lire « ceiling 2x » comme une
+ * contradiction avec la ligne x10 juste en dessous.
+ */
+function ceilingLine(pr) {
+  if (!pr?.ceiling) return "ceiling unreadable";
+  const ceiling = `ink ceiling x${Number(pr.ceiling) / 100}`;
+  const gate = pr.nextGate?.needed && pr.nextGate?.unlocks
+    ? ` · x${Number(pr.nextGate.unlocks) / 100} at ${fmtCompact(Number(BigInt(pr.nextGate.needed) / 10n ** 18n))} more burned`
+    : "";
+  return ceiling + gate;
+}
+
 export function contextHtml(d) {
   const p = d.printer ?? {};
   const e = d.eth ?? {};
@@ -69,7 +93,7 @@ export function contextHtml(d) {
       `${fmtBig(c.volumeUsd)} · ${fmtInt(c.sales)} sales · ` +
       `${c.volume24hEth === null || c.volume24hEth === undefined ? "—" : c.volume24hEth.toFixed(1)} ETH 24h`),
     statBlock("Machines", `${fmtInt(d.totals?.inked)} inked`, `${fmtInt(d.totals?.dormant)} dormant · ${fmtInt(d.totals?.listed)} listed`),
-    statBlock("Epoch", pr.epoch ?? "—", pr.ceiling ? `ceiling ${Number(pr.ceiling) / 100}x` : "ceiling unreadable"),
+    statBlock("Epoch", pr.epoch ?? "—", ceilingLine(pr)),
   ].join("");
 }
 

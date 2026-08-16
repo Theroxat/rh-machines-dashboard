@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   fmtEth, fmtRatio, halfCell, cellKey,
   bannerMessage, excludedLine, publishedLine, rowsHtml, contextHtml, legendHtml,
-  matchesFilter, filterBarHtml, filterSummary, freshness,
+  matchesFilter, filterBarHtml, filterSummary, freshness, fmtCompact,
 } from "../src/public/app.js";
 
 const entry = (tokenId, priceEth, image = `https://img/${tokenId}.webp`) => ({
@@ -394,4 +394,31 @@ test("each half names its own state, so it still reads with no column header", (
   assert.match(halfCell(half(), "ink"), /data-state="Inked"/);
   assert.match(halfCell(half(), "dormant"), /data-state="Dormant"/);
   assert.match(halfCell(half({ entries: [], listed: 0 }), "ink"), /data-state="Inked"/);
+});
+
+// La classe scellée (x1..x10) et le plafond d'encre sont deux multiplicateurs
+// sans rapport. Les afficher tous deux en « x » invitait à lire « ceiling 2x »
+// comme une contradiction avec la ligne x10 juste en dessous.
+test("the ink ceiling names what it caps, and uses the same notation as the classes", () => {
+  const html = contextHtml({ ...CTX, protocol: { epoch: "1", ceiling: "200", nextGate: { needed: "31220791000000000000000000", unlocks: "300" } } });
+  assert.match(html, /ink ceiling x2/);
+  assert.doesNotMatch(html, /ceiling 2x/);
+  assert.match(html, /x3 at 31\.2M more burned/);
+});
+
+test("an unreadable gate leaves the ceiling stated and the rest silent", () => {
+  const html = contextHtml({ ...CTX, protocol: { epoch: "1", ceiling: "200", nextGate: null } });
+  assert.match(html, /ink ceiling x2/);
+  assert.doesNotMatch(html, /more burned/);
+});
+
+test("an unreadable ceiling says so rather than inventing one", () => {
+  const html = contextHtml({ ...CTX, protocol: { epoch: "1", ceiling: null, nextGate: null } });
+  assert.match(html, /ceiling unreadable/);
+});
+
+test("large token amounts are compacted without a currency sign", () => {
+  assert.equal(fmtCompact(31220791), "31.2M");
+  assert.equal(fmtCompact(4250), "4,250");
+  assert.equal(fmtCompact(null), "—");
 });
