@@ -1,0 +1,13 @@
+services:
+  rh-dashboard:
+    build: .
+    container_name: rh-dashboard
+    restart: unless-stopped
+    env_file: .env
+    # 3050 a été vérifié libre sur cet hôte, et n'est déclaré par aucun autre
+    # conteneur, en marche ou arrêté. L'écoute est liée à 192.168.0.11 plutôt
+    # qu'à 0.0.0.0 : le dashboard reste sur l'interface LAN.
+    ports:
+      - "192.168.0.11:3050:3050"
+    volumes:
+      - ./data:/app/data
