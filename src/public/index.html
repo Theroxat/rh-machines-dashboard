@@ -104,6 +104,32 @@
   /* ---- filtres par trait ---- */
 
   .filter-bar { margin-top: 20px; }
+  .filter-row { display: flex; flex-wrap: wrap; gap: 26px; align-items: flex-start; justify-content: space-between; }
+
+  /* La file d'attente de l'anvil : trois prix pour la même machine selon qu'on
+     la subit, qu'on la choisit ou qu'on la tire au sort. */
+  .queue-panel { border: 1px solid var(--rule-2); padding: 10px 13px; min-width: 320px; }
+  .queue-panel .market { margin-bottom: 8px; }
+  .q-row { display: flex; align-items: baseline; gap: 9px; font-size: 12px; padding: 2px 0; }
+  .q-what { flex: 1; color: var(--muted); white-space: nowrap; }
+  .q-id { color: var(--dim); font-size: 11px; min-width: 30px; }
+  .q-price { font-weight: 700; color: var(--ink); font-size: 14.5px; }
+  .q-unit { color: var(--muted); font-size: 10px; }
+  .q-usd { font-weight: 600; color: var(--text); min-width: 44px; text-align: right; }
+  .q-paused { display: block; margin-top: 6px; color: var(--alarm); font-size: 11px; }
+  .q-link, .buy {
+    display: inline-block;
+    margin-top: 9px;
+    padding: 3px 10px;
+    border: 1px solid var(--ink);
+    color: var(--ink);
+    font-size: 11px;
+    text-decoration: none;
+  }
+  .q-link:hover, .buy:hover, .q-link:focus-visible, .buy:focus-visible {
+    background: var(--ink); color: var(--paper);
+  }
+  .buy { margin-top: 0; padding: 0 6px; font-size: 10.5px; }
   #filters { display: flex; flex-wrap: wrap; gap: 18px; }
 
   .fl { display: inline-flex; flex-direction: column; gap: 3px; }
@@ -267,7 +293,7 @@
   .shelf-price .label { margin-right: 9px; }
   .shelf-price .price { font-size: 21px; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); }
   .shelf-price .unit { font-size: 11px; color: var(--muted); }
-  .shelf-price .usd-big { font-size: 13px; font-weight: 600; color: var(--muted); margin-left: 6px; }
+  .shelf-price .usd-big { font-size: 14.5px; font-weight: 600; color: var(--muted); margin-left: 7px; }
   .shelf .depth { margin-top: 1px; }
   .shelf .strip { margin-top: 7px; }
   .chip.anvil .price { font-size: 11px; }
@@ -394,7 +420,10 @@
 </header>
 
 <section class="filter-bar">
-  <div id="filters"></div>
+  <div class="filter-row">
+    <div id="filters"></div>
+    <div id="queue"></div>
+  </div>
   <p id="filter-summary"></p>
 </section>
 
