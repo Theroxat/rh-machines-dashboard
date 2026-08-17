@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   fmtEth, fmtRatio, halfCell, cellKey,
   bannerMessage, excludedLine, publishedLine, rowsHtml, contextHtml, legendHtml,
-  matchesFilter, filterBarHtml, filterSummary, freshness, fmtCompact, queueHtml,
+  matchesFilter, filterBarHtml, filterSummary, freshness, fmtCompact, crateLine,
 } from "../src/public/app.js";
 
 const entry = (tokenId, priceEth, image = `https://img/${tokenId}.webp`) => ({
@@ -788,41 +788,33 @@ test("a cell the anvil holds nothing in names only the market that has something
   assert.doesNotMatch(html, /On the Anvil/);
 });
 
-// ---- la file d'attente de l'anvil ----
-
-const QUEUE = { frontTokenId: 6, frontPrinter: 14323, frontUsd: 170,
-  cratePrinter: 15182, crateUsd: 181, snipePrinter: 15755, snipeUsd: 188,
-  shelf: 30, bidPaused: false, paused: false, spotPrinter: 14111, spotUsd: 168 };
-
-test("the queue panel states its three prices, each in both currencies", () => {
-  const html = queueHtml(QUEUE);
-  assert.match(html, /at the front/i);
-  assert.match(html, /14,323/);
-  assert.match(html, /\$170/);
-  assert.match(html, /crate/i);
-  assert.match(html, /15,182/);
-  assert.match(html, /name the one/i);
-  assert.match(html, /15,755/);
-  assert.match(html, /#6/);
-});
-
-test("the panel links to the Anvil, where the trade happens", () => {
-  assert.match(queueHtml(QUEUE), /href="https:\/\/rh\.btcmachine\.gg\/"/);
-});
-
-test("an unreadable queue shows no panel rather than an empty frame", () => {
-  assert.equal(queueHtml(null), "");
-  assert.equal(queueHtml({ ...QUEUE, frontPrinter: null, cratePrinter: null, snipePrinter: null }), "");
-});
-
-test("a paused anvil says so rather than quoting prices it will not honour", () => {
-  assert.match(queueHtml({ ...QUEUE, paused: true }), /paused/i);
-});
-
 // ---- acheter du $PRINTER ----
 
 test("the token block offers the way to buy it", () => {
   const html = contextHtml(CTX);
   assert.match(html, /href="https:\/\/rh\.btcmachine\.gg\/swap"/);
   assert.match(html, /buy \$PRINTER/i);
+});
+
+// ---- la caisse ----
+
+// Une seule ligne, collée aux filtres : ce que coûte une machine tirée au sort.
+test("the crate line says what it costs, in both currencies", () => {
+  const html = crateLine({ cratePrinter: 14652, crateUsd: 195, paused: false });
+  assert.match(html, /try your luck/i);
+  assert.match(html, /14,652/);
+  assert.match(html, /\$195/);
+  assert.match(html, /drawn at random/i);
+  assert.match(html, /href="https:\/\/rh\.btcmachine\.gg\/"/);
+});
+
+test("no crate price means no line at all", () => {
+  assert.equal(crateLine(null), "");
+  assert.equal(crateLine({ cratePrinter: null, crateUsd: null }), "");
+});
+
+test("a paused anvil is not invited to be gambled with", () => {
+  const html = crateLine({ cratePrinter: 14652, crateUsd: 195, paused: true });
+  assert.match(html, /paused/i);
+  assert.doesNotMatch(html, /try your luck/i);
 });

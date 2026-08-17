@@ -100,41 +100,25 @@ function anvilBlock(a) {
 }
 
 /**
- * La file de l'anvil : prendre ce qui se présente, en désigner une, ou ouvrir
- * une caisse. Trois prix pour la même chose, et l'écart entre eux est le jeu
- * qu'il propose. Aucun ne se déduit du spot, donc chacun est lu.
+ * Une caisse : une machine du rayon tirée au sort, à prix unique. C'est le
+ * seul des trois prix de l'anvil qui soit un jeu — les deux autres achètent une
+ * certitude — et c'est la seule ligne que la page en garde.
  */
-export function queueHtml(a) {
-  if (!a) return "";
-  const rows = [
-    a.frontPrinter === null || a.frontPrinter === undefined ? null
-      : { what: "At the front", id: a.frontTokenId ? `#${a.frontTokenId}` : "", pr: a.frontPrinter, usd: a.frontUsd },
-    a.cratePrinter === null || a.cratePrinter === undefined ? null
-      : { what: "A crate", id: "any", pr: a.cratePrinter, usd: a.crateUsd },
-    a.snipePrinter === null || a.snipePrinter === undefined ? null
-      : { what: "Name the one you want", id: "", pr: a.snipePrinter, usd: a.snipeUsd },
-  ].filter(Boolean);
+export function crateLine(a) {
+  if (!a || a.cratePrinter === null || a.cratePrinter === undefined) return "";
 
-  if (!rows.length) return "";
+  if (a.paused) {
+    return `<span class="crate"><span class="crate-what">The Anvil is paused</span>` +
+      `<span class="crate-note">no crate to open right now</span></span>`;
+  }
 
-  // Côte à côte, dans la forme des cellules du bandeau du haut : intitulé
-  // au-dessus, chiffre en dessous, séparées par un filet.
-  const body = `<span class="q-line">` + rows.map((r) =>
-    `<span class="q-row">` +
-      `<span class="q-what">${r.what}${r.id ? ` <span class="q-id">${esc(r.id)}</span>` : ""}</span>` +
-      `<span class="q-v"><span class="q-price">${fmtInt(Math.round(r.pr))}</span>` +
-      `<span class="q-unit">$PRINTER</span>` +
-      `<span class="q-usd">${r.usd ? fmtUsdShort(r.usd) : "—"}</span></span>` +
-    `</span>`
-  ).join("") + `</span>`;
-
-  const note = a.paused
-    ? `<span class="q-paused">The Anvil is paused — these prices are not being honoured.</span>`
-    : "";
-
-  return `<div class="queue-panel"><span class="market">The Anvil&rsquo;s queue</span>` +
-    body + note +
-    `<a class="q-link" href="${ANVIL_URL}" target="_blank" rel="noopener">Open the Anvil &#8599;</a></div>`;
+  return `<a class="crate" href="${ANVIL_URL}" target="_blank" rel="noopener">` +
+    `<span class="crate-what">Try your luck</span>` +
+    `<span class="crate-price">${fmtInt(Math.round(a.cratePrinter))}</span>` +
+    `<span class="crate-unit">$PRINTER</span>` +
+    `<span class="crate-usd">${a.crateUsd ? fmtUsdShort(a.crateUsd) : "—"}</span>` +
+    `<span class="crate-note">one Machine off the shelf, drawn at random &#8599;</span>` +
+  `</a>`;
 }
 
 export function contextHtml(d) {
@@ -645,7 +629,7 @@ if (typeof document !== "undefined") {
     lastData = v.data;
     $("context").innerHTML = contextHtml(v.data);
     paintFilters(v.data.traitFilters);
-    $("queue").innerHTML = queueHtml(v.data.anvil);
+    $("queue").innerHTML = crateLine(v.data.anvil);
     paint();
     $("legend").innerHTML = legendHtml(v.data.legend);
     $("anvil-line").innerHTML = anvilLine(v.data);
