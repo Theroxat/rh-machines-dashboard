@@ -111,27 +111,30 @@
   /* À plat, comme tout le reste : la page sépare par des filets et n'encadre
      jamais rien. Un panneau bordé était le seul de son espèce et se lisait
      comme une pièce rapportée. */
-  .queue-panel .market { margin-bottom: 8px; }
-
-  /* Les trois prix côte à côte, dans la forme des cellules du bandeau du haut :
-     intitulé au-dessus, chiffre en dessous, un filet entre chacune. */
-  .q-line { display: flex; flex-wrap: wrap; }
-  .q-row { padding: 0 15px; border-left: 1px solid var(--rule); }
-  .q-row:first-child { padding-left: 0; border-left: 0; }
-  .q-what {
-    display: block;
+  /* Une seule ligne, collée aux filtres : ce que coûte une machine tirée au
+     sort. Les deux autres prix de l'anvil achètent une certitude ; celui-ci
+     achète un pari, et c'est le seul qui mérite d'être ici. */
+  .crate {
+    display: flex;
+    align-items: baseline;
+    gap: 9px;
+    text-decoration: none;
+    color: inherit;
+    border-bottom: 1px solid transparent;
+    padding-bottom: 3px;
+  }
+  a.crate:hover, a.crate:focus-visible { border-bottom-color: var(--ink); }
+  .crate-what {
     font-size: 10px;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: var(--muted);
+    color: var(--ink);
     white-space: nowrap;
   }
-  .q-id { color: var(--dim); letter-spacing: 0; }
-  .q-v { display: block; margin-top: 3px; white-space: nowrap; }
-  .q-price { font-weight: 700; color: var(--ink); font-size: 15.5px; }
-  .q-unit { color: var(--muted); font-size: 10px; margin-left: 4px; }
-  .q-usd { font-weight: 600; color: var(--text); font-size: 13px; margin-left: 8px; }
-  .q-paused { display: block; margin-top: 6px; color: var(--alarm); font-size: 11px; }
+  .crate-price { font-weight: 700; color: var(--ink); font-size: 15.5px; }
+  .crate-unit { color: var(--muted); font-size: 10px; }
+  .crate-usd { font-weight: 600; color: var(--text); font-size: 13px; }
+  .crate-note { color: var(--muted); font-size: 11px; white-space: nowrap; }
 
   /* Un lien, pas un bouton : souligné à l'approche, rien d'autre. */
   .q-link, .buy {

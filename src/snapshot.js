@@ -144,8 +144,6 @@ export function composeSnapshot({
           ...anvil,
           bids: undefined,   // 650 entrées déjà portées par chaque machine
           spotUsd: anvil.spotPrinter === null ? null : anvil.spotPrinter * (printer?.usd ?? 0) || null,
-          frontUsd: anvil.frontPrinter === null ? null : anvil.frontPrinter * (printer?.usd ?? 0) || null,
-          snipeUsd: anvil.snipePrinter === null ? null : anvil.snipePrinter * (printer?.usd ?? 0) || null,
           shelfAverageUsd: anvil.shelfAveragePrinter === null ? null : anvil.shelfAveragePrinter * (printer?.usd ?? 0) || null,
           crateUsd: anvil.cratePrinter === null ? null : anvil.cratePrinter * (printer?.usd ?? 0) || null,
           sellFeeBps: protocol?.sellFeeBps ?? null,
