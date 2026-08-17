@@ -42,13 +42,14 @@ test("the full statement disclaims affiliation, endorsement, and advice", () => 
   assert.match(footer, /verify every price/i);
 });
 
-// Le tableau est déplié en blocs sous 760 px. Tout élément resté en display
-// table dans ce conteneur se retrouve dans une boîte de largeur minimale : le
-// caption y descendait en colonne, un mot par ligne. Rien d'autre ne l'attrape.
-test("nothing keeps a table display inside the blockified mobile table", () => {
+// Le tableau est déplié en blocs sous 760 px : tout élément resté en display
+// table dans ce conteneur se retrouve dans une boîte de largeur minimale, et son
+// texte descend en colonne. Rien d'autre ne l'attrape.
+test("the mobile table is fully blockified", () => {
   const mobile = flat.slice(flat.indexOf("@media (max-width: 760px)"));
   assert.match(mobile, /table, tbody, tr, td \{ display: block/);
-  assert.match(mobile, /caption \{ display: block/);
+  // et plus aucun caption à traiter, puisqu'il n'y en a plus
+  assert.doesNotMatch(flat, /<caption/);
 });
 
 // Deux fois de suite, le layout mobile a été cassé par une règle desktop plus

@@ -185,7 +185,6 @@
 
   table { border-collapse: collapse; width: 100%; min-width: 900px; }
 
-  caption { caption-side: top; text-align: left; padding-bottom: 8px; }
 
   th, td { padding: 13px 15px; text-align: left; vertical-align: top; }
   th:first-child, td:first-child { padding-left: 0; }
@@ -374,10 +373,6 @@
     table { min-width: 0; }
     thead { display: none; }
     table, tbody, tr, td { display: block; width: auto; }
-    /* Le caption garde sinon son `display: table-caption` dans un conteneur
-       devenu bloc : il se retrouve dans une boîte de largeur minimale et son
-       texte descend en colonne, un mot par ligne. */
-    caption { display: block; padding-bottom: 10px; }
 
     tbody tr {
       border: 1px solid var(--rule-2);
@@ -447,7 +442,6 @@
 
 <div class="scroll">
   <table>
-    <caption class="label">Each row is one rarity, granted by the Machine's headwear. A dormant Machine and an inked one are different assets, so each has its own book.</caption>
     <thead>
       <tr class="label">
         <th>Rarity</th>
