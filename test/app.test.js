@@ -1204,3 +1204,23 @@ test("only the stock menu speaks of the pot; the cosmetic three cannot", () => {
     NO_FILTER, ballot());
   assert.equal((html.match(/of the pot/g) ?? []).length, 1);
 });
+
+// Les tickers viennent aujourd'hui d'un recensement figé de seize chaînes, donc
+// rien ne peut s'y glisser. La règle de la maison ne dépend pas de ça : tout ce
+// qui entre dans du balisage est échappé, pour que la sûreté survive au jour où
+// la source changera.
+test("a ticker is escaped on its way into the page, wherever it came from", () => {
+  const evil = '<img src=x onerror=alert(1)>';
+  const bar = filterBarHtml(
+    { Farms: [{ value: "X", listed: 1, total: 1, ticker: evil }], Headwear: [], Body: [], Eyes: [] },
+    NO_FILTER);
+  assert.doesNotMatch(bar, /<img src=x/);
+  assert.match(bar, /&lt;img src=x/);
+
+  const block = ballotBlock({
+    opened: true, closesAt: null, finalized: false, conflicts: [],
+    desks: [{ index: 0, ticker: evil, votedWeight: 10, share: 1 }],
+  }, 1, 1000);
+  assert.doesNotMatch(block, /<img src=x/);
+  assert.match(block, /&lt;img src=x/);
+});

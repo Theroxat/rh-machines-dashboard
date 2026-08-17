@@ -195,7 +195,7 @@ export function ballotBlock(vote, epoch, now) {
     : `closes in ${Math.round(left / 3600000)}h`;
 
   return statBlock("Ballot",
-    `${top.ticker ?? `desk ${top.index}`} ${fmtRatio(top.share)}`,
+    `${top.ticker ? esc(top.ticker) : `desk ${top.index}`} ${fmtRatio(top.share)}`,
     [when, `${voted.length} of 16 desks drew votes`].filter(Boolean).join(" · "));
 }
 
@@ -591,7 +591,7 @@ export function filterBarHtml(traitFilters, filter, vote = null) {
   return TRAIT_TYPES.map((type) => {
     const values = traitFilters[type] ?? [];
     const options = values.map((v) => {
-      const ticker = v.ticker ? ` — ${v.ticker}` : "";
+      const ticker = v.ticker ? ` — ${esc(v.ticker)}` : "";
       const pot = type === "Farms" && share.has(v.value) ? ` — ${fmtRatio(share.get(v.value))} of the pot` : "";
       const chosen = filter?.[type] === v.value ? " selected" : "";
       return `<option value="${esc(v.value)}"${chosen}>${esc(v.value)}${ticker}${pot} (${fmtInt(v.listed)} on sale of ${fmtInt(v.total)})</option>`;
