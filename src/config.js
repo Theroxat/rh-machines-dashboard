@@ -15,6 +15,14 @@ export const ADDRESSES = Object.freeze({
   // Le hook Uniswap qui prélève le frais de vente du $PRINTER : sans lui, une
   // comparaison entre un prix en PRINTER et un prix en ETH surestime le premier.
   HOOK:       "0x3685cc4Aa1266813Fa0EF346853341b0778C80Cc",
+  // Le scrutin, qui décide de la taille des parts du pot. Aucun des contrats
+  // ci-dessus n'y renvoie : l'adresse vient de la carte publiée par les bundles
+  // du terminal, relevée le 2026-08-17 et vérifiée on-chain.
+  VOTE:       "0x315A3aefa0F8547e79E85e0Ce644DA2A149a018F",
+  // Lus dans la même carte, gardés pour référence : ce sont eux qui achètent
+  // les actions et qui les poussent dans les comptes des machines.
+  SWAPPER:    "0xE43244260Ee978F28fD2052481a5E6E1FAcEbDc6",
+  DISTRIBUTOR: "0xf1C50FfEB5cC8A50B153cEEd1b7Dd0C42f3e5438",
 });
 
 export const TOTAL_MACHINES = 10000;

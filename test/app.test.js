@@ -4,7 +4,7 @@ import {
   fmtEth, fmtRatio, halfCell, cellKey,
   bannerMessage, rowsHtml, contextHtml, legendHtml,
   matchesFilter, filterBarHtml, filterSummary, freshness, fmtCompact, crateLine,
-  perPointUsd, viewBarHtml,
+  perPointUsd, viewBarHtml, ballotBlock,
 } from "../src/public/app.js";
 
 const entry = (tokenId, priceEth, image = `https://img/${tokenId}.webp`) => ({
@@ -848,7 +848,7 @@ test("the shelf never carries the under-bid mark", () => {
 // milieu de six colorés se lisaient comme des oublis, pas comme une règle.
 test("every value in the bar is amber", () => {
   const html = contextHtml({ ...CTX, anvil: { spotPrinter: 14100, spotUsd: 168, shelf: 18, bidPaused: false } });
-  assert.equal(html.match(/<div class="stat">/g).length, 8);
+  assert.equal(html.match(/<div class="stat">/g).length, 9);
   assert.doesNotMatch(html, /is-price/);
 });
 
@@ -1136,4 +1136,71 @@ test("a dormant cell names what the activation costs, not just that it counts", 
   const html = halfCell(half({ entries: [wEntry(1, 0.10, 0)] }), "dormant",
     { view: "value", classValue: 200, ...RATES });
   assert.match(html, /activation included, \$50/);
+});
+
+// ---- le bulletin ---------------------------------------------------------
+//
+// Le scrutin décide de la taille des parts du pot, donc du coefficient qui
+// s'applique par desk. Trois états qu'un tableau de zéros confondrait.
+
+const ballot = (over = {}) => ({
+  opened: true, finalized: false, closesAt: 1000 + 30 * 3600e3, conflicts: [],
+  desks: [
+    { index: 0, ticker: "NVDA", votedWeight: 6000, share: 0.6 },
+    { index: 5, ticker: "AAPL", votedWeight: 4000, share: 0.4 },
+    { index: 13, ticker: "USAR", votedWeight: 0, share: 0 },
+  ], ...over,
+});
+
+test("a ballot nobody could open announces no share at all", () => {
+  const html = ballotBlock(ballot({ opened: false, desks: [] }), 1, 1000);
+  assert.match(html, /not open yet/);
+  assert.match(html, /epoch 1/);
+  assert.doesNotMatch(html, /0\.0%/);
+});
+
+test("an open ballot leads with the desk that drew most, and the time left", () => {
+  const html = ballotBlock(ballot(), 1, 1000);
+  assert.match(html, /NVDA 60\.0%/);
+  assert.match(html, /closes in 30h/);
+  assert.match(html, /2 of 16 desks drew votes/);   // USAR à zéro n'en est pas
+});
+
+test("an open ballot with not one vote says so, rather than showing a winner", () => {
+  const html = ballotBlock(ballot({ desks: [{ index: 0, ticker: "NVDA", votedWeight: 0, share: null }] }), 1, 1000);
+  assert.match(html, /no vote yet/);
+  assert.doesNotMatch(html, /NVDA/);
+});
+
+test("a ballot that could not be read says so, never that nothing was voted", () => {
+  const html = ballotBlock(null, 1, 1000);
+  assert.match(html, /unreadable/);
+  assert.doesNotMatch(html, /not open/);
+});
+
+test("the stock menu carries what each desk drew out of the pot", () => {
+  const html = filterBarHtml(
+    { Farms: [{ value: "NVDA", listed: 116, total: 1245 }, { value: "AAPL", listed: 150, total: 1322 }],
+      Headwear: [], Body: [], Eyes: [] },
+    NO_FILTER, ballot());
+  assert.match(html, /NVDA — 60\.0% of the pot \(116 on sale of 1,245\)/);
+  assert.match(html, /AAPL — 40\.0% of the pot/);
+});
+
+// Le desk n'a de valeur mesurable que pendant une epoch votée. Hors bulletin le
+// menu ne doit rien laisser entendre : une part absente n'est pas une part nulle.
+test("with no ballot the stock menu claims no share", () => {
+  const html = filterBarHtml(
+    { Farms: [{ value: "NVDA", listed: 116, total: 1245 }], Headwear: [], Body: [], Eyes: [] },
+    NO_FILTER, null);
+  assert.match(html, /NVDA \(116 on sale of 1,245\)/);
+  assert.doesNotMatch(html, /of the pot/);
+});
+
+test("only the stock menu speaks of the pot; the cosmetic three cannot", () => {
+  const html = filterBarHtml(
+    { Farms: [{ value: "NVDA", listed: 1, total: 1 }], Headwear: [{ value: "NVDA", listed: 1, total: 1 }],
+      Body: [], Eyes: [] },
+    NO_FILTER, ballot());
+  assert.equal((html.match(/of the pot/g) ?? []).length, 1);
 });
