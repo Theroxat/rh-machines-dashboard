@@ -754,3 +754,14 @@ test("a machine with no picture still carries its marks", () => {
   assert.match(html, /class="thumb"/);
   assert.match(html, /class="under"/);
 });
+
+// Les deux moitiés d'une case annoncent un prix : elles doivent l'annoncer de
+// la même façon, sinon celle de l'anvil se lit comme un chiffre sans nom.
+test("the shelf names its price the way the OpenSea half does", () => {
+  const html = halfCell(half({ entries: [entry(1, 0.11)], anvilEntries: [shelfEntry()] }), "ink", { ethUsd: 1896 });
+  const shelf = html.slice(html.indexOf('class="shelf"'));
+  assert.match(shelf, /class="label">floor price<\/span>/);
+  assert.ok(shelf.indexOf("floor price") < shelf.indexOf("23,465"), "the label comes before the amount");
+  // et les deux moitiés portent bien le même mot
+  assert.equal((html.match(/floor price/g) || []).length, 2);
+});

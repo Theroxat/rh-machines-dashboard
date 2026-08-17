@@ -209,8 +209,11 @@ function shelfStrip(anvilEntries) {
     : "";
 
   const first = anvilEntries[0];
+  // Le même mot que la moitié OpenSea : sans lui, le montant du rayon se lit
+  // comme un chiffre sans nom à côté d'un floor qui, lui, se présente.
   const priceLine =
-    `<span class="shelf-price"><span class="price">${fmtInt(Math.round(first.askPrinter))}</span>` +
+    `<span class="shelf-price"><span class="label">floor price</span>` +
+    `<span class="price">${fmtInt(Math.round(first.askPrinter))}</span>` +
     ` <span class="unit">$PRINTER</span>` +
     (first.askUsd ? ` <span class="usd-big">${fmtUsdShort(first.askUsd)}</span>` : "") + `</span>`;
 
