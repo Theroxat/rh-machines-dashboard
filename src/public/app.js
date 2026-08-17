@@ -157,44 +157,56 @@ export function contextHtml(d) {
   ].join("");
 }
 
-/** Une machine en vente : sa photo, son prix, son numéro. Sans photo elle garde
- *  son prix et son lien — on a perdu une image, pas une offre. */
-function chip(e, isFloor, ethUsd) {
+/**
+ * Une machine en vente : sa photo, son prix, son numéro. Sans photo elle garde
+ * son prix et son lien — on a perdu une image, pas une offre.
+ *
+ * Un seul constructeur pour les deux marchés. Il y en avait deux, et ils ont
+ * dérivé : le badge de re-encrage n'existait que du côté OpenSea, si bien
+ * qu'une x10 re-inkée au plafond passait pour une x10 ordinaire sur le rayon.
+ */
+function chip(e, { isFloor = false, ethUsd = null, anvil = false } = {}) {
   const hw = e.machine?.headwear ? ` · ${headwearLabel(e.machine.headwear)}` : "";
   const img = e.machine?.image
     ? `<img src="${esc(e.machine.image)}" alt="Machine #${e.tokenId}" loading="lazy" width="60" height="60">`
     : `<span class="noimg" aria-hidden="true"></span>`;
 
-  // Une machine re-inkée pèse plus que ne le dit sa ligne : c'est la seule
-  // chose qu'une vignette doit crier, et elle ne concerne qu'un listing sur
-  // cent. Le badge porte le poids effectif, dans la notation du site officiel.
-  const dollars = fmtUsdShort(usdOf(e.priceEth, ethUsd));
+  const price = anvil ? fmtInt(Math.round(e.askPrinter)) : fmtEth(e.priceEth);
+  const dollars = anvil ? fmtUsdShort(e.askUsd) : fmtUsdShort(usdOf(e.priceEth, ethUsd));
+
+  // Une machine re-inkée pèse plus que ne le dit sa ligne — vrai des deux côtés.
   const reinked = e.inkMult > 1.0001 && e.weight;
   const badge = reinked ? `<span class="reink">${e.weight / 100}x</span>` : "";
   const inkStory = reinked
     ? ` · re-inked ×${e.inkMult.toFixed(2)} — ${fmtInt(e.inkPrinter)} $PRINTER burned · weight ${e.weight / 100}x`
     : "";
 
-  // La seule comparaison qui compte vraiment : ce listing s'échange-t-il sous
-  // ce que le protocole lui-même en donnerait ? Ce n'est pas une opinion, ce
-  // sont deux nombres publics mis côte à côte.
-  const gap = e.underBid && e.priceEth
-    ? Math.round((100 * (e.anvilBidEth - e.priceEth)) / e.priceEth)
-    : null;
-  // Un écart réel mais inférieur au point de pourcentage s'arrondissait à
-  // « +0% », ce qui se lit comme « aucun gain » — l'inverse de ce qu'il dit.
-  const under = gap === null ? "" : `<span class="under">${gap < 1 ? "&lt;1%" : `+${gap}%`}</span>`;
-  const bidStory = e.anvilBidEth
+  // L'anvil ne peut pas vendre sous sa propre offre : la marque n'a de sens que
+  // sur le carnet OpenSea.
+  const under = !anvil && e.underBid ? `<span class="under">${gapLabel(e)}</span>` : "";
+  const bidStory = !anvil && e.anvilBidEth
     ? ` · anvil pays ${fmtEth(e.anvilBidEth)} ETH (${fmtInt(e.anvilBidPrinter)} $PRINTER, net of the sell fee)`
     : "";
+  const anvilStory = anvil
+    ? ` · ${fmtInt(Math.round(e.askPrinter))} $PRINTER to pick this one` +
+      (e.askEth ? ` · ≈${fmtEth(e.askEth)} ETH` : "")
+    : "";
 
-  return `<a class="chip${isFloor ? " floor" : ""}${e.underBid ? " is-under" : ""}" href="${itemUrl(e.tokenId)}"` +
-    ` target="_blank" rel="noopener" title="${esc(`#${e.tokenId}${hw}${inkStory}${bidStory}`)}">` +
+  return `<a class="chip${isFloor ? " floor" : ""}${anvil ? " anvil" : ""}${!anvil && e.underBid ? " is-under" : ""}"` +
+    ` href="${anvil ? ANVIL_URL : itemUrl(e.tokenId)}" target="_blank" rel="noopener"` +
+    ` title="${esc(`#${e.tokenId}${hw}${inkStory}${bidStory}${anvilStory}`)}">` +
     `<span class="thumb">${img}${badge}${under}</span>` +
-    `<span class="price">${fmtEth(e.priceEth)}</span>` +
+    `<span class="price">${price}</span>` +
     (dollars ? `<span class="usd">${dollars}</span>` : "") +
     `<span class="tok">#${e.tokenId}</span>` +
   `</a>`;
+}
+
+/** Un écart réel mais inférieur au point de pourcentage s'arrondissait à
+ *  « +0% », ce qui se lit comme « aucun gain » — l'inverse de ce qu'il dit. */
+function gapLabel(e) {
+  const gap = Math.round((100 * (e.anvilBidEth - e.priceEth)) / e.priceEth);
+  return gap < 1 ? "&lt;1%" : `+${gap}%`;
 }
 
 export const TRAIT_TYPES = Object.freeze(["Headwear", "Body", "Eyes"]);
@@ -244,21 +256,7 @@ function shelfStrip(anvilEntries) {
     ` <span class="unit">$PRINTER</span>` +
     (first.askUsd ? ` <span class="usd-big">${fmtUsdShort(first.askUsd)}</span>` : "") + `</span>`;
 
-  const chips = anvilEntries.map((e) => {
-    const img = e.machine?.image
-      ? `<img src="${esc(e.machine.image)}" alt="Machine #${e.tokenId}" loading="lazy" width="60" height="60">`
-      : `<span class="noimg" aria-hidden="true"></span>`;
-    const tip = `#${e.tokenId} · ${fmtInt(Math.round(e.askPrinter))} $PRINTER` +
-      (e.askUsd ? ` · ${fmtUsdShort(e.askUsd)}` : "") +
-      (e.askEth ? ` · ≈${fmtEth(e.askEth)} ETH` : "") +
-      " — sold by the Anvil, paid in $PRINTER";
-    return `<a class="chip anvil" href="${ANVIL_URL}" target="_blank" rel="noopener" title="${esc(tip)}">` +
-      `<span class="thumb">${img}</span>` +
-      `<span class="price">${fmtInt(Math.round(e.askPrinter))}</span>` +
-      (e.askUsd ? `<span class="usd">${fmtUsdShort(e.askUsd)}</span>` : "") +
-      `<span class="tok">#${e.tokenId}</span>` +
-    `</a>`;
-  }).join("");
+  const chips = anvilEntries.map((e) => chip(e, { anvil: true })).join("");
 
   return `<span class="shelf">` +
     `<span class="market">On the Anvil</span>` +
@@ -367,7 +365,7 @@ function renderHalf(half, g, { shown: count, step, limit, key, depth, state, eth
     head +
     `<span class="depth">${depth}</span>` +
     underNote +
-    `<span class="strip">${shown.map((e, i) => chip(e, i === 0, ethUsd)).join("")}</span>` +
+    `<span class="strip">${shown.map((e, i) => chip(e, { isFloor: i === 0, ethUsd })).join("")}</span>` +
     more +
     shelfStrip(half.anvilEntries) +
   `</td>`;

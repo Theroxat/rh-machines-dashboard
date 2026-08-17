@@ -843,3 +843,28 @@ test("with no queue price read, only the named one is claimed", () => {
   assert.match(html, /to pick one/i);
   assert.doesNotMatch(html, /whichever is next/i);
 });
+
+// Deux constructeurs de vignette avaient dérivé : le badge de re-encrage
+// n'existait que du côté OpenSea, et #4173 — une x10 au plafond, donc 20x —
+// passait pour une x10 ordinaire sur le rayon. Un seul constructeur désormais.
+test("a re-inked machine is badged on the shelf too", () => {
+  const html = halfCell(half({
+    anvilEntries: [shelfEntry({ tokenId: 4173, askPrinter: 318395, askUsd: 4066, weight: 2000, inkMult: 2 })],
+  }), "ink", { ethUsd: 1896 });
+  const shelf = html.slice(html.indexOf('class="shelf"'));
+  assert.match(shelf, /class="reink"[^>]*>20x</);
+});
+
+test("a shelf machine at plain ink carries no badge", () => {
+  const html = halfCell(half({ anvilEntries: [shelfEntry({ weight: 100, inkMult: 1 })] }), "ink", { ethUsd: 1896 });
+  assert.doesNotMatch(html.slice(html.indexOf('class="shelf"')), /class="reink"/);
+});
+
+// L'anvil ne peut pas vendre sous sa propre offre : la marque verte n'a pas de
+// sens de ce côté.
+test("the shelf never carries the under-bid mark", () => {
+  const html = halfCell(half({
+    anvilEntries: [shelfEntry({ underBid: true, anvilBidEth: 9 })],
+  }), "ink", { ethUsd: 1896 });
+  assert.doesNotMatch(html.slice(html.indexOf('class="shelf"')), /class="under"/);
+});
