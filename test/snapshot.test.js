@@ -269,3 +269,22 @@ test("with no token price read, a shelf price stays in $PRINTER alone", () => {
   assert.equal(a.askUsd, null);
   assert.equal(a.askEth, null);
 });
+
+// Une machine du rayon peut avoir été re-inkée comme n'importe quelle autre :
+// #4173 est une x10 au plafond, donc poids 2000. Sans ces champs, la vignette
+// du rayon ne pouvait pas le dire.
+test("a shelf machine carries its weight like any other", () => {
+  const s = composeSnapshot({
+    ...withAnvil,
+    weights: new Map([[1253, 2000n]]),
+    grid: {
+      ...withAnvil.grid,
+      rows: withAnvil.grid.rows.map((r, i) => i === 0
+        ? { ...r, inked: { ...r.inked, anvilEntries: [{ tokenId: 1253, askPrinter: 318395 }] } }
+        : r),
+    },
+  });
+  const a = s.rows[0].inked.anvilEntries[0];
+  assert.equal(a.weight, 2000);
+  assert.equal(a.inkMult, 2);      // 2000 / classe 1000
+});
