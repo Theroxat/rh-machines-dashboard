@@ -64,7 +64,7 @@ To run without Docker: `npm install`, then
 
 ## Reading the grid
 
-Seven rows, one per sealed rarity class, each split into an **inked** half and a
+Seven rows, one per rarity, each split into an **inked** half and a
 **dormant** half. A Machine is inked when its `inkBurned` is above zero.
 
 Each half shows that book as pictures, cheapest Machine first, with its price
@@ -116,15 +116,17 @@ A wrong dashboard is worse than no dashboard. These are enforced, not aspiration
 - **Listings are deduplicated by Machine.** The API returns the same token more
   than once; without dedup, listing counts and the peloton are inflated.
 
-## Headwear is the class
+## Headwear is the rarity
 
-The rarity class is sealed on chain, but it is also written on the Machine's
-face: the **Headwear** trait determines it exactly. Measured across all 10,000
+Rarity is sealed on chain, but it is also written on the Machine's face: the
+**Headwear** trait determines it exactly. And rarity is not decoration — payouts
+are proportional to *weight*, which is rarity multiplied by the ink multiplier,
+so a rarer Machine takes a proportionally larger share of every drop. Measured across all 10,000
 Machines, 25 distinct headwear values each map to exactly one class, with no
 ambiguity, and the resulting per-class counts reproduce the published census
 (7,131 / 407 / 1,356 / 559 / 429 / 81 / 37) precisely.
 
-| Class | Headwear |
+| Rarity | Headwear |
 |---|---|
 | x10 | Blueberries |
 | x6 | **None — no headwear at all** |

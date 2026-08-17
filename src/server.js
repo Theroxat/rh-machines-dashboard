@@ -57,16 +57,19 @@ function apiPayload() {
 
 let traits = new Map();
 let ink = new Map();
+let weights = new Map();
 let inkMeta = { readAt: null, failures: null };
 let meta = new Map();
 let legend = null;
 let bodyTickers = new Map();
 
 async function sweepInk() {
-  const { ink: fresh, failures } = await readInk({ provider, batchSize: cfg.multicallBatchSize });
+  const { ink: fresh, weights: freshWeights, failures } = await readInk({ provider, batchSize: cfg.multicallBatchSize });
   ink = fresh;
+  weights = freshWeights;
   inkMeta = { readAt: Date.now(), failures };
-  console.log(`ink: ${fresh.size} machines read, ${failures} failures`);
+  const reinked = [...fresh].filter(([, v]) => v > 4250n * 10n ** 18n).length;
+  console.log(`ink: ${fresh.size} machines read, ${reinked} re-inked past activation, ${failures} failures`);
 }
 
 async function sweepBook() {
@@ -83,7 +86,7 @@ async function sweepBook() {
   store.succeed(composeSnapshot({
     grid, printer, eth, protocol, stats,
     book: { listed: book.listings.size, pages: book.pages, skipped: book.skipped },
-    inkMeta, meta, legend, bodyTickers, now: Date.now(),
+    inkMeta, meta, legend, bodyTickers, ink, weights, now: Date.now(),
   }));
   console.log(`book: ${book.listings.size} listings over ${book.pages} pages`);
 }

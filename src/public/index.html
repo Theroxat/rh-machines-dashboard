@@ -4,7 +4,7 @@
 <!-- Le mot « unofficial » vit dans le titre et dans les balises de partage,
      pas seulement dans la page : un lien envoyé sur Discord affiche ça avant
      que qui que ce soit n'ouvre le dashboard. -->
-<title>Unofficial RH MACHINES dashboard — floors by class and ink</title>
+<title>Unofficial RH MACHINES dashboard — floors by rarity and ink</title>
 <meta name="description" content="Unofficial, independent market view of the RH MACHINES NFT collection. Not built by or affiliated with the project team.">
 <meta property="og:title" content="Unofficial RH MACHINES dashboard">
 <meta property="og:description" content="An independent, read-only market view. Not built by, affiliated with, or endorsed by the RH MACHINES team.">
@@ -153,7 +153,8 @@
   /* La frontière entre colonnes est un filet, pas un aplat : elle sépare sans crier. */
   .edge { border-left: 1px solid var(--rule-2); }
 
-  .cls-cell { width: 108px; white-space: nowrap; }
+  .cls-cell { width: 158px; }
+  .grants { display: block; font-size: 11px; color: var(--text); margin-top: 2px; line-height: 1.25; }
   .cls { font-size: 22px; font-weight: 700; display: block; letter-spacing: -0.02em; line-height: 1.1; }
   .census { color: var(--dim); font-size: 10.5px; }
   .census.mismatch { color: var(--alarm); }
@@ -177,7 +178,21 @@
 
   .strip { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 8px; }
 
-  .chip { display: block; width: 54px; text-decoration: none; color: inherit; }
+  .chip { display: block; position: relative; width: 54px; text-decoration: none; color: inherit; }
+
+  /* Un listing sur cent porte ce badge, et quand il le porte la machine pèse le
+     double de ce que sa ligne annonce. Ambre sur fond sombre : minuscule, mais
+     impossible à manquer. */
+  .reink {
+    position: absolute;
+    top: 0; right: 0;
+    padding: 0 3px;
+    background: var(--ink);
+    color: var(--paper);
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 1.5;
+  }
   .chip img, .chip .noimg {
     display: block;
     width: 54px; height: 54px;
@@ -275,6 +290,7 @@
       padding: 8px 12px;
     }
     .cls { display: inline; font-size: 19px; margin-right: 9px; }
+    .grants { display: inline; margin-right: 9px; }
 
     /* Le filet vertical séparait des colonnes qui n'existent plus. */
     .edge { border-left: 0; }
@@ -309,7 +325,7 @@
 </style>
 
 <header>
-  <h1>RH MACHINES <span class="sep">/</span> <span class="sub">floors by class and ink state</span></h1>
+  <h1>RH MACHINES <span class="sep">/</span> <span class="sub">floors by rarity and ink state</span></h1>
   <p class="disclaimer"><span class="tag">Unofficial</span>An independent tool, not built by, affiliated with, or endorsed by the RH MACHINES team.</p>
   <div class="context" id="context"></div>
   <div class="banner" id="banner" role="status"></div>
@@ -322,10 +338,10 @@
 
 <div class="scroll">
   <table>
-    <caption class="label">Each row is one rarity class, cheapest machine first. A dormant Machine and an inked one are different assets, so each has its own book.</caption>
+    <caption class="label">Each row is one rarity, granted by the Machine's headwear. A dormant Machine and an inked one are different assets, so each has its own book.</caption>
     <thead>
       <tr class="label">
-        <th>Class</th>
+        <th>Rarity</th>
         <th class="g-ink edge">Inked — carries burned $PRINTER</th>
         <th class="g-dormant edge">Dormant — never activated</th>
       </tr>
@@ -335,18 +351,21 @@
 </div>
 
 <section class="legend-section">
-  <h2 class="label">How to tell a Machine's class by looking at it</h2>
-  <p class="note">The class is sealed on chain, but it always matches the <b>Headwear</b> trait. This table is
-    derived from the collection itself on every boot, not written down — if a headwear ever appeared in two
-    classes, it would be named here rather than filed into one of them.</p>
+  <h2 class="label">Which headwear grants which rarity</h2>
+  <p class="note">A Machine's rarity is sealed on chain, and it always matches the <b>Headwear</b> it
+    wears. This table is derived from the collection itself on every boot, not written down — if a headwear
+    ever appeared under two different rarities, it would be named here rather than filed under one of them.</p>
   <div id="legend"></div>
 </section>
 
 <footer>
-  <p>A Machine's <b>class</b> — x1 through x10 — is its sealed rarity, fixed at mint and capped by nothing.
-    The <b>ink ceiling</b> in the header is a different multiplier entirely: it caps how much extra weight
-    burning more $PRINTER can buy on top of that class, and it rises as the protocol burns more. A ceiling of
-    x2 does not stop a x10 Machine from existing.</p>
+  <p>A Machine's <b>rarity</b> — x1 through x10 — is granted by its headwear and sealed at mint. Its
+    <b>weight</b> is rarity multiplied by ink, and weight is what every payout is proportional to: a x6
+    re-inked to ×2 weighs <b>12x</b> and takes twelve times a baseline Machine's share of every drop. Those
+    Machines carry an amber badge on their picture, because their row alone would understate them.</p>
+  <p>The <b>ink ceiling</b> in the header is a third multiplier again: it caps how much extra weight burning
+    more $PRINTER can buy, and it rises as the protocol burns more. A ceiling of x2 does not stop a x10
+    Machine from existing.</p>
   <p id="book-line"></p>
   <p id="excluded-line"></p>
   <p id="published-line"></p>

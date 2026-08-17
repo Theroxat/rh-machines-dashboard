@@ -4,7 +4,7 @@ import { TOTAL_MACHINES } from "./config.js";
 /** Assemblage pur de tout ce dont la page a besoin. Une dérivation qui
  *  diviserait par une valeur non lue produit null plutôt qu'un zéro confiant. */
 export function composeSnapshot({
-  grid, printer, eth, protocol, stats, book, inkMeta, meta, legend, bodyTickers, now,
+  grid, printer, eth, protocol, stats, book, inkMeta, meta, legend, bodyTickers, ink, weights, now,
 }) {
   const activationPrinter = protocol?.activationInk
     ? Number(BigInt(protocol.activationInk) / 10n ** 15n) / 1000
@@ -24,15 +24,34 @@ export function composeSnapshot({
     return { ...m, ticker: bodyTickers?.get(m.body) ?? null };
   };
 
-  const withMachines = (cell) => ({
+  const PRINTER = 10n ** 18n;
+
+  /**
+   * Le poids vient du contrat, pas d'une racine carrée que je recalculerais.
+   * `inkMult` est ce qui distingue une machine re-inkée d'une machine activée au
+   * minimum : même classe, poids doublé, et rien ne le disait jusqu'ici.
+   */
+  const withMachines = (cell, classValue) => ({
     ...cell,
-    entries: cell.entries.map((e) => ({ ...e, machine: machineOf(e.tokenId) })),
+    entries: cell.entries.map((e) => {
+      const w = weights?.get(e.tokenId);
+      const i = ink?.get(e.tokenId);
+      const weight = w === undefined ? null : Number(w);
+      return {
+        ...e,
+        machine: machineOf(e.tokenId),
+        weight,
+        inkPrinter: i === undefined ? null : Number(i / PRINTER),
+        // Une machine dormante ne pèse rien : un rapport n'aurait aucun sens.
+        inkMult: weight ? weight / classValue : null,
+      };
+    }),
   });
 
   const rows = grid.rows.map((r) => ({
     ...r,
-    inked: withMachines(r.inked),
-    dormant: withMachines(r.dormant),
+    inked: withMachines(r.inked, r.classValue),
+    dormant: withMachines(r.dormant, r.classValue),
   }));
 
   const listed = new Set();
