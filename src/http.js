@@ -69,7 +69,8 @@ export function securityHeaders() {
       "default-src 'none'",
       "script-src 'self'",
       "style-src 'unsafe-inline'",
-      "img-src https://i2c.seadn.io",
+      // 'self' pour le favicon, et le CDN d'OpenSea pour les vignettes. Rien d'autre.
+      "img-src 'self' https://i2c.seadn.io",
       "connect-src 'self'",
       "base-uri 'none'",
       "form-action 'none'",

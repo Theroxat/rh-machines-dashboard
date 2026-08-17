@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Un bloc d'encre marqué du signe multiplicateur : les deux seules idées
+       de la page, dans les deux seules couleurs qu'elle utilise pour le dire.
+       Champ ambre plutôt que traits ambres — à 16 px, une masse se lit, un
+       trait fin disparaît. -->
+  <rect width="32" height="32" fill="#0a0a0b"/>
+  <rect x="3" y="3" width="26" height="26" fill="#f0a41c"/>
+  <path d="M10 10 L22 22 M22 10 L10 22" stroke="#0a0a0b" stroke-width="4.5" stroke-linecap="square"/>
+</svg>
