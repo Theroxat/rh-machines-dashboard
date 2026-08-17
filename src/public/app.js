@@ -17,9 +17,19 @@ export const fmtUsdShort = (v) =>
 
 const MACHINES = "0xb509e195bcb3e4461e235ff152c68d66915f67b5";
 export const itemUrl = (id) => `https://opensea.io/assets/robinhood/${MACHINES}/${id}`;
+/** Une machine du rayon s'achète sur l'anvil, et nulle part ailleurs : le lien
+ *  mène donc là où la transaction se fait, pas sur une fiche descriptive. */
+export const ANVIL_URL = "https://rh.btcmachine.gg/";
+export const anvilUrl = () => ANVIL_URL;
 
 /** Combien de machines une case montre avant de proposer le reste. */
 export const DEFAULT_LIMIT = 8;
+
+/** Combien un clic en révèle de plus. Un dépliage d'un seul coup mettait 375
+ *  vignettes d'un bloc sur les x1 dormantes : la page devenait impraticable et
+ *  le navigateur chargeait autant d'images. Par tranches, on garde l'accès à
+ *  l'intégralité sans le mur. */
+export const REVEAL_STEP = 40;
 
 export const cellKey = (classValue, side) => `${classValue}:${side}`;
 
@@ -144,9 +154,12 @@ function chip(e, isFloor, ethUsd) {
   // La seule comparaison qui compte vraiment : ce listing s'échange-t-il sous
   // ce que le protocole lui-même en donnerait ? Ce n'est pas une opinion, ce
   // sont deux nombres publics mis côte à côte.
-  const under = e.underBid
-    ? `<span class="under">under bid</span>`
-    : "";
+  const gap = e.underBid && e.priceEth
+    ? Math.round((100 * (e.anvilBidEth - e.priceEth)) / e.priceEth)
+    : null;
+  // Un écart réel mais inférieur au point de pourcentage s'arrondissait à
+  // « +0% », ce qui se lit comme « aucun gain » — l'inverse de ce qu'il dit.
+  const under = gap === null ? "" : `<span class="under">${gap < 1 ? "&lt;1%" : `+${gap}%`}</span>`;
   const bidStory = e.anvilBidEth
     ? ` · anvil pays ${fmtEth(e.anvilBidEth)} ETH (${fmtInt(e.anvilBidPrinter)} $PRINTER, net of the sell fee)`
     : "";
@@ -180,12 +193,58 @@ export function matchesFilter(machine, filter) {
 }
 
 /**
+ * Le rayon de l'anvil dans cette case : un second marché, libellé en $PRINTER.
+ * Il a sa propre bande et son propre en-tête plutôt que d'être fondu dans le
+ * carnet OpenSea — les fondre laisserait croire qu'une machine de l'anvil
+ * s'achète comme un listing, avec la même monnaie et la même transaction.
+ */
+function shelfStrip(anvilEntries) {
+  if (!anvilEntries?.length) return "";
+
+  const eths = anvilEntries.map((e) => e.askEth).filter((v) => v !== null && v !== undefined);
+  const range = eths.length
+    ? (Math.min(...eths).toFixed(4) === Math.max(...eths).toFixed(4)
+        ? `≈${fmtEth(eths[0])} ETH each`
+        : `≈${fmtEth(Math.min(...eths))}–${fmtEth(Math.max(...eths))} ETH`)
+    : "";
+
+  const first = anvilEntries[0];
+  const priceLine =
+    `<span class="shelf-price"><span class="price">${fmtInt(Math.round(first.askPrinter))}</span>` +
+    ` <span class="unit">$PRINTER</span>` +
+    (first.askUsd ? ` <span class="usd-big">${fmtUsdShort(first.askUsd)}</span>` : "") + `</span>`;
+
+  const chips = anvilEntries.map((e) => {
+    const img = e.machine?.image
+      ? `<img src="${esc(e.machine.image)}" alt="Machine #${e.tokenId}" loading="lazy" width="40" height="40">`
+      : `<span class="noimg" aria-hidden="true"></span>`;
+    const tip = `#${e.tokenId} · ${fmtInt(Math.round(e.askPrinter))} $PRINTER` +
+      (e.askUsd ? ` · ${fmtUsdShort(e.askUsd)}` : "") +
+      (e.askEth ? ` · ≈${fmtEth(e.askEth)} ETH` : "") +
+      " — sold by the Anvil, paid in $PRINTER";
+    return `<a class="chip anvil" href="${ANVIL_URL}" target="_blank" rel="noopener" title="${esc(tip)}">` +
+      img +
+      `<span class="price">${fmtInt(Math.round(e.askPrinter))}</span>` +
+      (e.askUsd ? `<span class="usd">${fmtUsdShort(e.askUsd)}</span>` : "") +
+      `<span class="tok">#${e.tokenId}</span>` +
+    `</a>`;
+  }).join("");
+
+  return `<span class="shelf">` +
+    `<span class="label">On the Anvil</span>` +
+    priceLine +
+    `<span class="depth">${fmtInt(anvilEntries.length)} on the shelf${range ? ` · ${range}` : ""}</span>` +
+    `<span class="strip">${chips}</span>` +
+  `</span>`;
+}
+
+/**
  * Une moitié de ligne : tout le carnet de cette case, du moins cher au plus
  * cher. Huit machines par défaut, le reste derrière un bouton — la case dit
  * toujours combien elle cache, pour qu'un carnet coupé ne passe jamais pour
  * un carnet complet.
  */
-export function halfCell(half, side, { expanded = false, limit = DEFAULT_LIMIT, key = "", filter = EMPTY_FILTER, ethUsd = null } = {}) {
+export function halfCell(half, side, { shown = null, step = REVEAL_STEP, limit = DEFAULT_LIMIT, key = "", filter = EMPTY_FILTER, ethUsd = null } = {}) {
   const g = `g-${side}`;
   // Sur mobile l'en-tête du tableau disparaît : la case doit alors annoncer
   // elle-même de quel côté elle parle.
@@ -211,20 +270,22 @@ export function halfCell(half, side, { expanded = false, limit = DEFAULT_LIMIT, 
     const tip = active
       ? "Nothing on sale in this class and state carries the traits you picked."
       : "Nothing is on sale in this class in this state.";
-    return `<td class="${g} edge half" data-state="${state}" title="${esc(tip)}"><span class="depth">${why}</span></td>`;
+    return `<td class="${g} edge half" data-state="${state}" title="${esc(tip)}">` +
+      `<span class="depth">${why}</span>` + shelfStrip(half.anvilEntries) + `</td>`;
   }
 
   const half_ = { ...half, entries: kept };
-  return renderHalf(half_, g, { expanded, limit, key, depth, state, ethUsd, floorLabel: active ? "cheapest match" : "floor price" });
+  return renderHalf(half_, g, { shown: shown ?? limit, step, limit, key, depth, state, ethUsd, floorLabel: active ? "cheapest match" : "floor price" });
 }
 
-function renderHalf(half, g, { expanded, limit, key, depth, state, ethUsd, floorLabel }) {
+function renderHalf(half, g, { shown: count, step, limit, key, depth, state, ethUsd, floorLabel }) {
 
   const tip = half.pelotonEth === null
     ? `${half.listed} listings — too few for a peloton, so no median is shown`
     : `peloton ${fmtEth(half.pelotonEth)} ETH · ${fmtRatio(half.listedRatio)} of this class is listed`;
 
-  const shown = expanded ? half.entries : half.entries.slice(0, limit);
+  const visible = Math.max(limit, Math.min(count, half.entries.length));
+  const shown = half.entries.slice(0, visible);
   const hidden = half.entries.length - shown.length;
 
   // Une machine re-inkée repliée dans le « + N more » est justement celle qu'on
@@ -232,11 +293,29 @@ function renderHalf(half, g, { expanded, limit, key, depth, state, ethUsd, floor
   const hiddenReinked = half.entries.slice(shown.length).filter((e) => e.inkMult > 1.0001 && e.weight).length;
   const note = hiddenReinked ? `, ${fmtInt(hiddenReinked)} re-inked` : "";
 
-  const more = expanded
-    ? `<button class="more" type="button" data-key="${esc(key)}">▴ show fewer</button>`
-    : (hidden > 0
-        ? `<button class="more" type="button" data-key="${esc(key)}">+ ${fmtInt(hidden)} more${note} ▾</button>`
+  // Le bouton dit exactement ce qu'un clic va faire, et combien restera après :
+  // « show 40 more · 367 left » plutôt qu'un « + 367 more » qui les déverse tous.
+  const next = Math.min(step, hidden);
+  const label = hidden > step
+    ? `show ${fmtInt(next)} more${note} · ${fmtInt(hidden)} left ▾`
+    : `show the last ${fmtInt(hidden)}${note} ▾`;
+
+  const more = hidden > 0
+    ? `<button class="more" type="button" data-key="${esc(key)}" data-next="${visible + next}">${label}</button>`
+    : (visible > limit
+        ? `<button class="more" type="button" data-key="${esc(key)}" data-next="${limit}">▴ show fewer</button>`
         : "");
+
+  // « under bid » ne disait rien à personne : la case l'explique une fois, en
+  // toutes lettres et avec le chiffre, plutôt que de compter sur un badge de
+  // deux mots pour porter une idée entière.
+  const underBidEntries = half.entries.filter((e) => e.underBid);
+  const underNote = underBidEntries.length
+    ? `<span class="under-note">${fmtInt(underBidEntries.length)} of these sell below the Anvil's ` +
+      `standing bid of ${fmtEth(underBidEntries[0].anvilBidEth)} ETH` +
+      (ethUsd ? ` (${fmtUsdShort(usdOf(underBidEntries[0].anvilBidEth, ethUsd))})` : "") +
+      ` — the green mark is how much more it would pay.</span>`
+    : "";
 
   // Le floor en tête, en grand et nommé : c'est le chiffre qu'on vient chercher.
   // Sous un filtre ce n'est plus le floor de la classe mais le moins cher de la
@@ -251,8 +330,10 @@ function renderHalf(half, g, { expanded, limit, key, depth, state, ethUsd, floor
   return `<td class="${g} edge half" data-state="${state}" title="${esc(tip)}">` +
     head +
     `<span class="depth">${depth}</span>` +
+    underNote +
     `<span class="strip">${shown.map((e, i) => chip(e, i === 0, ethUsd)).join("")}</span>` +
     more +
+    shelfStrip(half.anvilEntries) +
   `</td>`;
 }
 
@@ -268,7 +349,7 @@ function boostTraits(legend, classValue) {
   return `<span class="grants" title="${esc(full)}">${esc(shown)}</span>`;
 }
 
-export function rowsHtml(d, { expanded = new Set(), limit = DEFAULT_LIMIT, filter = EMPTY_FILTER } = {}) {
+export function rowsHtml(d, { expanded = new Map(), limit = DEFAULT_LIMIT, step = REVEAL_STEP, filter = EMPTY_FILTER } = {}) {
   const ethUsd = d.eth?.usd ?? null;
   return d.rows.map((r) => {
     const census = r.chainCount === r.docCount
@@ -280,8 +361,8 @@ export function rowsHtml(d, { expanded = new Set(), limit = DEFAULT_LIMIT, filte
 
     return `<tr>` +
       `<td class="cls-cell"><span class="cls">${r.classLabel}</span>${boostTraits(d.legend, r.classValue)}${census}</td>` +
-      halfCell(r.inked,   "ink",     { expanded: expanded.has(inkKey), limit, key: inkKey, filter, ethUsd }) +
-      halfCell(r.dormant, "dormant", { expanded: expanded.has(dorKey), limit, key: dorKey, filter, ethUsd }) +
+      halfCell(r.inked,   "ink",     { shown: expanded.get(inkKey) ?? limit, step, limit, key: inkKey, filter, ethUsd }) +
+      halfCell(r.dormant, "dormant", { shown: expanded.get(dorKey) ?? limit, step, limit, key: dorKey, filter, ethUsd }) +
     `</tr>`;
   }).join("");
 }
@@ -374,12 +455,17 @@ export function bookLine(d) {
 
 export function excludedLine(d) {
   const ex = d.excluded ?? {};
+  const stale = ex.heldByAnvil
+    ? ` <b>${fmtInt(ex.heldByAnvil)}</b> OpenSea listing${ex.heldByAnvil > 1 ? "s were" : " was"} dropped for ` +
+      `Machines the Anvil now holds: it owns them, so nobody else can sell them and the listing cannot be filled.`
+    : "";
+
   if (ex.unknownRarity || ex.unknownInk || ex.listingsOffGrid) {
     return `Excluded from every count: <b>${fmtInt(ex.unknownRarity)}</b> with an unreadable rarity, ` +
       `<b>${fmtInt(ex.unknownInk)}</b> whose ink was never read, ` +
-      `<b>${fmtInt(ex.listingsOffGrid)}</b> listings that could not be placed. An unread value is never guessed.`;
+      `<b>${fmtInt(ex.listingsOffGrid)}</b> listings that could not be placed. An unread value is never guessed.` + stale;
   }
-  return `Every one of the 10,000 Machines was read: no rarity or ink value had to be excluded.`;
+  return `Every one of the 10,000 Machines was read: no rarity or ink value had to be excluded.` + stale;
 }
 
 export function publishedLine(d) {
@@ -426,7 +512,7 @@ if (typeof document !== "undefined") {
   // Les cases dépliées et le filtre vivent ici plutôt que dans le DOM : la table
   // est reconstruite toutes les quinze secondes, et ni une case ouverte ni un
   // filtre posé ne doivent survivre à ça par accident.
-  const expanded = new Set();
+  const expanded = new Map();
   const filter = { ...EMPTY_FILTER };
   const filtersEl = $("filters");
   const summaryEl = $("filter-summary");
@@ -483,8 +569,8 @@ if (typeof document !== "undefined") {
   rowsEl.addEventListener("click", (e) => {
     const btn = e.target.closest(".more");
     if (!btn) return;
-    const key = btn.dataset.key;
-    if (expanded.has(key)) expanded.delete(key); else expanded.add(key);
+    const next = Number(btn.dataset.next);
+    if (Number.isFinite(next)) expanded.set(btn.dataset.key, next);
     paint();
   });
 

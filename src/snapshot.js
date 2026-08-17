@@ -48,8 +48,19 @@ export function composeSnapshot({
    * `inkMult` est ce qui distingue une machine re-inkée d'une machine activée au
    * minimum : même classe, poids doublé, et rien ne le disait jusqu'ici.
    */
+  /** Le rayon de l'anvil, converti dans les deux autres monnaies pour être
+   *  comparable — mais jamais fondu dans le carnet OpenSea : ce sont deux
+   *  marchés, deux monnaies, deux transactions différentes. */
+  const shelfEntry = (e) => ({
+    ...e,
+    machine: machineOf(e.tokenId),
+    askUsd: printer?.usd ? e.askPrinter * printer.usd : null,
+    askEth: printer?.usd && eth?.usd ? (e.askPrinter * printer.usd) / eth.usd : null,
+  });
+
   const withMachines = (cell, classValue) => ({
     ...cell,
+    anvilEntries: (cell.anvilEntries ?? []).map(shelfEntry),
     entries: cell.entries.map((e) => {
       const w = weights?.get(e.tokenId);
       const i = ink?.get(e.tokenId);

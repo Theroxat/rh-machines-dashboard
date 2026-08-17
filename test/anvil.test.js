@@ -68,3 +68,23 @@ test("a bid that fails to read leaves that machine out rather than at zero", asy
   assert.equal(a.bids.has(7), false);
   assert.equal(a.bids.get(8), 100);
 });
+
+test("the shelf is read with the price asked for each machine on it", async () => {
+  const provider = {
+    call: async ({ data }) => {
+      const fn = ANVIL_ABI.getFunction(data.slice(0, 10))?.name;
+      if (fn === "listing") return ANVIL_ABI.encodeFunctionResult("listing", [[9036n, 9616n], [23465n * 10n ** 18n, 27733n * 10n ** 18n]]);
+      if (fn in GLOBALS) return ANVIL_ABI.encodeFunctionResult(fn, [GLOBALS[fn]]);
+      return "0x";
+    },
+  };
+  const a = await readAnvil({ provider, aggregate3: async () => [], tokenIds: [] });
+  assert.equal(a.shelfListings.size, 2);
+  assert.equal(a.shelfListings.get(9036), 23465);
+  assert.equal(a.shelfListings.get(9616), 27733);
+});
+
+test("a shelf that cannot be read is empty, not imagined", async () => {
+  const a = await readAnvil({ provider: fakeProvider(GLOBALS), aggregate3: async () => [], tokenIds: [] });
+  assert.equal(a.shelfListings.size, 0);
+});

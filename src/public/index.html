@@ -209,6 +209,15 @@
   .chip .usd   { display: block; font-size: 9.5px; color: var(--muted); }
   .chip .tok   { display: block; font-size: 9.5px; color: var(--dim); }
 
+  /* Le badge porte l'écart ; la phrase au-dessus de la bande dit ce qu'il veut
+     dire. Deux mots de jargon ne portaient pas l'idée. */
+  .under-note {
+    display: block;
+    margin-top: 5px;
+    font-size: 10.5px;
+    color: var(--under);
+  }
+
   .under {
     position: absolute;
     left: 0; bottom: 0;
@@ -228,6 +237,22 @@
   .chip.floor img, .chip.floor .noimg { border-color: currentColor; }
   td.g-ink     .chip .price, td.g-ink     .chip.floor { color: var(--ink); }
   td.g-dormant .chip .price, td.g-dormant .chip.floor { color: var(--dormant); }
+
+  /* Le rayon de l'anvil : sa propre bande, séparée par un filet et annoncée par
+     son en-tête. Deux marchés dans deux monnaies ne se mélangent pas. */
+  .shelf { display: block; margin-top: 12px; padding-top: 9px; border-top: 1px dashed var(--rule-2); }
+  .shelf > .label { display: block; color: var(--muted); }
+  /* Le prix du rayon est libellé en $PRINTER : il s'annonce comme un prix, au
+     même rang que le floor, et dans la couleur de l'encre puisque c'est la
+     monnaie du jeton. */
+  .shelf-price { display: block; line-height: 1.15; }
+  .shelf-price .price { font-size: 19px; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); }
+  .shelf-price .unit { font-size: 10px; color: var(--muted); }
+  .shelf-price .usd-big { font-size: 12px; font-weight: 600; color: var(--muted); margin-left: 6px; }
+  .shelf .depth { margin-top: 1px; }
+  .shelf .strip { margin-top: 7px; }
+  .chip.anvil .price { font-size: 10px; }
+  .chip.anvil img, .chip.anvil .noimg { border-style: dashed; }
 
   .more {
     display: inline-block;
@@ -389,8 +414,8 @@
   <p id="excluded-line"></p>
   <p id="published-line"></p>
   <p>Each cell states two separate numbers: how many Machines are <b>on sale</b>, and how many exist
-    <b>in this class</b>. It shows the eight cheapest and, when it is holding more back, offers them on a
-    button — so a cell with no button is already showing everything it has. A cell reading <b>no listing</b>
+    <b>in this class</b>. It shows the eight cheapest and reveals the rest forty at a time — the button says
+    what a click will show and how many remain — so a cell with no button is already showing everything it has. A cell reading <b>no listing</b>
     has nothing on sale; it is not a floor of zero. Hover a cell for its peloton and its exact listed share;
     hover a Machine for its headwear.</p>
   <p class="disclaimer"><span class="tag">Unofficial</span><b>An independent tool.</b> It is not built by,

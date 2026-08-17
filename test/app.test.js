@@ -47,15 +47,16 @@ test("the machine setting the floor is marked as such", () => {
 test("a long book is cut to the limit and offers the rest", () => {
   const html = halfCell(half({ entries: manyEntries(191), supply: 4388 }), "ink", { limit: 8, key: "100:ink" });
   assert.equal(countChips(html), 8);
-  assert.match(html, /\+ 183 more/);
+  assert.match(html, /show 40 more/);
+  assert.match(html, /183 left/);
   assert.match(html, /data-key="100:ink"/);
 });
 
 test("an expanded cell shows every machine and offers the way back", () => {
-  const html = halfCell(half({ entries: manyEntries(191), supply: 4388 }), "ink", { limit: 8, expanded: true, key: "100:ink" });
+  const html = halfCell(half({ entries: manyEntries(191), supply: 4388 }), "ink", { limit: 8, shown: 191, key: "100:ink" });
   assert.equal(countChips(html), 191);
   assert.match(html, /show fewer/);
-  assert.doesNotMatch(html, /more<\/button>/);
+  assert.doesNotMatch(html, /show \d+ more/);
 });
 
 test("a book that fits under the limit offers nothing to expand", () => {
@@ -144,11 +145,11 @@ test("only the cells asked to expand do so", () => {
     dormant: half({ entries: manyEntries(20) }),
   });
   const html = rowsHtml({ rows: [row(100, "x1"), row(1000, "x10")] },
-    { expanded: new Set(["100:ink"]), limit: 8 });
+    { expanded: new Map([["100:ink", 20]]), limit: 8 });
 
   assert.equal(html.match(/<tr>/g).length, 2);
   assert.equal(countChips(html), 20 + 8 + 8 + 8);   // one cell expanded, three cut
-  assert.match(html, /\+ 12 more/);                 // the cut cells still offer the rest
+  assert.match(html, /show the last 12/);           // the cut cells still offer the rest
 });
 
 test("a census that disagrees with the documentation is shown, not hidden", () => {
@@ -508,19 +509,19 @@ test("the expander says when it is hiding a re-inked machine", () => {
   plain[15] = { ...plain[15], weight: 200, inkMult: 2 };
   plain[18] = { ...plain[18], weight: 200, inkMult: 2 };
   const html = halfCell(half({ entries: plain, listed: 20 }), "ink", { limit: 8, key: "100:ink" });
-  assert.match(html, /\+ 12 more, 2 re-inked/);
+  assert.match(html, /show the last 12, 2 re-inked/);
 });
 
 test("an expander hiding nothing special stays plain", () => {
   const plain = manyEntries(20).map((e) => ({ ...e, weight: 100, inkMult: 1 }));
   const html = halfCell(half({ entries: plain, listed: 20 }), "ink", { limit: 8, key: "100:ink" });
-  assert.match(html, /\+ 12 more/);
+  assert.match(html, /show the last 12/);
   assert.doesNotMatch(html, /re-inked/);
 });
 
 test("once expanded there is nothing left hidden to announce", () => {
   const plain = manyEntries(20).map((e) => ({ ...e, weight: 200, inkMult: 2 }));
-  const html = halfCell(half({ entries: plain, listed: 20 }), "ink", { limit: 8, expanded: true, key: "100:ink" });
+  const html = halfCell(half({ entries: plain, listed: 20 }), "ink", { limit: 8, shown: 20, key: "100:ink" });
   assert.match(html, /show fewer/);
   assert.doesNotMatch(html, /re-inked</);
 });
@@ -580,4 +581,156 @@ test("an unreadable anvil says so instead of vanishing from the bar", () => {
   const html = contextHtml({ ...CTX, anvil: null });
   assert.match(html, /Anvil/i);
   assert.match(html, /unreadable/i);
+});
+
+// ---- le rayon de l'anvil dans la case ----
+
+const shelfEntry = (over = {}) => ({
+  tokenId: 9036, askPrinter: 23464.734, askUsd: 285, askEth: 0.1502,
+  machine: machineOf(), ...over,
+});
+
+test("a cell shows what the anvil holds, as its own strip", () => {
+  const html = halfCell(half({ anvilEntries: [shelfEntry()] }), "ink", { ethUsd: 1896 });
+  assert.match(html, /class="shelf"/);
+  assert.match(html, /On the Anvil/i);
+  assert.match(html, /23,465/);        // le montant en $PRINTER
+  assert.match(html, /\$285/);
+});
+
+// Deux marchés, deux monnaies : les fondre laisserait croire qu'une machine de
+// l'anvil s'achète comme un listing OpenSea, ce qui est faux.
+test("the anvil's machines never join the OpenSea strip", () => {
+  const html = halfCell(half({ entries: [entry(1, 0.105)], anvilEntries: [shelfEntry()] }), "ink", { ethUsd: 1896 });
+  const openSeaStrip = html.slice(html.indexOf('class="strip"'), html.indexOf('class="shelf"'));
+  assert.match(openSeaStrip, /#1</);
+  assert.doesNotMatch(openSeaStrip, /#9036</);
+});
+
+test("the strip states the ETH each would cost, so the two markets compare", () => {
+  const html = halfCell(half({ anvilEntries: [shelfEntry()] }), "ink", { ethUsd: 1896 });
+  assert.match(html, /0\.1502 ETH/);
+});
+
+test("a cell the anvil holds nothing in shows no strip at all", () => {
+  const html = halfCell(half({ anvilEntries: [] }), "ink", { ethUsd: 1896 });
+  assert.doesNotMatch(html, /class="shelf"/);
+});
+
+test("an empty OpenSea cell still shows what the anvil holds there", () => {
+  const html = halfCell(half({ entries: [], listed: 0, anvilEntries: [shelfEntry()] }), "ink", { ethUsd: 1896 });
+  assert.match(html, /no listing/);
+  assert.match(html, /class="shelf"/);
+  assert.match(html, /23,465/);
+});
+
+// ---- dépliage par paliers ----
+
+// Un clic dépliait tout : sur les 375 x1 dormantes, c'était 375 images d'un
+// bloc. On garde l'accès à l'intégralité, par tranches.
+test("the first click reveals a slice, not the whole book", () => {
+  const html = halfCell(half({ entries: manyEntries(375), listed: 375 }), "ink",
+    { limit: 8, shown: 8, step: 40, key: "100:ink" });
+  assert.equal(countChips(html), 8);
+  assert.match(html, /show 40 more/);
+  assert.match(html, /367 left/);
+});
+
+test("each further click adds another slice", () => {
+  const html = halfCell(half({ entries: manyEntries(375), listed: 375 }), "ink",
+    { limit: 8, shown: 48, step: 40, key: "100:ink" });
+  assert.equal(countChips(html), 48);
+  assert.match(html, /show 40 more/);
+  assert.match(html, /327 left/);
+});
+
+test("the last slice says it is the last, rather than promising forty", () => {
+  const html = halfCell(half({ entries: manyEntries(20), listed: 20 }), "ink",
+    { limit: 8, shown: 8, step: 40, key: "100:ink" });
+  assert.match(html, /show the last 12/);
+  assert.doesNotMatch(html, /left/);
+});
+
+test("once everything is out, only the way back remains", () => {
+  const html = halfCell(half({ entries: manyEntries(20), listed: 20 }), "ink",
+    { limit: 8, shown: 20, step: 40, key: "100:ink" });
+  assert.equal(countChips(html), 20);
+  assert.match(html, /show fewer/);
+  assert.doesNotMatch(html, /show 40 more/);
+});
+
+test("a book that fits under the limit offers nothing at all", () => {
+  const html = halfCell(half({ entries: manyEntries(5), listed: 5 }), "ink", { limit: 8, shown: 8, step: 40 });
+  assert.equal(countChips(html), 5);
+  assert.doesNotMatch(html, /more/);
+  assert.doesNotMatch(html, /show fewer/);
+});
+
+test("what is still folded away is still counted, re-inked machines included", () => {
+  const plain = manyEntries(60).map((e) => ({ ...e, weight: 100, inkMult: 1 }));
+  plain[50] = { ...plain[50], weight: 200, inkMult: 2 };
+  const html = halfCell(half({ entries: plain, listed: 60 }), "ink", { limit: 8, shown: 8, step: 40, key: "100:ink" });
+  assert.match(html, /1 re-inked/);
+});
+
+// ---- les trois corrections ----
+
+// Une machine du rayon s'achète sur l'anvil, pas sur OpenSea : l'y envoyer
+// menait sur une page où elle n'est pas à vendre.
+test("an anvil machine links to the anvil, not to OpenSea", () => {
+  const html = halfCell(half({ anvilEntries: [shelfEntry()] }), "ink", { ethUsd: 1896 });
+  assert.match(html, /href="https:\/\/rh\.btcmachine\.gg\/"/);
+  const shelf = html.slice(html.indexOf('class="shelf"'));
+  assert.doesNotMatch(shelf, /opensea\.io/);
+});
+
+test("an OpenSea listing still links to OpenSea", () => {
+  const html = halfCell(half({ entries: [entry(1234, 0.105)] }), "ink", { ethUsd: 1896 });
+  assert.match(html, /href="https:\/\/opensea\.io\/assets\/robinhood/);
+});
+
+// Le prix du rayon est libellé en $PRINTER : il doit s'annoncer comme un prix,
+// au même rang que le floor juste au-dessus, pas se perdre dans une légende.
+test("the shelf states its price like a price, in the token's own colour", () => {
+  const html = halfCell(half({ anvilEntries: [shelfEntry()] }), "ink", { ethUsd: 1896 });
+  assert.match(html, /class="shelf-price"/);
+  assert.match(html, /23,465/);
+  assert.match(html, /\$PRINTER/);
+  assert.match(html, /\$285/);
+});
+
+// « under bid » ne disait rien à personne : la case explique une fois, et
+// chaque vignette porte l'écart plutôt qu'un mot de jargon.
+test("a cell explains once what the green marks mean", () => {
+  const html = halfCell(half({ entries: [withBid()] }), "ink", { ethUsd: 1896 });
+  assert.match(html, /sell below the Anvil/i);
+  assert.match(html, /0\.1170 ETH/);
+});
+
+test("each marked machine carries the gap rather than a phrase", () => {
+  const html = halfCell(half({ entries: [withBid()] }), "ink", { ethUsd: 1896 });
+  assert.match(html, /class="under">\+11%</);
+  assert.doesNotMatch(html, />under bid</);
+});
+
+test("a cell with nothing under the bid explains nothing", () => {
+  const html = halfCell(half({ entries: [withBid({ underBid: false })] }), "ink", { ethUsd: 1896 });
+  assert.doesNotMatch(html, /sell below the Anvil/i);
+});
+
+test("a gap smaller than a point says so rather than rounding to nothing", () => {
+  const html = halfCell(half({ entries: [withBid({ priceEth: 0.1169, anvilBidEth: 0.1170 })] }), "ink", { ethUsd: 1896 });
+  assert.match(html, /&lt;1%/);
+  assert.doesNotMatch(html, /\+0%/);
+});
+
+test("a listing dropped as stale is reported, not silently removed", () => {
+  const line = excludedLine({ excluded: { unknownRarity: 0, unknownInk: 0, listingsOffGrid: 0, heldByAnvil: 2 } });
+  assert.match(line, /2<\/b> OpenSea listings were dropped/);
+  assert.match(line, /cannot be filled/);
+});
+
+test("with no overlap the line says nothing about it", () => {
+  const line = excludedLine({ excluded: { unknownRarity: 0, unknownInk: 0, listingsOffGrid: 0, heldByAnvil: 0 } });
+  assert.doesNotMatch(line, /Anvil/);
 });
