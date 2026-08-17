@@ -104,7 +104,10 @@
   /* ---- filtres par trait ---- */
 
   .filter-bar { margin-top: 20px; }
-  .filter-row { display: flex; flex-wrap: wrap; gap: 26px; align-items: flex-start; justify-content: space-between; }
+  /* La ligne de caisse suit directement les menus au lieu d'être poussée à
+     l'autre bout, et s'aligne sur le bas des sélecteurs plutôt que sur le haut
+     de leurs intitulés. */
+  .filter-row { display: flex; flex-wrap: wrap; gap: 22px; align-items: flex-end; }
 
   /* La file d'attente de l'anvil : trois prix pour la même machine selon qu'on
      la subit, qu'on la choisit ou qu'on la tire au sort. */
