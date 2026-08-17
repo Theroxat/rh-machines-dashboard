@@ -20,6 +20,7 @@ export const itemUrl = (id) => `https://opensea.io/assets/robinhood/${MACHINES}/
 /** Une machine du rayon s'achète sur l'anvil, et nulle part ailleurs : le lien
  *  mène donc là où la transaction se fait, pas sur une fiche descriptive. */
 export const ANVIL_URL = "https://rh.btcmachine.gg/";
+export const SWAP_URL = "https://rh.btcmachine.gg/swap";
 export const anvilUrl = () => ANVIL_URL;
 
 /** Combien de machines une case montre avant de proposer le reste. */
@@ -98,6 +99,41 @@ function anvilBlock(a) {
   return statBlock("The Anvil", spot, extra);
 }
 
+/**
+ * La file de l'anvil : prendre ce qui se présente, en désigner une, ou ouvrir
+ * une caisse. Trois prix pour la même chose, et l'écart entre eux est le jeu
+ * qu'il propose. Aucun ne se déduit du spot, donc chacun est lu.
+ */
+export function queueHtml(a) {
+  if (!a) return "";
+  const rows = [
+    a.frontPrinter === null || a.frontPrinter === undefined ? null
+      : { what: "At the front", id: a.frontTokenId ? `#${a.frontTokenId}` : "", pr: a.frontPrinter, usd: a.frontUsd },
+    a.cratePrinter === null || a.cratePrinter === undefined ? null
+      : { what: "A crate", id: "any", pr: a.cratePrinter, usd: a.crateUsd },
+    a.snipePrinter === null || a.snipePrinter === undefined ? null
+      : { what: "Name the one you want", id: "", pr: a.snipePrinter, usd: a.snipeUsd },
+  ].filter(Boolean);
+
+  if (!rows.length) return "";
+
+  const body = rows.map((r) =>
+    `<span class="q-row"><span class="q-what">${r.what}</span>` +
+    `<span class="q-id">${esc(r.id)}</span>` +
+    `<span class="q-price">${fmtInt(Math.round(r.pr))}</span>` +
+    `<span class="q-unit">$PRINTER</span>` +
+    `<span class="q-usd">${r.usd ? fmtUsdShort(r.usd) : "—"}</span></span>`
+  ).join("");
+
+  const note = a.paused
+    ? `<span class="q-paused">The Anvil is paused — these prices are not being honoured.</span>`
+    : "";
+
+  return `<div class="queue-panel"><span class="market">The Anvil&rsquo;s queue</span>` +
+    body + note +
+    `<a class="q-link" href="${ANVIL_URL}" target="_blank" rel="noopener">Open the Anvil &#8599;</a></div>`;
+}
+
 export function contextHtml(d) {
   const p = d.printer ?? {};
   const e = d.eth ?? {};
@@ -116,7 +152,8 @@ export function contextHtml(d) {
   return [
     statBlock("$PRINTER", fmtUsd(p.usd, 5),
       [chg, `${fmtBig(p.marketCap)} mkt cap`, p.liquidityUsd ? `${fmtBig(p.liquidityUsd)} liquidity` : null]
-        .filter(Boolean).join(" · ")),
+        .filter(Boolean).join(" · ") +
+      ` · <a class="buy" href="${SWAP_URL}" target="_blank" rel="noopener">buy $PRINTER &#8599;</a>`),
     statBlock("ETH", fmtUsd(e.local, 2), ethExtra),
     statBlock("Cost of ink", fmtUsd(ink.activationUsd), `${fmtInt(ink.activationPrinter)} $PRINTER · ${fmtEth(ink.activationEth)} ETH`, true),
     // Le floor vient de notre carnet, pas du chiffre publié : c'est le même
@@ -605,6 +642,7 @@ if (typeof document !== "undefined") {
     lastData = v.data;
     $("context").innerHTML = contextHtml(v.data);
     paintFilters(v.data.traitFilters);
+    $("queue").innerHTML = queueHtml(v.data.anvil);
     paint();
     $("legend").innerHTML = legendHtml(v.data.legend);
     $("anvil-line").innerHTML = anvilLine(v.data);

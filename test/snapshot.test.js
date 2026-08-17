@@ -269,3 +269,13 @@ test("with no token price read, a shelf price stays in $PRINTER alone", () => {
   assert.equal(a.askUsd, null);
   assert.equal(a.askEth, null);
 });
+
+test("the queue's prices ride along in dollars too", () => {
+  const s = composeSnapshot({
+    ...withAnvil,
+    anvil: { ...withAnvil.anvil, frontTokenId: 6, frontPrinter: 14323, snipePrinter: 15755 },
+  });
+  assert.equal(s.anvil.frontTokenId, 6);
+  assert.ok(Math.abs(s.anvil.frontUsd - 14323 * 0.0126) < 0.01);
+  assert.ok(Math.abs(s.anvil.snipeUsd - 15755 * 0.0126) < 0.01);
+});

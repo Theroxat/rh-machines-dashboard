@@ -27,6 +27,8 @@ export const ANVIL_ABI = new ethers.Interface([
   "function sellPrice(uint256) view returns (uint256)",
   "function buyPrice(uint256) view returns (uint256)",
   "function listing(uint256,uint256) view returns (uint256[],uint256[])",
+  "function nextOut() view returns (uint256)",
+  "function snipePrice(uint256) view returns (uint256)",
 ]);
 
 const PRINTER = 10n ** 18n;
@@ -80,6 +82,21 @@ export async function readAnvil({ provider, aggregate3, tokenIds, batchSize = 40
 
   const shelfListings = await readShelf(provider, inventoryLength === null ? 0 : Number(inventoryLength));
 
+  // La file d'attente : prendre ce qui se présente coûte le prix simple, en
+  // désigner une coûte une prime. C'est le mécanisme que l'anvil met en avant,
+  // et ses trois prix ne se déduisent pas du spot.
+  const front = await readView(provider, "nextOut");
+  let frontPrinter = null;
+  let snipePrinter = null;
+  if (front !== null) {
+    try {
+      const bp = await provider.call({ to: ADDRESSES.VAULT, data: ANVIL_ABI.encodeFunctionData("buyPrice", [front]) });
+      if (bp !== "0x") frontPrinter = toPrinter(ANVIL_ABI.decodeFunctionResult("buyPrice", bp)[0]);
+      const sp = await provider.call({ to: ADDRESSES.VAULT, data: ANVIL_ABI.encodeFunctionData("snipePrice", [front]) });
+      if (sp !== "0x") snipePrinter = toPrinter(ANVIL_ABI.decodeFunctionResult("snipePrice", sp)[0]);
+    } catch { /* un prix illisible reste null plutôt que deviné */ }
+  }
+
   return {
     spotPrinter: toPrinter(spot),
     spreadBps: spreadBps === null ? null : Number(spreadBps),
@@ -92,5 +109,8 @@ export async function readAnvil({ provider, aggregate3, tokenIds, batchSize = 40
     bidPaused: bidPaused === null ? null : Boolean(bidPaused),
     bids,
     shelfListings,
+    frontTokenId: front === null ? null : Number(front),
+    frontPrinter,
+    snipePrinter,
   };
 }

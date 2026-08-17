@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   fmtEth, fmtRatio, halfCell, cellKey,
   bannerMessage, excludedLine, publishedLine, rowsHtml, contextHtml, legendHtml,
-  matchesFilter, filterBarHtml, filterSummary, freshness, fmtCompact,
+  matchesFilter, filterBarHtml, filterSummary, freshness, fmtCompact, queueHtml,
 } from "../src/public/app.js";
 
 const entry = (tokenId, priceEth, image = `https://img/${tokenId}.webp`) => ({
@@ -786,4 +786,43 @@ test("a cell the anvil holds nothing in names only the market that has something
   const html = halfCell(half({ entries: [entry(1, 0.11)], anvilEntries: [] }), "ink", { ethUsd: 1896 });
   assert.match(html, /class="market">On OpenSea</);
   assert.doesNotMatch(html, /On the Anvil/);
+});
+
+// ---- la file d'attente de l'anvil ----
+
+const QUEUE = { frontTokenId: 6, frontPrinter: 14323, frontUsd: 170,
+  cratePrinter: 15182, crateUsd: 181, snipePrinter: 15755, snipeUsd: 188,
+  shelf: 30, bidPaused: false, paused: false, spotPrinter: 14111, spotUsd: 168 };
+
+test("the queue panel states its three prices, each in both currencies", () => {
+  const html = queueHtml(QUEUE);
+  assert.match(html, /at the front/i);
+  assert.match(html, /14,323/);
+  assert.match(html, /\$170/);
+  assert.match(html, /crate/i);
+  assert.match(html, /15,182/);
+  assert.match(html, /name the one/i);
+  assert.match(html, /15,755/);
+  assert.match(html, /#6/);
+});
+
+test("the panel links to the Anvil, where the trade happens", () => {
+  assert.match(queueHtml(QUEUE), /href="https:\/\/rh\.btcmachine\.gg\/"/);
+});
+
+test("an unreadable queue shows no panel rather than an empty frame", () => {
+  assert.equal(queueHtml(null), "");
+  assert.equal(queueHtml({ ...QUEUE, frontPrinter: null, cratePrinter: null, snipePrinter: null }), "");
+});
+
+test("a paused anvil says so rather than quoting prices it will not honour", () => {
+  assert.match(queueHtml({ ...QUEUE, paused: true }), /paused/i);
+});
+
+// ---- acheter du $PRINTER ----
+
+test("the token block offers the way to buy it", () => {
+  const html = contextHtml(CTX);
+  assert.match(html, /href="https:\/\/rh\.btcmachine\.gg\/swap"/);
+  assert.match(html, /buy \$PRINTER/i);
 });

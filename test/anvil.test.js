@@ -88,3 +88,31 @@ test("a shelf that cannot be read is empty, not imagined", async () => {
   const a = await readAnvil({ provider: fakeProvider(GLOBALS), aggregate3: async () => [], tokenIds: [] });
   assert.equal(a.shelfListings.size, 0);
 });
+
+test("the queue's three prices are read: the front, the crate, the premium", async () => {
+  const iface = ANVIL_ABI;
+  const provider = {
+    call: async ({ data }) => {
+      const fn = iface.getFunction(data.slice(0, 10))?.name;
+      if (fn === "nextOut") return iface.encodeFunctionResult("nextOut", [6n]);
+      if (fn === "buyPrice") return iface.encodeFunctionResult("buyPrice", [14323n * 10n ** 18n]);
+      if (fn === "snipePrice") return iface.encodeFunctionResult("snipePrice", [15755n * 10n ** 18n]);
+      if (fn in GLOBALS) return iface.encodeFunctionResult(fn, [GLOBALS[fn]]);
+      return "0x";
+    },
+  };
+  const a = await readAnvil({ provider, aggregate3: async () => [], tokenIds: [] });
+  assert.equal(a.frontTokenId, 6);
+  assert.equal(a.frontPrinter, 14323);
+  assert.equal(a.snipePrinter, 15755);
+  assert.equal(a.cratePrinter, 21331);
+});
+
+// Un prix de file illisible ne doit pas se déduire du spot : la courbe et la
+// prime ne s'en déduisent pas.
+test("an unreadable queue leaves its prices null rather than guessed", async () => {
+  const a = await readAnvil({ provider: fakeProvider(GLOBALS), aggregate3: async () => [], tokenIds: [] });
+  assert.equal(a.frontTokenId, null);
+  assert.equal(a.frontPrinter, null);
+  assert.equal(a.snipePrinter, null);
+});
