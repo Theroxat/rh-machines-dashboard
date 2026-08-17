@@ -221,6 +221,7 @@ test("a cell where nothing matches says so, which is not the same as no listing"
 
 test("the filter bar offers every value with what is on sale and what exists", () => {
   const html = filterBarHtml({
+    Farms: [{ value: "MSFT", listed: 12, total: 886 }],
     Headwear: [{ value: "Halo", listed: 9, total: 37 }],
     Body: [{ value: "Sky", listed: 12, total: 501, ticker: "MSFT" }],
     Eyes: [{ value: "UwU", listed: 3, total: 600 }],
@@ -229,7 +230,7 @@ test("the filter bar offers every value with what is on sale and what exists", (
   assert.match(html, /Halo.*9.*37/);
   assert.match(html, /Sky.*MSFT/);          // le corps annonce le desk qu'il farme
   assert.match(html, /UwU/);
-  assert.equal((html.match(/<select/g) ?? []).length, 3);
+  assert.equal((html.match(/<select/g) ?? []).length, 4);
 });
 
 test("the chosen value is the one marked selected", () => {
@@ -921,4 +922,67 @@ test("a shelf dearer than the book says nothing", () => {
 test("with nothing on OpenSea there is nothing to undercut", () => {
   const html = halfCell(half({ entries: [], listed: 0, anvilEntries: [shelfEntry({ askEth: 0.0787 })] }), "ink", { ethUsd: 1896 });
   assert.doesNotMatch(html, /cheaper than anything/i);
+});
+
+// ---- filtrer par stock ----
+
+test("filtering by stock keeps the machines that farm it", () => {
+  const msft = machineOf({ ticker: "MSFT" });
+  const cost = machineOf({ ticker: "COST" });
+  assert.equal(matchesFilter(msft, { ...NO_FILTER, Farms: "MSFT" }), true);
+  assert.equal(matchesFilter(cost, { ...NO_FILTER, Farms: "MSFT" }), false);
+});
+
+test("a machine whose desk could not be resolved never satisfies a stock filter", () => {
+  assert.equal(matchesFilter(machineOf({ ticker: null }), { ...NO_FILTER, Farms: "MSFT" }), false);
+});
+
+test("the stock filter combines with the cosmetic ones", () => {
+  const f = { ...NO_FILTER, Farms: "MSFT", Headwear: "Halo" };
+  assert.equal(matchesFilter(machineOf({ ticker: "MSFT", headwear: "Halo" }), f), true);
+  assert.equal(matchesFilter(machineOf({ ticker: "MSFT", headwear: "Blade" }), f), false);
+});
+
+test("the bar offers the stock menu first, before the cosmetic three", () => {
+  const html = filterBarHtml({
+    Farms: [{ value: "MSFT", listed: 12, total: 886 }],
+    Headwear: [{ value: "Halo", listed: 9, total: 37 }],
+    Body: [{ value: "Sky", listed: 12, total: 501, ticker: "MSFT" }],
+    Eyes: [{ value: "UwU", listed: 3, total: 600 }],
+  }, NO_FILTER);
+  assert.equal((html.match(/<select/g) || []).length, 4);
+  assert.ok(html.indexOf('data-trait="Farms"') < html.indexOf('data-trait="Headwear"'));
+  assert.match(html, /MSFT/);
+});
+
+// Le filtre traversait le carnet mais pas le rayon : une case pouvait annoncer
+// « 0 correspondance » tout en affichant huit machines de l'anvil.
+test("a filter narrows the shelf as well as the book", () => {
+  const html = halfCell(half({
+    entries: [],
+    listed: 0,
+    anvilEntries: [
+      shelfEntry({ tokenId: 1, machine: machineOf({ ticker: "MSFT" }) }),
+      shelfEntry({ tokenId: 2, machine: machineOf({ ticker: "COST" }) }),
+    ],
+  }), "ink", { ethUsd: 1896, filter: { ...NO_FILTER, Farms: "MSFT" } });
+  assert.match(html, /#1</);
+  assert.doesNotMatch(html, /#2</);
+});
+
+test("a shelf with nothing matching disappears rather than contradicting the count", () => {
+  const html = halfCell(half({
+    entries: [], listed: 0,
+    anvilEntries: [shelfEntry({ tokenId: 2, machine: machineOf({ ticker: "COST" }) })],
+  }), "ink", { ethUsd: 1896, filter: { ...NO_FILTER, Farms: "MSFT" } });
+  assert.doesNotMatch(html, /class="shelf"/);
+});
+
+test("with no filter the shelf shows everything it holds", () => {
+  const html = halfCell(half({
+    entries: [], listed: 0,
+    anvilEntries: [shelfEntry({ tokenId: 1 }), shelfEntry({ tokenId: 2 })],
+  }), "ink", { ethUsd: 1896 });
+  assert.match(html, /#1</);
+  assert.match(html, /#2</);
 });

@@ -5,9 +5,6 @@ import { buildTraitIndex, TRAIT_TYPES } from "../src/traitindex.js";
 const metaOf = (rows) => new Map(rows.map(([id, headwear, body, eyes]) =>
   [id, { image: "u", headwear, body, eyes }]));
 
-test("only the three traits that vary are indexed", () => {
-  assert.deepEqual(TRAIT_TYPES, ["Headwear", "Body", "Eyes"]);
-});
 
 test("each value carries what exists and what is actually on sale", () => {
   const index = buildTraitIndex({
@@ -69,4 +66,36 @@ test("a machine missing a trait is skipped for that trait, not counted as blank"
   assert.equal(index.Body.length, 1);
   assert.equal(index.Eyes.length, 1);
   assert.equal(index.Headwear[0].total, 2);
+});
+
+// Le desk vient du Body et décide du stock sur lequel la machine touche double.
+// C'est la seule dimension mécanique des quatre : les trois autres sont
+// cosmétiques. Elle vient donc en premier.
+test("the stock a machine farms is indexed as its own dimension, first", () => {
+  assert.deepEqual(TRAIT_TYPES, ["Farms", "Headwear", "Body", "Eyes"]);
+});
+
+test("machines are grouped by the ticker their body puts them on", () => {
+  const index = buildTraitIndex({
+    meta: new Map([
+      [1, { image: "u", headwear: "Halo", body: "Sky", eyes: "UwU" }],
+      [2, { image: "u", headwear: "Fez", body: "Sky Stripe", eyes: "Rage" }],
+      [3, { image: "u", headwear: "Fez", body: "Concrete", eyes: "Rage" }],
+    ]),
+    listed: new Set([1, 3]),
+    bodyTickers: new Map([["Sky", "MSFT"], ["Sky Stripe", "MSFT"], ["Concrete", "COST"]]),
+  });
+  const msft = index.Farms.find((v) => v.value === "MSFT");
+  assert.equal(msft.total, 2);      // deux couleurs de corps, un seul desk
+  assert.equal(msft.listed, 1);
+  assert.equal(index.Farms.find((v) => v.value === "COST").total, 1);
+});
+
+test("a body whose desk could not be resolved joins no ticker", () => {
+  const index = buildTraitIndex({
+    meta: new Map([[1, { image: "u", headwear: "Halo", body: "Sky", eyes: "UwU" }]]),
+    listed: new Set(),
+    bodyTickers: new Map(),
+  });
+  assert.deepEqual(index.Farms, []);
 });
