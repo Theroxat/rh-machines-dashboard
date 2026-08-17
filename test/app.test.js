@@ -679,7 +679,7 @@ test("what is still folded away is still counted, re-inked machines included", (
 // menait sur une page où elle n'est pas à vendre.
 test("an anvil machine links to the anvil, not to OpenSea", () => {
   const html = halfCell(half({ anvilEntries: [shelfEntry()] }), "ink", { ethUsd: 1896 });
-  assert.match(html, /href="https:\/\/rh\.btcmachine\.gg\/machines\/9036"/);
+  assert.match(html, /href="https:\/\/rh\.btcmachine\.gg\/"/);
   const shelf = html.slice(html.indexOf('class="shelf"'));
   assert.doesNotMatch(shelf, /opensea\.io/);
 });
@@ -722,4 +722,15 @@ test("a gap smaller than a point says so rather than rounding to nothing", () =>
   const html = halfCell(half({ entries: [withBid({ priceEth: 0.1169, anvilBidEth: 0.1170 })] }), "ink", { ethUsd: 1896 });
   assert.match(html, /&lt;1%/);
   assert.doesNotMatch(html, /\+0%/);
+});
+
+test("a listing dropped as stale is reported, not silently removed", () => {
+  const line = excludedLine({ excluded: { unknownRarity: 0, unknownInk: 0, listingsOffGrid: 0, heldByAnvil: 2 } });
+  assert.match(line, /2<\/b> OpenSea listings were dropped/);
+  assert.match(line, /cannot be filled/);
+});
+
+test("with no overlap the line says nothing about it", () => {
+  const line = excludedLine({ excluded: { unknownRarity: 0, unknownInk: 0, listingsOffGrid: 0, heldByAnvil: 0 } });
+  assert.doesNotMatch(line, /Anvil/);
 });

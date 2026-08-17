@@ -204,3 +204,34 @@ test("with no shelf at all every cell simply holds none", () => {
   const grid = buildGrid({ traits: new Map(), ink: new Map(), listings: new Map(), pelotonSize: 5 });
   assert.deepEqual(grid.rows[0].inked.anvilEntries, []);
 });
+
+// Une machine que le vault détient ne peut être vendue par personne d'autre :
+// si un listing traîne encore dans le carnet OpenSea pour elle, c'est un
+// résidu inexécutable. L'afficher promettrait un achat impossible.
+test("a listing for a machine the anvil holds is dropped as stale", () => {
+  const grid = buildGrid({
+    traits: traitsOf([[1, 100], [2, 100]]),
+    ink: inkOf([[1, 4250], [2, 4250]]),
+    listings: listingsOf([[1, 0.05], [2, 0.11]]),
+    shelf: new Map([[1, 23465]]),
+    pelotonSize: 5,
+  });
+  const cell = rowOf(grid, "x1").inked;
+  assert.equal(cell.listed, 1);                    // #1 ne compte plus
+  assert.equal(cell.entries[0].tokenId, 2);
+  assert.equal(cell.floorEth, 0.11);               // le floor n'est plus tiré par un résidu
+  assert.equal(grid.excluded.heldByAnvil, 1);
+  assert.equal(cell.anvilEntries[0].tokenId, 1);   // elle reste, du côté de l'anvil
+});
+
+test("nothing is dropped when the two markets do not overlap", () => {
+  const grid = buildGrid({
+    traits: traitsOf([[1, 100], [2, 100]]),
+    ink: inkOf([[1, 4250], [2, 4250]]),
+    listings: listingsOf([[1, 0.11]]),
+    shelf: new Map([[2, 23465]]),
+    pelotonSize: 5,
+  });
+  assert.equal(grid.excluded.heldByAnvil, 0);
+  assert.equal(rowOf(grid, "x1").inked.listed, 1);
+});

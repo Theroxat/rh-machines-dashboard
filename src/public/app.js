@@ -17,9 +17,10 @@ export const fmtUsdShort = (v) =>
 
 const MACHINES = "0xb509e195bcb3e4461e235ff152c68d66915f67b5";
 export const itemUrl = (id) => `https://opensea.io/assets/robinhood/${MACHINES}/${id}`;
-/** Une machine du rayon s'achète sur l'anvil : l'envoyer sur OpenSea mènerait
- *  sur une page où elle n'est justement pas à vendre. */
-export const anvilUrl = (id) => `https://rh.btcmachine.gg/machines/${id}`;
+/** Une machine du rayon s'achète sur l'anvil, et nulle part ailleurs : le lien
+ *  mène donc là où la transaction se fait, pas sur une fiche descriptive. */
+export const ANVIL_URL = "https://rh.btcmachine.gg/";
+export const anvilUrl = () => ANVIL_URL;
 
 /** Combien de machines une case montre avant de proposer le reste. */
 export const DEFAULT_LIMIT = 8;
@@ -221,7 +222,7 @@ function shelfStrip(anvilEntries) {
       (e.askUsd ? ` · ${fmtUsdShort(e.askUsd)}` : "") +
       (e.askEth ? ` · ≈${fmtEth(e.askEth)} ETH` : "") +
       " — sold by the Anvil, paid in $PRINTER";
-    return `<a class="chip anvil" href="${anvilUrl(e.tokenId)}" target="_blank" rel="noopener" title="${esc(tip)}">` +
+    return `<a class="chip anvil" href="${ANVIL_URL}" target="_blank" rel="noopener" title="${esc(tip)}">` +
       img +
       `<span class="price">${fmtInt(Math.round(e.askPrinter))}</span>` +
       (e.askUsd ? `<span class="usd">${fmtUsdShort(e.askUsd)}</span>` : "") +
@@ -454,12 +455,17 @@ export function bookLine(d) {
 
 export function excludedLine(d) {
   const ex = d.excluded ?? {};
+  const stale = ex.heldByAnvil
+    ? ` <b>${fmtInt(ex.heldByAnvil)}</b> OpenSea listing${ex.heldByAnvil > 1 ? "s were" : " was"} dropped for ` +
+      `Machines the Anvil now holds: it owns them, so nobody else can sell them and the listing cannot be filled.`
+    : "";
+
   if (ex.unknownRarity || ex.unknownInk || ex.listingsOffGrid) {
     return `Excluded from every count: <b>${fmtInt(ex.unknownRarity)}</b> with an unreadable rarity, ` +
       `<b>${fmtInt(ex.unknownInk)}</b> whose ink was never read, ` +
-      `<b>${fmtInt(ex.listingsOffGrid)}</b> listings that could not be placed. An unread value is never guessed.`;
+      `<b>${fmtInt(ex.listingsOffGrid)}</b> listings that could not be placed. An unread value is never guessed.` + stale;
   }
-  return `Every one of the 10,000 Machines was read: no rarity or ink value had to be excluded.`;
+  return `Every one of the 10,000 Machines was read: no rarity or ink value had to be excluded.` + stale;
 }
 
 export function publishedLine(d) {

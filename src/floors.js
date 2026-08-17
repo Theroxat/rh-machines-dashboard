@@ -34,7 +34,7 @@ function buildCell(entries, supply, pelotonSize) {
 }
 
 export function buildGrid({ listings, traits, ink, pelotonSize, shelf }) {
-  const excluded = { unknownRarity: 0, unknownInk: 0, listingsOffGrid: 0 };
+  const excluded = { unknownRarity: 0, unknownInk: 0, listingsOffGrid: 0, heldByAnvil: 0 };
   const stateOf = new Map();   // tokenId -> "inked" | "dormant"
   const classOf = new Map();   // tokenId -> weightClass
   const supply = new Map();    // "class:state" -> compte
@@ -52,6 +52,11 @@ export function buildGrid({ listings, traits, ink, pelotonSize, shelf }) {
 
   const byCell = new Map();    // "class:state" -> entries[]
   for (const entry of listings.values()) {
+    // Le vault détient les machines de son rayon : personne d'autre ne peut les
+    // vendre. Un listing OpenSea qui subsiste pour l'une d'elles est un résidu,
+    // inexécutable, et il tirerait le floor vers le bas sans que rien ne soit
+    // achetable à ce prix.
+    if (shelf?.has(entry.tokenId)) { excluded.heldByAnvil++; continue; }
     const state = stateOf.get(entry.tokenId);
     const wc = classOf.get(entry.tokenId);
     // En vente, mais sa rareté ou son encre n'a jamais été lue : impossible de
