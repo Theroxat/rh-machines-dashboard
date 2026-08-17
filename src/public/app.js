@@ -235,8 +235,11 @@ function shelfStrip(anvilEntries) {
   const first = anvilEntries[0];
   // Le même mot que la moitié OpenSea : sans lui, le montant du rayon se lit
   // comme un chiffre sans nom à côté d'un floor qui, lui, se présente.
+  // Ce prix inclut la prime de 10% pour désigner sa machine : l'appeler « floor
+  // price » le ferait passer pour un tarif. Le prix de file achète une machine
+  // aussi, juste pas celle-là, et il est annoncé à côté plutôt que tu.
   const priceLine =
-    `<span class="shelf-price"><span class="label">floor price</span>` +
+    `<span class="shelf-price"><span class="label">to pick one</span>` +
     `<span class="price">${fmtInt(Math.round(first.askPrinter))}</span>` +
     ` <span class="unit">$PRINTER</span>` +
     (first.askUsd ? ` <span class="usd-big">${fmtUsdShort(first.askUsd)}</span>` : "") + `</span>`;
@@ -260,7 +263,11 @@ function shelfStrip(anvilEntries) {
   return `<span class="shelf">` +
     `<span class="market">On the Anvil</span>` +
     priceLine +
-    `<span class="depth">${fmtInt(anvilEntries.length)} on the shelf${range ? ` · ${range}` : ""}</span>` +
+    `<span class="depth">${fmtInt(anvilEntries.length)} on the shelf` +
+      (first.queuePrinter
+        ? ` · <b>${fmtInt(Math.round(first.queuePrinter))} $PRINTER</b> for whichever is next`
+        : "") +
+      `${range ? ` · ${range}` : ""}</span>` +
     `<span class="strip">${chips}</span>` +
   `</span>`;
 }

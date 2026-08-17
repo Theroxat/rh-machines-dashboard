@@ -56,6 +56,7 @@ export function composeSnapshot({
     machine: machineOf(e.tokenId),
     askUsd: printer?.usd ? e.askPrinter * printer.usd : null,
     askEth: printer?.usd && eth?.usd ? (e.askPrinter * printer.usd) / eth.usd : null,
+    queueUsd: printer?.usd && e.queuePrinter ? e.queuePrinter * printer.usd : null,
   });
 
   const withMachines = (cell, classValue) => ({
