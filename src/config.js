@@ -5,10 +5,16 @@ export const ADDRESSES = Object.freeze({
   MACHINES:   "0xB509e195bcB3E4461e235Ff152c68D66915f67b5",
   MINE:       "0x3C4E763E87Ac5775A23aE2eb2e69F90232f413E1",
   TRAITS:     "0x8a0833f41cE9e869d6ebd8aC16EfDC9Ee7a38a22",
+  // The Anvil : le teneur de marché du protocole. Ni l'adresse ni l'ABI ne sont
+  // documentées — extraites des bundles du terminal officiel, vérifiées on-chain.
+  VAULT:      "0x03645012b560Ea96Ab9a050dF98C72BfCBc9bE4F",
   TOKEN:      "0x85a574f2fF0795685F58d1D7B0D4b51F148Ac489",
   MULTICALL3: "0xcA11bde05977b3631167028862bE2a173976CA11",
   USDG:       "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
   WETH:       "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+  // Le hook Uniswap qui prélève le frais de vente du $PRINTER : sans lui, une
+  // comparaison entre un prix en PRINTER et un prix en ETH surestime le premier.
+  HOOK:       "0x3685cc4Aa1266813Fa0EF346853341b0778C80Cc",
 });
 
 export const TOTAL_MACHINES = 10000;

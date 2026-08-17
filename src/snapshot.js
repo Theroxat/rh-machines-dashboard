@@ -4,7 +4,7 @@ import { TOTAL_MACHINES } from "./config.js";
 /** Assemblage pur de tout ce dont la page a besoin. Une dérivation qui
  *  diviserait par une valeur non lue produit null plutôt qu'un zéro confiant. */
 export function composeSnapshot({
-  grid, printer, eth, protocol, stats, book, inkMeta, meta, legend, bodyTickers, ink, weights, now,
+  grid, printer, eth, protocol, stats, book, inkMeta, meta, legend, bodyTickers, ink, weights, anvil, now,
 }) {
   const activationPrinter = protocol?.activationInk
     ? Number(BigInt(protocol.activationInk) / 10n ** 15n) / 1000
@@ -27,6 +27,23 @@ export function composeSnapshot({
   const PRINTER = 10n ** 18n;
 
   /**
+   * Ce que l'anvil paierait, exprimé en ETH pour être comparable à un prix
+   * OpenSea. Les frais de vente du token sont déduits : encaisser un prix en
+   * $PRINTER suppose de le reconvertir, et ce passage coûte. Sans ce taux, la
+   * conversion surestimerait l'offre et signalerait des affaires qui n'existent
+   * pas — donc sans lui, on ne compare rien du tout.
+   */
+  const netFactor = protocol?.sellFeeBps === null || protocol?.sellFeeBps === undefined
+    ? null
+    : 1 - protocol.sellFeeBps / 10000;
+
+  const bidEthOf = (tokenId) => {
+    const bid = anvil?.bids?.get(tokenId);
+    if (bid === undefined || netFactor === null || !printer?.usd || !eth?.usd) return null;
+    return (bid * printer.usd * netFactor) / eth.usd;
+  };
+
+  /**
    * Le poids vient du contrat, pas d'une racine carrée que je recalculerais.
    * `inkMult` est ce qui distingue une machine re-inkée d'une machine activée au
    * minimum : même classe, poids doublé, et rien ne le disait jusqu'ici.
@@ -37,6 +54,7 @@ export function composeSnapshot({
       const w = weights?.get(e.tokenId);
       const i = ink?.get(e.tokenId);
       const weight = w === undefined ? null : Number(w);
+      const anvilBidEth = bidEthOf(e.tokenId);
       return {
         ...e,
         machine: machineOf(e.tokenId),
@@ -44,6 +62,10 @@ export function composeSnapshot({
         inkPrinter: i === undefined ? null : Number(i / PRINTER),
         // Une machine dormante ne pèse rien : un rapport n'aurait aucun sens.
         inkMult: weight ? weight / classValue : null,
+        anvilBidPrinter: anvil?.bids?.get(e.tokenId) ?? null,
+        anvilBidEth,
+        // Une offre suspendue n'est pas une offre basse : on ne compare pas.
+        underBid: Boolean(anvilBidEth !== null && !anvil?.bidPaused && anvilBidEth > e.priceEth),
       };
     }),
   });
@@ -106,5 +128,15 @@ export function composeSnapshot({
     protocol,
     book,
     collection,
+    anvil: anvil
+      ? {
+          ...anvil,
+          bids: undefined,   // 650 entrées déjà portées par chaque machine
+          spotUsd: anvil.spotPrinter === null ? null : anvil.spotPrinter * (printer?.usd ?? 0) || null,
+          shelfAverageUsd: anvil.shelfAveragePrinter === null ? null : anvil.shelfAveragePrinter * (printer?.usd ?? 0) || null,
+          crateUsd: anvil.cratePrinter === null ? null : anvil.cratePrinter * (printer?.usd ?? 0) || null,
+          sellFeeBps: protocol?.sellFeeBps ?? null,
+        }
+      : null,
   };
 }

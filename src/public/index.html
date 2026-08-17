@@ -23,6 +23,9 @@
     --ink:      #f0a41c;
     --dormant:  #6b8ba4;
     --alarm:    #d9564b;
+    /* La seule couleur ajoutée depuis le début, et elle porte un sens précis :
+       ce listing s'échange sous ce que le protocole lui-même en donnerait. */
+    --under:    #6fbf73;
     --mono: ui-monospace, "SF Mono", "JetBrains Mono", "DejaVu Sans Mono", Menlo, Consolas, monospace;
   }
 
@@ -167,6 +170,7 @@
   .cell-floor .label { margin-right: 9px; }
   .cell-floor .price { font-size: 23px; font-weight: 700; letter-spacing: -0.025em; }
   .cell-floor .unit { font-size: 10px; }
+  .cell-floor .usd-big { font-size: 13px; font-weight: 600; color: var(--muted); margin-left: 7px; }
   td.g-ink     .cell-floor .price { color: var(--ink); }
   td.g-dormant .cell-floor .price { color: var(--dormant); }
 
@@ -202,7 +206,21 @@
   }
   .chip .noimg { background: repeating-linear-gradient(45deg, var(--paper-2) 0 4px, var(--paper) 4px 8px); }
   .chip .price { display: block; font-size: 11px; font-weight: 600; margin-top: 3px; }
+  .chip .usd   { display: block; font-size: 9.5px; color: var(--muted); }
   .chip .tok   { display: block; font-size: 9.5px; color: var(--dim); }
+
+  .under {
+    position: absolute;
+    left: 0; bottom: 0;
+    padding: 0 3px;
+    background: var(--under);
+    color: var(--paper);
+    font-size: 8.5px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    line-height: 1.5;
+  }
+  .chip.is-under img, .chip.is-under .noimg { border-color: var(--under); }
   .chip:hover img, .chip:focus-visible img, .chip:hover .noimg { border-color: var(--text); }
 
   /* La moins chère est la seule que le tableau désignait avant : elle garde un
@@ -366,6 +384,7 @@
   <p>The <b>ink ceiling</b> in the header is a third multiplier again: it caps how much extra weight burning
     more $PRINTER can buy, and it rises as the protocol burns more. A ceiling of x2 does not stop a x10
     Machine from existing.</p>
+  <p id="anvil-line"></p>
   <p id="book-line"></p>
   <p id="excluded-line"></p>
   <p id="published-line"></p>

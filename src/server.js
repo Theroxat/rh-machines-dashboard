@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { ethers } from "ethers";
 
-import { loadConfig, RPC_URL, CHAIN_ID } from "./config.js";
+import { loadConfig, RPC_URL, CHAIN_ID, ADDRESSES } from "./config.js";
 import { fetchListings, fetchCollectionStats } from "./opensea.js";
 import { loadTraits } from "./traits.js";
 import { loadMetadata } from "./metadata.js";
@@ -13,10 +13,12 @@ import { deriveDeskTickers, deriveBodyTickers } from "./desks.js";
 import { readInk } from "./ink.js";
 import { fetchPrinter, fetchEthUsd } from "./prices.js";
 import { readProtocol } from "./protocol.js";
+import { readAnvil } from "./anvil.js";
 import { buildGrid } from "./floors.js";
 import { composeSnapshot } from "./snapshot.js";
 import { createStore } from "./store.js";
 import { assetHash, assetPath, stampPage, cacheHeaders, securityHeaders, etagOf } from "./http.js";
+import { multicallOf } from "./multicall.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const cfg = loadConfig(process.env, JSON.parse(readFileSync(join(here, "..", "config.json"), "utf8")));
@@ -83,12 +85,28 @@ async function sweepBook() {
 
   const grid = buildGrid({ listings: book.listings, traits, ink, pelotonSize: cfg.pelotonSize });
 
-  store.succeed(composeSnapshot({
+  // L'anvil est lu après le carnet parce qu'il faut savoir quelles machines sont
+  // en vente pour lui demander ce qu'il en donnerait.
+  const anvil = await readAnvil({
+    provider,
+    aggregate3: multicallOf(provider, ADDRESSES.MULTICALL3),
+    tokenIds: [...book.listings.keys()],
+    batchSize: cfg.multicallBatchSize,
+  }).catch((e) => { console.error(`anvil: ${e.message}`); return null; });
+
+  const composed = composeSnapshot({
     grid, printer, eth, protocol, stats,
     book: { listed: book.listings.size, pages: book.pages, skipped: book.skipped },
-    inkMeta, meta, legend, bodyTickers, ink, weights, now: Date.now(),
-  }));
-  console.log(`book: ${book.listings.size} listings over ${book.pages} pages`);
+    inkMeta, meta, legend, bodyTickers, ink, weights, anvil, now: Date.now(),
+  });
+  store.succeed(composed);
+
+  const under = composed.rows
+    .flatMap((r) => [...r.inked.entries, ...r.dormant.entries])
+    .filter((e) => e.underBid).length;
+  console.log(`book: ${book.listings.size} listings over ${book.pages} pages` +
+    (anvil ? `, anvil spot ${Math.round(anvil.spotPrinter)} PRINTER, shelf ${anvil.shelf}` +
+      (anvil.bidPaused ? ", BID PAUSED" : "") : ", anvil unreadable") + `, ${under} under the anvil bid`);
 }
 
 /** Chaque boucle se replanifie après s'être terminée, pour qu'un balayage lent

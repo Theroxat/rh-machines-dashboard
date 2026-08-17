@@ -184,3 +184,52 @@ test("a dormant machine has no ink multiplier to report", () => {
   assert.equal(s.rows[0].inked.entries[0].weight, 0);
   assert.equal(s.rows[0].inked.entries[0].inkMult, null);
 });
+
+// ---- The Anvil ----
+
+const withAnvil = {
+  ...withWeights,
+  protocol: { ...withWeights.protocol, sellFeeBps: 500 },
+  anvil: {
+    spotPrinter: 16082, spreadBps: 500, stepBps: 200, snipeBps: 1000,
+    shelf: 30, cratePrinter: 21331, shelfAveragePrinter: 20315,
+    paused: false, bidPaused: false,
+    // 1253 est coté 2.0 ETH ; l'anvil en donne 400 000 PRINTER
+    bids: new Map([[1253, 400000], [999, 100000]]),
+  },
+};
+
+test("each machine carries what the anvil would pay for it, net of the token's sell fee", () => {
+  const s = composeSnapshot(withAnvil);
+  const e = s.rows[0].inked.entries[0];
+  // 400 000 x $0.0126 = $5040, moins 5% = $4788, / $1883.24 = 2.5425 ETH
+  assert.ok(Math.abs(e.anvilBidEth - 2.5425) < 0.002, `got ${e.anvilBidEth}`);
+  assert.equal(e.anvilBidPrinter, 400000);
+});
+
+// La seule comparaison qui compte : ce listing s'échange-t-il sous ce que le
+// protocole lui-même en donnerait ?
+test("a listing priced under the anvil's own bid is flagged", () => {
+  const s = composeSnapshot(withAnvil);
+  assert.equal(s.rows[0].inked.entries[0].underBid, true);   // 2.0 ETH demandé, 2.54 offert
+  assert.equal(s.rows[0].inked.entries[1].underBid, false);  // 2.4 demandé, 0.63 offert
+});
+
+test("with the bid paused nothing is flagged, because there is no bid to be under", () => {
+  const s = composeSnapshot({ ...withAnvil, anvil: { ...withAnvil.anvil, bidPaused: true } });
+  assert.equal(s.rows[0].inked.entries[0].underBid, false);
+  assert.equal(s.anvil.bidPaused, true);
+});
+
+test("with no sell fee read, no comparison is invented", () => {
+  const s = composeSnapshot({ ...withAnvil, protocol: { ...withAnvil.protocol, sellFeeBps: null } });
+  assert.equal(s.rows[0].inked.entries[0].anvilBidEth, null);
+  assert.equal(s.rows[0].inked.entries[0].underBid, false);
+});
+
+test("the anvil's own numbers ride along in both currencies", () => {
+  const s = composeSnapshot(withAnvil);
+  assert.equal(s.anvil.spotPrinter, 16082);
+  assert.ok(Math.abs(s.anvil.spotUsd - 16082 * 0.0126) < 0.01);
+  assert.equal(s.anvil.shelf, 30);
+});
