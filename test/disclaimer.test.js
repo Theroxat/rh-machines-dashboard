@@ -107,3 +107,16 @@ test("the page links to its author, and names the link for anyone who cannot see
   const link = flat.slice(flat.indexOf('class="x-link"'), flat.indexOf("</a>", flat.indexOf('class="x-link"')));
   assert.match(link, /rel="noopener"/);
 });
+
+// Un montant en dollars accompagne toujours un prix libellé dans une autre
+// monnaie : il est le second, donc en retrait. Un seul portait la couleur du
+// texte et ressortait plus que le prix qu'il traduisait.
+test("every dollar figure on the page is set in the same, quieter colour", () => {
+  const rules = [...flat.matchAll(/([.#][\w.-]+(?:\s+[.#][\w-]+)*)\s*\{([^}]*)\}/g)]
+    .filter((m) => m[1].includes("usd"))
+    .map((m) => [m[1], (m[2].match(/color:\s*([^;]+)/) || [, "(inherits)"])[1].trim()]);
+
+  assert.ok(rules.length >= 4, "expected every dollar figure to declare a colour");
+  const colours = [...new Set(rules.map(([, c]) => c))];
+  assert.deepEqual(colours, ["var(--muted)"], `dollar figures disagree: ${JSON.stringify(rules)}`);
+});
