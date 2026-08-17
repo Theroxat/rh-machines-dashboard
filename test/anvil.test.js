@@ -88,3 +88,24 @@ test("a shelf that cannot be read is empty, not imagined", async () => {
   const a = await readAnvil({ provider: fakeProvider(GLOBALS), aggregate3: async () => [], tokenIds: [] });
   assert.equal(a.shelfListings.size, 0);
 });
+
+// `listing()` donne le prix pour désigner une machine, prime comprise. Le prix
+// de file est plus bas, et l'écart est ce que l'anvil vend : afficher l'un sans
+// l'autre ferait passer une prime pour un tarif.
+test("both the named price and the queue price are read for the shelf", async () => {
+  const provider = {
+    call: async ({ data }) => {
+      const fn = ANVIL_ABI.getFunction(data.slice(0, 10))?.name;
+      if (fn === "listing") return ANVIL_ABI.encodeFunctionResult("listing", [[9036n], [14252n * 10n ** 18n]]);
+      if (fn in GLOBALS) return ANVIL_ABI.encodeFunctionResult(fn, [GLOBALS[fn]]);
+      return "0x";
+    },
+  };
+  const iface = new ethers.Interface(["function buyPrice(uint256) view returns (uint256)"]);
+  const aggregate3 = async (calls) =>
+    calls.map(() => [true, iface.encodeFunctionResult("buyPrice", [12957n * 10n ** 18n])]);
+
+  const a = await readAnvil({ provider, aggregate3, tokenIds: [] });
+  assert.equal(a.shelfListings.get(9036), 14252);
+  assert.equal(a.shelfQueue.get(9036), 12957);
+});

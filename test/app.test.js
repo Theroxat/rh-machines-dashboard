@@ -755,15 +755,19 @@ test("a machine with no picture still carries its marks", () => {
   assert.match(html, /class="under"/);
 });
 
-// Les deux moitiés d'une case annoncent un prix : elles doivent l'annoncer de
-// la même façon, sinon celle de l'anvil se lit comme un chiffre sans nom.
-test("the shelf names its price the way the OpenSea half does", () => {
+// Les deux moitiés d'une case annoncent un prix, chacune avec le mot juste :
+// « floor price » pour le carnet, « to pick one » pour le rayon, dont le prix
+// inclut une prime. Ce qu'elles partagent, c'est de ne jamais laisser un
+// montant sans nom.
+test("both halves label their price, each with the right word", () => {
   const html = halfCell(half({ entries: [entry(1, 0.11)], anvilEntries: [shelfEntry()] }), "ink", { ethUsd: 1896 });
-  const shelf = html.slice(html.indexOf('class="shelf"'));
-  assert.match(shelf, /class="label">floor price<\/span>/);
-  assert.ok(shelf.indexOf("floor price") < shelf.indexOf("23,465"), "the label comes before the amount");
-  // et les deux moitiés portent bien le même mot
-  assert.equal((html.match(/floor price/g) || []).length, 2);
+  const cut = html.indexOf('class="shelf"');
+  const book = html.slice(0, cut);
+  const shelf = html.slice(cut);
+
+  assert.match(book, /class="label">floor price<\/span>/);
+  assert.match(shelf, /class="label">to pick one<\/span>/);
+  assert.ok(shelf.indexOf("to pick one") < shelf.indexOf("23,465"), "the label comes before the amount");
 });
 
 // Une case contient deux marchés. Un seul portait son nom, donc le premier ne
@@ -817,4 +821,25 @@ test("a paused anvil is not invited to be gambled with", () => {
   const html = crateLine({ cratePrinter: 14652, crateUsd: 195, paused: true });
   assert.match(html, /paused/i);
   assert.doesNotMatch(html, /try your luck/i);
+});
+
+// Le prix du rayon inclut une prime de 10% pour désigner sa machine. L'appeler
+// « floor price » le faisait passer pour un tarif, alors que le prix de file
+// est plus bas et achète une machine — juste pas celle-là.
+test("the shelf calls its price what it is: the cost of picking one", () => {
+  const html = halfCell(half({ anvilEntries: [shelfEntry({ queuePrinter: 12957, queueUsd: 157 })] }), "ink", { ethUsd: 1896 });
+  assert.match(html, /to pick one/i);
+  assert.doesNotMatch(html.slice(html.indexOf('class="shelf"')), /floor price/i);
+});
+
+test("the cheaper way is stated beside it, not hidden", () => {
+  const html = halfCell(half({ anvilEntries: [shelfEntry({ queuePrinter: 12957, queueUsd: 157 })] }), "ink", { ethUsd: 1896 });
+  assert.match(html, /12,957/);
+  assert.match(html, /whichever is next/i);
+});
+
+test("with no queue price read, only the named one is claimed", () => {
+  const html = halfCell(half({ anvilEntries: [shelfEntry({ queuePrinter: null })] }), "ink", { ethUsd: 1896 });
+  assert.match(html, /to pick one/i);
+  assert.doesNotMatch(html, /whichever is next/i);
 });
