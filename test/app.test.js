@@ -4,6 +4,7 @@ import {
   fmtEth, fmtRatio, halfCell, cellKey,
   bannerMessage, rowsHtml, contextHtml, legendHtml,
   matchesFilter, filterBarHtml, filterSummary, freshness, fmtCompact, crateLine,
+  perPointUsd, viewBarHtml,
 } from "../src/public/app.js";
 
 const entry = (tokenId, priceEth, image = `https://img/${tokenId}.webp`) => ({
@@ -985,4 +986,97 @@ test("with no filter the shelf shows everything it holds", () => {
   }), "ink", { ethUsd: 1896 });
   assert.match(html, /#1</);
   assert.match(html, /#2</);
+});
+
+// ---- la vue « prix du point de poids » ----------------------------------
+//
+// Le poids est ce qui paie. Comparer sept floors ne dit donc pas où l'on
+// achète le moins cher : il faut ramener chaque annonce au prix d'un point
+// de poids, et pour une dormante ce prix inclut l'ink qu'il faudra brûler.
+
+const RATES = { ethUsd: 2000, printerUsd: 0.01 };   // activation = 5 000 × 0.01 = $50
+const wEntry = (tokenId, priceEth, weight) =>
+  ({ ...entry(tokenId, priceEth), weight, inkMult: 1, inkPrinter: 4250 });
+
+test("an inked machine costs its price divided by the weight it already carries", () => {
+  // 0.15 ETH × $2000 = $300, pour 3 points de poids
+  assert.equal(perPointUsd(wEntry(1, 0.15, 300), { ...RATES, side: "ink" }), 100);
+});
+
+test("a dormant machine carries the ink it will have to burn", () => {
+  // 0.10 ETH = $200, plus $50 d'activation, pour les 2 points de sa classe
+  assert.equal(perPointUsd(wEntry(1, 0.10, 0), { ...RATES, side: "dormant", classValue: 200 }), 125);
+});
+
+test("without an eth rate no cost per point is invented", () => {
+  assert.equal(perPointUsd(wEntry(1, 0.15, 300), { ethUsd: null, printerUsd: 0.01, side: "ink" }), null);
+});
+
+test("without a printer rate a dormant machine has no knowable entry cost", () => {
+  assert.equal(perPointUsd(wEntry(1, 0.10, 0), { ethUsd: 2000, printerUsd: null, side: "dormant", classValue: 200 }), null);
+});
+
+test("a machine of unknown weight is ranked nowhere rather than at zero", () => {
+  assert.equal(perPointUsd(wEntry(1, 0.15, 0), { ...RATES, side: "ink" }), null);
+});
+
+test("the value view leads with the cost of a weight point, named as such", () => {
+  const html = halfCell(half({ entries: [wEntry(1, 0.15, 300)] }), "ink",
+    { view: "value", classValue: 300, ...RATES });
+  assert.match(html, /\$100/);
+  assert.match(html, /weight point/i);
+  assert.doesNotMatch(html, /floor price/);
+});
+
+test("the value view ranks by the point, so a dearer machine can come first", () => {
+  // #1 coûte $600 mais porte 6 points ($100) ; #2 coûte $320 pour 3 ($107).
+  const html = halfCell(half({ entries: [wEntry(2, 0.16, 300), wEntry(1, 0.30, 600)] }), "ink",
+    { view: "value", classValue: 300, ...RATES });
+  assert.ok(html.indexOf("#1<") < html.indexOf("#2<"), "le moins cher au point passe devant");
+});
+
+test("the floor view still ranks by what the machine costs", () => {
+  const html = halfCell(half({ entries: [wEntry(2, 0.16, 300), wEntry(1, 0.30, 600)] }), "ink",
+    { view: "floor", classValue: 300, ...RATES });
+  assert.ok(html.indexOf("#2<") < html.indexOf("#1<"), "le moins cher en ETH passe devant");
+});
+
+test("a dormant cell says the activation is counted in", () => {
+  const html = halfCell(half({ entries: [wEntry(1, 0.10, 0)] }), "dormant",
+    { view: "value", classValue: 200, ...RATES });
+  assert.match(html, /activation included/i);
+});
+
+test("an inked cell claims no activation, having nothing to burn", () => {
+  const html = halfCell(half({ entries: [wEntry(1, 0.15, 300)] }), "ink",
+    { view: "value", classValue: 300, ...RATES });
+  assert.doesNotMatch(html, /activation included/i);
+});
+
+const valueRows = {
+  eth: { usd: 2000 }, printer: { usd: 0.01 },
+  rows: [
+    { classValue: 100, classLabel: "x1", docCount: 1, chainCount: 1,
+      inked: half({ entries: [wEntry(11, 0.10, 100)] }), dormant: half({ entries: [] }) },   // $200 /point
+    { classValue: 300, classLabel: "x3", docCount: 1, chainCount: 1,
+      inked: half({ entries: [wEntry(33, 0.15, 300)] }), dormant: half({ entries: [] }) },   // $100 /point
+  ],
+};
+
+test("the value view floats the class where a point costs least to the top", () => {
+  const html = rowsHtml(valueRows, { view: "value" });
+  assert.ok(html.indexOf(">x3<") < html.indexOf(">x1<"), "x3 achète le point moins cher que x1");
+});
+
+test("the floor view leaves the classes in their documented order", () => {
+  const html = rowsHtml(valueRows, { view: "floor" });
+  assert.ok(html.indexOf(">x1<") < html.indexOf(">x3<"));
+});
+
+test("the view is a choice the reader makes, and the current one is marked", () => {
+  const html = viewBarHtml("value");
+  assert.match(html, /data-view/);
+  assert.equal((html.match(/<option/g) ?? []).length, 2);
+  assert.match(html, /value"\s+selected|selected[^>]*>[^<]*weight point/);
+  assert.match(html, /floor price/i);
 });

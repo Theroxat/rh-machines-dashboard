@@ -15,6 +15,52 @@ export const usdOf = (eth, ethUsd) =>
 export const fmtUsdShort = (v) =>
   v === null || v === undefined ? "" : v >= 10000 ? `$${Math.round(v / 1000)}k` : `$${Math.round(v)}`;
 
+/**
+ * Le prix d'un point de poids — la seule mesure qui compare une classe à une
+ * autre. Le poids est ce qui paie : `rareté × √(ink/4250)`. Sept floors alignés
+ * ne disent donc pas où l'on achète le moins cher, parce qu'ils ne portent pas
+ * la même chose. Un point vaut ici ce que porte une x1 tout juste activée.
+ *
+ * Une dormante ne pèse rien tant que rien n'a brûlé : son prix d'entrée réel
+ * est le prix demandé plus l'activation, et son poids sera celui de sa classe.
+ * L'omettre ferait passer les dormantes bon marché pour les meilleures affaires
+ * du tableau, ce qu'elles ne sont pas.
+ */
+export const ACTIVATION_PRINTER = 5000;
+
+export function perPointUsd(e, { classValue = null, side = "ink", ethUsd = null, printerUsd = null } = {}) {
+  const usd = usdOf(e?.priceEth, ethUsd);
+  if (usd === null) return null;
+
+  const dormant = side === "dormant";
+  const weight = dormant ? classValue : e?.weight;
+  // Sans poids connu on ne classe pas : un zéro se lirait comme « gratuit »,
+  // et une machine hors classement vaut mieux qu'une machine mal classée.
+  if (!weight) return null;
+  // Même règle que partout ailleurs : sans taux lu, aucune conversion inventée.
+  if (dormant && !printerUsd) return null;
+
+  const entry = usd + (dormant ? ACTIVATION_PRINTER * printerUsd : 0);
+  return entry / (weight / 100);
+}
+
+/** Deux façons de lire le même tableau : ce que coûte la machine, ou ce que
+ *  coûte ce qu'elle rapporte. La seconde réordonne tout, jusqu'aux lignes. */
+export const VIEW_FLOOR = "floor";
+export const VIEW_VALUE = "value";
+const VIEW_LABELS = Object.freeze([
+  [VIEW_FLOOR, "floor price"],
+  [VIEW_VALUE, "price per weight point"],
+]);
+
+export function viewBarHtml(view) {
+  const options = VIEW_LABELS
+    .map(([v, label]) => `<option value="${v}"${v === view ? " selected" : ""}>${label}</option>`)
+    .join("");
+  return `<label class="fl view"><span class="label">View</span>` +
+    `<select data-view>${options}</select></label>`;
+}
+
 const MACHINES = "0xb509e195bcb3e4461e235ff152c68d66915f67b5";
 export const itemUrl = (id) => `https://opensea.io/assets/robinhood/${MACHINES}/${id}`;
 /** Une machine du rayon s'achète sur l'anvil, et nulle part ailleurs : le lien
@@ -169,13 +215,17 @@ export function contextHtml(d) {
  * dérivé : le badge de re-encrage n'existait que du côté OpenSea, si bien
  * qu'une x10 re-inkée au plafond passait pour une x10 ordinaire sur le rayon.
  */
-function chip(e, { isFloor = false, ethUsd = null, anvil = false, showPrice = true } = {}) {
+function chip(e, { isFloor = false, ethUsd = null, anvil = false, showPrice = true, perPoint = null } = {}) {
   const hw = e.machine?.headwear ? ` · ${headwearLabel(e.machine.headwear)}` : "";
   const img = e.machine?.image
     ? `<img src="${esc(e.machine.image)}" alt="Machine #${e.tokenId}" loading="lazy" width="60" height="60">`
     : `<span class="noimg" aria-hidden="true"></span>`;
 
-  const price = anvil ? fmtInt(Math.round(e.askPrinter)) : fmtEth(e.priceEth);
+  // En vue « valeur » le grand chiffre est le coût du point, et le petit reste
+  // ce qu'il faut sortir pour l'acheter : sans lui la vignette classerait sans
+  // jamais dire son prix.
+  const price = perPoint !== null ? fmtUsdShort(perPoint)
+    : anvil ? fmtInt(Math.round(e.askPrinter)) : fmtEth(e.priceEth);
   const dollars = anvil ? fmtUsdShort(e.askUsd) : fmtUsdShort(usdOf(e.priceEth, ethUsd));
 
   // Une machine re-inkée pèse plus que ne le dit sa ligne — vrai des deux côtés.
@@ -196,9 +246,15 @@ function chip(e, { isFloor = false, ethUsd = null, anvil = false, showPrice = tr
       (e.askEth ? ` · ≈${fmtEth(e.askEth)} ETH` : "")
     : "";
 
+  const pointStory = perPoint !== null
+    ? ` · ${fmtUsd(perPoint, 0)} per weight point` +
+      (e.dormantHere ? ", activation included" : "") +
+      ` · asking ${fmtEth(e.priceEth)} ETH`
+    : "";
+
   return `<a class="chip${isFloor ? " floor" : ""}${anvil ? " anvil" : ""}${!anvil && e.underBid ? " is-under" : ""}"` +
     ` href="${anvil ? ANVIL_URL : itemUrl(e.tokenId)}" target="_blank" rel="noopener"` +
-    ` title="${esc(`#${e.tokenId}${hw}${inkStory}${bidStory}${anvilStory}`)}">` +
+    ` title="${esc(`#${e.tokenId}${hw}${pointStory}${inkStory}${bidStory}${anvilStory}`)}">` +
     `<span class="thumb">${img}${badge}${under}</span>` +
     (showPrice ? `<span class="price">${price}</span>` : "") +
     (showPrice && dollars ? `<span class="usd">${dollars}</span>` : "") +
@@ -281,7 +337,7 @@ function shelfStrip(anvilEntries, floorEth) {
  * toujours combien elle cache, pour qu'un carnet coupé ne passe jamais pour
  * un carnet complet.
  */
-export function halfCell(half, side, { shown = null, step = REVEAL_STEP, limit = DEFAULT_LIMIT, key = "", filter = EMPTY_FILTER, ethUsd = null } = {}) {
+export function halfCell(half, side, { shown = null, step = REVEAL_STEP, limit = DEFAULT_LIMIT, key = "", filter = EMPTY_FILTER, ethUsd = null, printerUsd = null, view = VIEW_FLOOR, classValue = null } = {}) {
   const g = `g-${side}`;
   // Sur mobile l'en-tête du tableau disparaît : la case doit alors annoncer
   // elle-même de quel côté elle parle.
@@ -294,15 +350,33 @@ export function halfCell(half, side, { shown = null, step = REVEAL_STEP, limit =
   const allShelf = half.anvilEntries ?? [];
   const keptShelf = active ? allShelf.filter((e) => matchesFilter(e.machine, filter)) : allShelf;
 
+  // En vue « valeur » le carnet se reclasse sur le prix du point, pas sur le
+  // prix : une machine plus chère qui porte plus de poids passe devant. Celles
+  // dont le point n'est pas calculable sortent du classement, et la case le dit
+  // plutôt que de les faire disparaître en silence.
+  const valued = view === VIEW_VALUE;
+  const rates = { classValue, side, ethUsd, printerUsd };
+  const ranked = valued
+    ? kept
+        .map((e) => ({ ...e, perPoint: perPointUsd(e, rates), dormantHere: side === "dormant" }))
+        .filter((e) => e.perPoint !== null)
+        .sort((a, b) => a.perPoint - b.perPoint || a.tokenId - b.tokenId)
+    : kept;
+  const unranked = kept.length - ranked.length;
+
   // Deux faits distincts, énoncés séparément. « 5 of 249 listed » se lisait
   // « 5 affichées sur 249 disponibles » et faisait chercher un bouton de
   // dépliage qui n'avait pas lieu d'être : les 249 sont les machines qui
   // existent, et les 5 en vente étaient déjà toutes là.
-  const depth = active
-    ? `${fmtInt(kept.length)} of ${fmtInt(all.length)} on sale match`
-    : `<b>${fmtInt(half.listed)} on sale</b> · ${fmtInt(half.supply)} in this class`;
+  const depth = (active
+    ? `${fmtInt(ranked.length)} of ${fmtInt(all.length)} on sale match`
+    : `<b>${fmtInt(half.listed)} on sale</b> · ${fmtInt(half.supply)} in this class`)
+    + (unranked ? ` · ${fmtInt(unranked)} of unknown weight, left out` : "")
+    // L'activation est comptée dans le chiffre : le taire ferait passer une
+    // dormante bon marché pour meilleure qu'elle n'est.
+    + (valued && side === "dormant" ? ` · <span class="incl">activation included</span>` : "");
 
-  if (!kept.length) {
+  if (!ranked.length) {
     // « rien ne correspond ici » et « rien n'est en vente ici » ne sont pas la
     // même information, et les confondre ferait passer un filtre pour un marché vide.
     const why = active
@@ -316,11 +390,16 @@ export function halfCell(half, side, { shown = null, step = REVEAL_STEP, limit =
       `<span class="depth">${why}</span>` + shelfStrip(keptShelf, half.floorEth) + `</td>`;
   }
 
-  const half_ = { ...half, entries: kept, anvilEntries: keptShelf };
-  return renderHalf(half_, g, { shown: shown ?? limit, step, limit, key, depth, state, ethUsd, floorLabel: active ? "cheapest match" : "floor price" });
+  const half_ = { ...half, entries: ranked, anvilEntries: keptShelf };
+  // Sous filtre ce n'est plus le floor de la classe mais le moins cher de la
+  // sélection ; en vue « valeur » ce n'est plus un prix du tout.
+  const floorLabel = valued
+    ? (active ? "cheapest matching weight" : "cheapest weight")
+    : (active ? "cheapest match" : "floor price");
+  return renderHalf(half_, g, { shown: shown ?? limit, step, limit, key, depth, state, ethUsd, floorLabel, valued });
 }
 
-function renderHalf(half, g, { shown: count, step, limit, key, depth, state, ethUsd, floorLabel }) {
+function renderHalf(half, g, { shown: count, step, limit, key, depth, state, ethUsd, floorLabel, valued = false }) {
 
   const tip = half.pelotonEth === null
     ? `${half.listed} listings — too few for a peloton, so no median is shown`
@@ -364,17 +443,25 @@ function renderHalf(half, g, { shown: count, step, limit, key, depth, state, eth
   // sélection, et l'étiquette le dit plutôt que de laisser croire au premier.
   const floor = half.entries[0];
   const floorUsd = fmtUsdShort(usdOf(floor.priceEth, ethUsd));
-  const head = `<span class="cell-floor">` +
-    `<span class="label">${floorLabel}</span>` +
-    `<span class="price">${fmtEth(floor.priceEth)}</span> <span class="unit">ETH</span>` +
-    (floorUsd ? ` <span class="usd-big">${floorUsd}</span>` : "") + `</span>`;
+  // En vue « valeur » le grand chiffre change d'unité : il n'est plus ce que
+  // coûte la machine mais ce que coûte un point de son poids. Le prix demandé
+  // reste à côté, sinon la case classerait sans dire ce qu'il faut payer.
+  const head = valued
+    ? `<span class="cell-floor">` +
+      `<span class="label">${floorLabel}</span>` +
+      `<span class="price">${fmtUsdShort(floor.perPoint)}</span> <span class="unit">per weight point</span>` +
+      (floorUsd ? ` <span class="usd-big">${floorUsd} to buy</span>` : "") + `</span>`
+    : `<span class="cell-floor">` +
+      `<span class="label">${floorLabel}</span>` +
+      `<span class="price">${fmtEth(floor.priceEth)}</span> <span class="unit">ETH</span>` +
+      (floorUsd ? ` <span class="usd-big">${floorUsd}</span>` : "") + `</span>`;
 
   return `<td class="${g} edge half" data-state="${state}" title="${esc(tip)}">` +
     `<span class="market">On OpenSea</span>` +
     head +
     `<span class="depth">${depth}</span>` +
     underNote +
-    `<span class="strip">${shown.map((e, i) => chip(e, { isFloor: i === 0, ethUsd })).join("")}</span>` +
+    `<span class="strip">${shown.map((e, i) => chip(e, { isFloor: i === 0, ethUsd, perPoint: valued ? e.perPoint : null })).join("")}</span>` +
     more +
     shelfStrip(half.anvilEntries, half.floorEth) +
   `</td>`;
@@ -392,9 +479,34 @@ function boostTraits(legend, classValue) {
   return `<span class="grants" title="${esc(full)}">${esc(shown)}</span>`;
 }
 
-export function rowsHtml(d, { expanded = new Map(), limit = DEFAULT_LIMIT, step = REVEAL_STEP, filter = EMPTY_FILTER } = {}) {
+export function rowsHtml(d, { expanded = new Map(), limit = DEFAULT_LIMIT, step = REVEAL_STEP, filter = EMPTY_FILTER, view = VIEW_FLOOR } = {}) {
   const ethUsd = d.eth?.usd ?? null;
-  return d.rows.map((r) => {
+  const printerUsd = d.printer?.usd ?? null;
+  const valued = view === VIEW_VALUE;
+
+  /** Le meilleur point de la ligne, filtre compris : c'est sur lui que les
+   *  lignes se rangent en vue « valeur ». Une classe sans rien de calculable
+   *  tombe en bas plutôt que de prendre une place qu'elle ne mérite pas. */
+  const bestPoint = (r) => {
+    let best = Infinity;
+    for (const [side, cell] of [["ink", r.inked], ["dormant", r.dormant]]) {
+      for (const e of cell?.entries ?? []) {
+        if (!matchesFilter(e.machine, filter)) continue;
+        const p = perPointUsd(e, { classValue: r.classValue, side, ethUsd, printerUsd });
+        if (p !== null && p < best) best = p;
+      }
+    }
+    return best;
+  };
+
+  // L'ordre des classes est documentaire en vue « floor » — x1 puis x1.5, comme
+  // la doc — et devient un classement en vue « valeur » : c'est là qu'on voit
+  // d'un coup d'œil que la x3 achète le poids moins cher que la x10.
+  const rows = valued
+    ? d.rows.map((r) => ({ r, p: bestPoint(r) })).sort((a, b) => (a.p - b.p) || 0).map((x) => x.r)
+    : d.rows;
+
+  return rows.map((r) => {
     const census = r.chainCount === r.docCount
       ? `<span class="census">${fmtInt(r.chainCount)} machines</span>`
       : `<span class="census mismatch" title="The chain returned ${r.chainCount}; the documentation says ${r.docCount}.">${fmtInt(r.chainCount)} ≠ ${fmtInt(r.docCount)}</span>`;
@@ -404,8 +516,8 @@ export function rowsHtml(d, { expanded = new Map(), limit = DEFAULT_LIMIT, step 
 
     return `<tr>` +
       `<td class="cls-cell"><span class="cls">${r.classLabel}</span>${boostTraits(d.legend, r.classValue)}${census}</td>` +
-      halfCell(r.inked,   "ink",     { shown: expanded.get(inkKey) ?? limit, step, limit, key: inkKey, filter, ethUsd }) +
-      halfCell(r.dormant, "dormant", { shown: expanded.get(dorKey) ?? limit, step, limit, key: dorKey, filter, ethUsd }) +
+      halfCell(r.inked,   "ink",     { shown: expanded.get(inkKey) ?? limit, step, limit, key: inkKey, filter, ethUsd, printerUsd, view, classValue: r.classValue }) +
+      halfCell(r.dormant, "dormant", { shown: expanded.get(dorKey) ?? limit, step, limit, key: dorKey, filter, ethUsd, printerUsd, view, classValue: r.classValue }) +
     `</tr>`;
   }).join("");
 }
@@ -515,13 +627,18 @@ if (typeof document !== "undefined") {
   const filter = { ...EMPTY_FILTER };
   const filtersEl = $("filters");
   const summaryEl = $("filter-summary");
+  // La vue vit ici aussi : elle ne dépend d'aucune donnée, donc son menu se
+  // construit une fois pour toutes et survit aux rafraîchissements.
+  const viewEl = $("view");
+  let view = VIEW_FLOOR;
+  viewEl.innerHTML = viewBarHtml(view);
   let lastData = null;
   let painted = "";
   let barBuilt = false;
 
   const paint = () => {
     if (!lastData) return;
-    const html = rowsHtml(lastData, { expanded, filter });
+    const html = rowsHtml(lastData, { expanded, filter, view });
     if (html !== painted) {
       rowsEl.innerHTML = html;
       painted = html;
@@ -550,6 +667,13 @@ if (typeof document !== "undefined") {
       }
     }
   };
+
+  viewEl.addEventListener("change", (e) => {
+    const select = e.target.closest("select[data-view]");
+    if (!select) return;
+    view = select.value;
+    paint();
+  });
 
   filtersEl.addEventListener("change", (e) => {
     const select = e.target.closest("select[data-trait]");
