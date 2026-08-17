@@ -524,3 +524,60 @@ test("once expanded there is nothing left hidden to announce", () => {
   assert.match(html, /show fewer/);
   assert.doesNotMatch(html, /re-inked</);
 });
+
+// ---- prix en dollars, partout ----
+
+test("every price carries its dollar value beside it", () => {
+  const html = halfCell(half({ entries: [entry(9, 0.1050)] }), "ink", { ethUsd: 1896 });
+  assert.match(html, /0\.1050/);
+  assert.match(html, /\$199/);        // 0.1050 x 1896
+});
+
+test("with no ETH price read, prices stay in ETH rather than inventing dollars", () => {
+  const html = halfCell(half({ entries: [entry(9, 0.1050)] }), "ink", { ethUsd: null });
+  assert.match(html, /0\.1050/);
+  assert.doesNotMatch(html, /\$/);
+});
+
+// ---- l'anvil ----
+
+const withBid = (over = {}) => ({
+  tokenId: 2774, priceEth: 0.1050, machine: machineOf(),
+  weight: 100, inkMult: 1, inkPrinter: 4250,
+  anvilBidPrinter: 19316, anvilBidEth: 0.1170, underBid: true, ...over,
+});
+
+test("a listing the protocol itself would pay more for is marked", () => {
+  const html = halfCell(half({ entries: [withBid()] }), "ink", { ethUsd: 1896 });
+  assert.match(html, /class="under"/);
+});
+
+test("a listing above the anvil's bid carries no mark", () => {
+  const html = halfCell(half({ entries: [withBid({ underBid: false, anvilBidEth: 0.09 })] }), "ink", { ethUsd: 1896 });
+  assert.doesNotMatch(html, /class="under"/);
+});
+
+test("the mark says what the anvil would pay, in both currencies", () => {
+  const html = halfCell(half({ entries: [withBid()] }), "ink", { ethUsd: 1896 });
+  assert.match(html, /anvil pays 0\.1170 ETH/);
+  assert.match(html, /19,316 \$PRINTER/);
+});
+
+test("the bar states the anvil's spot, its shelf, and whether it is still bidding", () => {
+  const html = contextHtml({ ...CTX, anvil: { spotPrinter: 16082, spotUsd: 194, shelf: 30, bidPaused: false, paused: false, spreadBps: 500 } });
+  assert.match(html, /Anvil/i);
+  assert.match(html, /16,082/);
+  assert.match(html, /30 on the shelf/);
+});
+
+// Une offre suspendue doit se lire comme suspendue, pas comme un plancher bas.
+test("a paused bid is announced rather than shown as a number", () => {
+  const html = contextHtml({ ...CTX, anvil: { spotPrinter: 16082, spotUsd: 194, shelf: 30, bidPaused: true, paused: false, spreadBps: 500 } });
+  assert.match(html, /bid paused/i);
+});
+
+test("an unreadable anvil says so instead of vanishing from the bar", () => {
+  const html = contextHtml({ ...CTX, anvil: null });
+  assert.match(html, /Anvil/i);
+  assert.match(html, /unreadable/i);
+});

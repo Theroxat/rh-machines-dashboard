@@ -7,6 +7,14 @@ export const fmtRatio = (v) => v === null || v === undefined ? "—" : (v * 100)
 export const fmtUsd   = (v, d = 2) => v === null || v === undefined ? "—" : "$" + v.toFixed(d);
 export const fmtInt   = (v) => v === null || v === undefined ? "—" : v.toLocaleString("en-US");
 
+/** Le prix en dollars à côté du prix en ETH : tout le monde sait ce que vaut un
+ *  dollar, personne ne convertit 0.1050 ETH de tête. Sans taux lu, on n'invente
+ *  pas de conversion — on laisse l'ETH seul plutôt que d'afficher un faux. */
+export const usdOf = (eth, ethUsd) =>
+  eth === null || eth === undefined || !ethUsd ? null : eth * ethUsd;
+export const fmtUsdShort = (v) =>
+  v === null || v === undefined ? "" : v >= 10000 ? `$${Math.round(v / 1000)}k` : `$${Math.round(v)}`;
+
 const MACHINES = "0xb509e195bcb3e4461e235ff152c68d66915f67b5";
 export const itemUrl = (id) => `https://opensea.io/assets/robinhood/${MACHINES}/${id}`;
 
@@ -63,6 +71,23 @@ function ceilingLine(pr) {
   return ceiling + gate;
 }
 
+/**
+ * The Anvil : le teneur de marché du protocole. Il publie en permanence un prix
+ * d'achat sur n'importe quelle machine — c'est le plancher réel de la
+ * collection, et il est libellé dans une autre monnaie que le marché OpenSea.
+ * Une offre suspendue doit se lire comme suspendue, jamais comme un plancher bas.
+ */
+function anvilBlock(a) {
+  if (!a) return statBlock("The Anvil", "—", "unreadable right now");
+  const spot = `${fmtInt(Math.round(a.spotPrinter))} $PRINTER`;
+  const extra = [
+    a.spotUsd ? fmtUsdShort(a.spotUsd) : null,
+    a.shelf === null || a.shelf === undefined ? null : `${fmtInt(a.shelf)} on the shelf`,
+    a.bidPaused ? "bid paused" : null,
+  ].filter(Boolean).join(" · ");
+  return statBlock("The Anvil", spot, extra);
+}
+
 export function contextHtml(d) {
   const p = d.printer ?? {};
   const e = d.eth ?? {};
@@ -93,13 +118,14 @@ export function contextHtml(d) {
       `${fmtBig(c.volumeUsd)} · ${fmtInt(c.sales)} sales · ` +
       `${c.volume24hEth === null || c.volume24hEth === undefined ? "—" : c.volume24hEth.toFixed(1)} ETH 24h`),
     statBlock("Machines", `${fmtInt(d.totals?.inked)} inked`, `${fmtInt(d.totals?.dormant)} dormant · ${fmtInt(d.totals?.listed)} listed`),
+    anvilBlock(d.anvil),
     statBlock("Epoch", pr.epoch ?? "—", ceilingLine(pr)),
   ].join("");
 }
 
 /** Une machine en vente : sa photo, son prix, son numéro. Sans photo elle garde
  *  son prix et son lien — on a perdu une image, pas une offre. */
-function chip(e, isFloor) {
+function chip(e, isFloor, ethUsd) {
   const hw = e.machine?.headwear ? ` · ${headwearLabel(e.machine.headwear)}` : "";
   const img = e.machine?.image
     ? `<img src="${esc(e.machine.image)}" alt="Machine #${e.tokenId}" loading="lazy" width="40" height="40">`
@@ -108,16 +134,28 @@ function chip(e, isFloor) {
   // Une machine re-inkée pèse plus que ne le dit sa ligne : c'est la seule
   // chose qu'une vignette doit crier, et elle ne concerne qu'un listing sur
   // cent. Le badge porte le poids effectif, dans la notation du site officiel.
+  const dollars = fmtUsdShort(usdOf(e.priceEth, ethUsd));
   const reinked = e.inkMult > 1.0001 && e.weight;
   const badge = reinked ? `<span class="reink">${e.weight / 100}x</span>` : "";
   const inkStory = reinked
     ? ` · re-inked ×${e.inkMult.toFixed(2)} — ${fmtInt(e.inkPrinter)} $PRINTER burned · weight ${e.weight / 100}x`
     : "";
 
-  return `<a class="chip${isFloor ? " floor" : ""}" href="${itemUrl(e.tokenId)}" target="_blank" rel="noopener"` +
-    ` title="${esc(`#${e.tokenId}${hw}${inkStory}`)}">` +
-    img + badge +
+  // La seule comparaison qui compte vraiment : ce listing s'échange-t-il sous
+  // ce que le protocole lui-même en donnerait ? Ce n'est pas une opinion, ce
+  // sont deux nombres publics mis côte à côte.
+  const under = e.underBid
+    ? `<span class="under">under bid</span>`
+    : "";
+  const bidStory = e.anvilBidEth
+    ? ` · anvil pays ${fmtEth(e.anvilBidEth)} ETH (${fmtInt(e.anvilBidPrinter)} $PRINTER, net of the sell fee)`
+    : "";
+
+  return `<a class="chip${isFloor ? " floor" : ""}${e.underBid ? " is-under" : ""}" href="${itemUrl(e.tokenId)}"` +
+    ` target="_blank" rel="noopener" title="${esc(`#${e.tokenId}${hw}${inkStory}${bidStory}`)}">` +
+    img + badge + under +
     `<span class="price">${fmtEth(e.priceEth)}</span>` +
+    (dollars ? `<span class="usd">${dollars}</span>` : "") +
     `<span class="tok">#${e.tokenId}</span>` +
   `</a>`;
 }
@@ -147,7 +185,7 @@ export function matchesFilter(machine, filter) {
  * toujours combien elle cache, pour qu'un carnet coupé ne passe jamais pour
  * un carnet complet.
  */
-export function halfCell(half, side, { expanded = false, limit = DEFAULT_LIMIT, key = "", filter = EMPTY_FILTER } = {}) {
+export function halfCell(half, side, { expanded = false, limit = DEFAULT_LIMIT, key = "", filter = EMPTY_FILTER, ethUsd = null } = {}) {
   const g = `g-${side}`;
   // Sur mobile l'en-tête du tableau disparaît : la case doit alors annoncer
   // elle-même de quel côté elle parle.
@@ -177,10 +215,10 @@ export function halfCell(half, side, { expanded = false, limit = DEFAULT_LIMIT, 
   }
 
   const half_ = { ...half, entries: kept };
-  return renderHalf(half_, g, { expanded, limit, key, depth, state, floorLabel: active ? "cheapest match" : "floor price" });
+  return renderHalf(half_, g, { expanded, limit, key, depth, state, ethUsd, floorLabel: active ? "cheapest match" : "floor price" });
 }
 
-function renderHalf(half, g, { expanded, limit, key, depth, state, floorLabel }) {
+function renderHalf(half, g, { expanded, limit, key, depth, state, ethUsd, floorLabel }) {
 
   const tip = half.pelotonEth === null
     ? `${half.listed} listings — too few for a peloton, so no median is shown`
@@ -204,14 +242,16 @@ function renderHalf(half, g, { expanded, limit, key, depth, state, floorLabel })
   // Sous un filtre ce n'est plus le floor de la classe mais le moins cher de la
   // sélection, et l'étiquette le dit plutôt que de laisser croire au premier.
   const floor = half.entries[0];
+  const floorUsd = fmtUsdShort(usdOf(floor.priceEth, ethUsd));
   const head = `<span class="cell-floor">` +
     `<span class="label">${floorLabel}</span>` +
-    `<span class="price">${fmtEth(floor.priceEth)}</span> <span class="unit">ETH</span></span>`;
+    `<span class="price">${fmtEth(floor.priceEth)}</span> <span class="unit">ETH</span>` +
+    (floorUsd ? ` <span class="usd-big">${floorUsd}</span>` : "") + `</span>`;
 
   return `<td class="${g} edge half" data-state="${state}" title="${esc(tip)}">` +
     head +
     `<span class="depth">${depth}</span>` +
-    `<span class="strip">${shown.map((e, i) => chip(e, i === 0)).join("")}</span>` +
+    `<span class="strip">${shown.map((e, i) => chip(e, i === 0, ethUsd)).join("")}</span>` +
     more +
   `</td>`;
 }
@@ -229,6 +269,7 @@ function boostTraits(legend, classValue) {
 }
 
 export function rowsHtml(d, { expanded = new Set(), limit = DEFAULT_LIMIT, filter = EMPTY_FILTER } = {}) {
+  const ethUsd = d.eth?.usd ?? null;
   return d.rows.map((r) => {
     const census = r.chainCount === r.docCount
       ? `<span class="census">${fmtInt(r.chainCount)} machines</span>`
@@ -239,8 +280,8 @@ export function rowsHtml(d, { expanded = new Set(), limit = DEFAULT_LIMIT, filte
 
     return `<tr>` +
       `<td class="cls-cell"><span class="cls">${r.classLabel}</span>${boostTraits(d.legend, r.classValue)}${census}</td>` +
-      halfCell(r.inked,   "ink",     { expanded: expanded.has(inkKey), limit, key: inkKey, filter }) +
-      halfCell(r.dormant, "dormant", { expanded: expanded.has(dorKey), limit, key: dorKey, filter }) +
+      halfCell(r.inked,   "ink",     { expanded: expanded.has(inkKey), limit, key: inkKey, filter, ethUsd }) +
+      halfCell(r.dormant, "dormant", { expanded: expanded.has(dorKey), limit, key: dorKey, filter, ethUsd }) +
     `</tr>`;
   }).join("");
 }
@@ -306,6 +347,21 @@ export function legendHtml(legend) {
     : "";
 
   return `<div class="lg">${rows}</div>${warn}`;
+}
+
+/** Ce que l'anvil est et pourquoi son prix compte, dit une fois en bas plutôt
+ *  qu'en abrégé sur chaque vignette. */
+export function anvilLine(d) {
+  const a = d.anvil;
+  if (!a) return `<b>The Anvil</b> — the protocol's own market maker — could not be read on this sweep.`;
+  const fee = a.sellFeeBps === null || a.sellFeeBps === undefined ? null : (a.sellFeeBps / 100).toFixed(1);
+  return `<b>The Anvil</b> is the protocol's own market maker: it publishes a standing offer to buy any Machine, ` +
+    `paid in $PRINTER, and it is the real floor under this market. ` +
+    (a.bidPaused
+      ? `Its bid is <b>paused</b> right now, so nothing below is compared against it.`
+      : `A Machine marked <b>under bid</b> is listed for less than the Anvil itself would pay for it` +
+        (fee ? `, after the ${fee}% fee charged on selling $PRINTER back` : "") +
+        `. Both numbers are public; the comparison is not advice, and $PRINTER moves fast enough to close or open the gap within minutes.`);
 }
 
 export function bookLine(d) {
@@ -460,6 +516,7 @@ if (typeof document !== "undefined") {
     paintFilters(v.data.traitFilters);
     paint();
     $("legend").innerHTML = legendHtml(v.data.legend);
+    $("anvil-line").innerHTML = anvilLine(v.data);
     $("book-line").innerHTML = bookLine(v.data);
     $("excluded-line").innerHTML = excludedLine(v.data);
     $("published-line").innerHTML = publishedLine(v.data);

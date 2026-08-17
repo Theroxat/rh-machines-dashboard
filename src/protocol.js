@@ -12,6 +12,10 @@ const MINE_ABI = new ethers.Interface([
   "function nextGate() view returns (uint256 needed, uint256 unlocks)",
 ]);
 
+const HOOK_ABI = new ethers.Interface([
+  "function currentFeeBps() view returns (uint24)",
+]);
+
 const SINGLE = ["currentEpoch", "multiplierCeiling", "totalInkBurned", "activeMachines", "totalWeight", "ACTIVATION_INK"];
 
 /** Chaque champ a le droit d'échouer indépendamment. Une vue illisible ne doit
@@ -37,7 +41,17 @@ export async function readProtocol({ provider }) {
     }
   });
 
+  // Le frais de vente du token : il se paie au moment de reconvertir des
+  // $PRINTER en ETH, donc toute comparaison entre les deux monnaies doit le
+  // déduire pour ne pas surestimer ce que vaut un prix libellé en PRINTER.
+  let sellFeeBps = null;
+  try {
+    const raw = await provider.call({ to: ADDRESSES.HOOK, data: HOOK_ABI.encodeFunctionData("currentFeeBps", []) });
+    if (raw !== "0x") sellFeeBps = Number(HOOK_ABI.decodeFunctionResult("currentFeeBps", raw)[0]);
+  } catch { sellFeeBps = null; }
+
   return {
+    sellFeeBps,
     epoch: out.currentEpoch,
     ceiling: out.multiplierCeiling,
     totalInkBurned: out.totalInkBurned,
