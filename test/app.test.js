@@ -852,17 +852,12 @@ test("the shelf never carries the under-bid mark", () => {
   assert.doesNotMatch(html.slice(html.indexOf('class="shelf"')), /class="under"/);
 });
 
-// Ambre veut dire « c'est un prix ». Les deux blocs qui n'en sont pas — un
-// comptage et un index d'époque — restent neutres, sinon la règle ne dit plus
-// rien et le bandeau est simplement plus bruyant.
-test("every price in the bar is amber, and only the prices", () => {
+// Chaque valeur du bandeau est en ambre, sans exception : deux blocs neutres au
+// milieu de six colorés se lisaient comme des oublis, pas comme une règle.
+test("every value in the bar is amber", () => {
   const html = contextHtml({ ...CTX, anvil: { spotPrinter: 14100, spotUsd: 168, shelf: 18, bidPaused: false } });
-  const blocks = html.split('<div class="stat').slice(1);
-  const amber = blocks.filter((b) => b.startsWith(" is-price")).map((b) => b.match(/class="label">([^<]*)/)[1]);
-  const plain = blocks.filter((b) => !b.startsWith(" is-price")).map((b) => b.match(/class="label">([^<]*)/)[1]);
-
-  assert.deepEqual(amber.sort(), ["$PRINTER", "Collection floor", "Cost of ink", "ETH", "The Anvil", "Volume traded"]);
-  assert.deepEqual(plain.sort(), ["Epoch", "Inked machines"]);
+  assert.equal(html.match(/<div class="stat">/g).length, 8);
+  assert.doesNotMatch(html, /is-price/);
 });
 
 // Le seul bloc dont la valeur mêlait un chiffre et un mot : « Machines /
