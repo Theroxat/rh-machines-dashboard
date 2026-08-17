@@ -19,6 +19,19 @@ export const ADDRESSES = Object.freeze({
 
 export const TOTAL_MACHINES = 10000;
 
+/**
+ * Activer une machine coûte 5 000 $PRINTER : 4 250 partent en ink — la chaîne
+ * expose ce montant sous `ACTIVATION_INK`, et c'est le dénominateur de
+ * `√(ink/4250)` — et 750 en charge d'exploitation, qui ne brûlent pas.
+ *
+ * Aucune vue du contrat ne publie ces 750 : ils viennent de la documentation.
+ * Ils sont donc écrits ici, nommés et isolés, plutôt que fondus dans un total
+ * qui se lirait comme une lecture on-chain. La part brûlée décide du poids ;
+ * la facture entière décide de ce que l'activation coûte à l'acheteur, et les
+ * deux ne doivent jamais être confondues.
+ */
+export const OPERATING_CHARGE_PRINTER = 750;
+
 export const OPENSEA = Object.freeze({
   base: "https://api.opensea.io/api/v2",
   slug: "rh-machines",
