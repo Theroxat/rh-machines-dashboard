@@ -138,7 +138,7 @@ export function contextHtml(d) {
 function chip(e, isFloor, ethUsd) {
   const hw = e.machine?.headwear ? ` · ${headwearLabel(e.machine.headwear)}` : "";
   const img = e.machine?.image
-    ? `<img src="${esc(e.machine.image)}" alt="Machine #${e.tokenId}" loading="lazy" width="40" height="40">`
+    ? `<img src="${esc(e.machine.image)}" alt="Machine #${e.tokenId}" loading="lazy" width="60" height="60">`
     : `<span class="noimg" aria-hidden="true"></span>`;
 
   // Une machine re-inkée pèse plus que ne le dit sa ligne : c'est la seule
@@ -216,7 +216,7 @@ function shelfStrip(anvilEntries) {
 
   const chips = anvilEntries.map((e) => {
     const img = e.machine?.image
-      ? `<img src="${esc(e.machine.image)}" alt="Machine #${e.tokenId}" loading="lazy" width="40" height="40">`
+      ? `<img src="${esc(e.machine.image)}" alt="Machine #${e.tokenId}" loading="lazy" width="60" height="60">`
       : `<span class="noimg" aria-hidden="true"></span>`;
     const tip = `#${e.tokenId} · ${fmtInt(Math.round(e.askPrinter))} $PRINTER` +
       (e.askUsd ? ` · ${fmtUsdShort(e.askUsd)}` : "") +
