@@ -875,3 +875,16 @@ test("every block in the bar states a bare figure, named by its label", () => {
   assert.match(machines, /3,784 dormant/);
   assert.doesNotMatch(html, />[\d,]+ inked</);
 });
+
+// Deux cases dont le rayon n'a pas le même prix doivent afficher chacune le
+// sien : un prix partagé entre raretés passerait inaperçu tant que la courbe
+// de l'anvil les rapproche.
+test("each cell shows its own shelf price, never a neighbour's", () => {
+  const cheap = halfCell(half({ anvilEntries: [shelfEntry({ tokenId: 1, askPrinter: 15217, askUsd: 133, queuePrinter: 13833 })] }), "ink", { ethUsd: 1896 });
+  const dear = halfCell(half({ anvilEntries: [shelfEntry({ tokenId: 2, askPrinter: 51128, askUsd: 447, queuePrinter: 46480 })] }), "ink", { ethUsd: 1896 });
+
+  assert.match(cheap, /class="price">15,217</);
+  assert.match(dear, /class="price">51,128</);
+  assert.doesNotMatch(cheap, /51,128/);
+  assert.doesNotMatch(dear, /15,217/);
+});
