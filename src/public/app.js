@@ -166,7 +166,7 @@ function chip(e, isFloor, ethUsd) {
 
   return `<a class="chip${isFloor ? " floor" : ""}${e.underBid ? " is-under" : ""}" href="${itemUrl(e.tokenId)}"` +
     ` target="_blank" rel="noopener" title="${esc(`#${e.tokenId}${hw}${inkStory}${bidStory}`)}">` +
-    img + badge + under +
+    `<span class="thumb">${img}${badge}${under}</span>` +
     `<span class="price">${fmtEth(e.priceEth)}</span>` +
     (dollars ? `<span class="usd">${dollars}</span>` : "") +
     `<span class="tok">#${e.tokenId}</span>` +
@@ -223,7 +223,7 @@ function shelfStrip(anvilEntries) {
       (e.askEth ? ` · ≈${fmtEth(e.askEth)} ETH` : "") +
       " — sold by the Anvil, paid in $PRINTER";
     return `<a class="chip anvil" href="${ANVIL_URL}" target="_blank" rel="noopener" title="${esc(tip)}">` +
-      img +
+      `<span class="thumb">${img}</span>` +
       `<span class="price">${fmtInt(Math.round(e.askPrinter))}</span>` +
       (e.askUsd ? `<span class="usd">${fmtUsdShort(e.askUsd)}</span>` : "") +
       `<span class="tok">#${e.tokenId}</span>` +
