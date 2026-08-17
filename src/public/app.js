@@ -26,9 +26,7 @@ export const fmtUsdShort = (v) =>
  * L'omettre ferait passer les dormantes bon marché pour les meilleures affaires
  * du tableau, ce qu'elles ne sont pas.
  */
-export const ACTIVATION_PRINTER = 5000;
-
-export function perPointUsd(e, { classValue = null, side = "ink", ethUsd = null, printerUsd = null } = {}) {
+export function perPointUsd(e, { classValue = null, side = "ink", ethUsd = null, activationUsd = null } = {}) {
   const usd = usdOf(e?.priceEth, ethUsd);
   if (usd === null) return null;
 
@@ -37,11 +35,12 @@ export function perPointUsd(e, { classValue = null, side = "ink", ethUsd = null,
   // Sans poids connu on ne classe pas : un zéro se lirait comme « gratuit »,
   // et une machine hors classement vaut mieux qu'une machine mal classée.
   if (!weight) return null;
-  // Même règle que partout ailleurs : sans taux lu, aucune conversion inventée.
-  if (dormant && !printerUsd) return null;
+  // Le coût d'activation est lu, jamais supposé : il vaut 4 250 d'ink que la
+  // chaîne publie plus 750 de charge que la doc seule donne. Sans lui une
+  // dormante n'a pas de prix d'entrée connu, et elle sort du classement.
+  if (dormant && !activationUsd) return null;
 
-  const entry = usd + (dormant ? ACTIVATION_PRINTER * printerUsd : 0);
-  return entry / (weight / 100);
+  return (usd + (dormant ? activationUsd : 0)) / (weight / 100);
 }
 
 /** Deux façons de lire le même tableau : ce que coûte la machine, ou ce que
@@ -191,7 +190,14 @@ export function contextHtml(d) {
         .filter(Boolean).join(" · ") +
       ` · <a class="buy" href="${SWAP_URL}" target="_blank" rel="noopener">buy $PRINTER &#8599;</a>`),
     statBlock("ETH", fmtUsd(e.local, 2), ethExtra),
-    statBlock("Cost of ink", fmtUsd(ink.activationUsd), `${fmtInt(ink.activationPrinter)} $PRINTER · ${fmtEth(ink.activationEth)} ETH`),
+    // L'ink et l'activation ne coûtent pas la même chose : 4 250 brûlent, 750
+    // s'ajoutent sans brûler. Le bandeau annonçait le premier pendant que les
+    // prix au point comptaient le second, sans que rien ne relie les deux.
+    statBlock("Cost of ink", fmtUsd(ink.activationUsd),
+      `${fmtInt(ink.activationPrinter)} $PRINTER burned · ${fmtEth(ink.activationEth)} ETH` +
+      (ink.activationTotalPrinter
+        ? ` · ${fmtInt(ink.activationTotalPrinter)} to activate (${fmtUsd(ink.activationTotalUsd)})`
+        : "")),
     // Le floor vient de notre carnet, pas du chiffre publié : c'est le même
     // nombre que la case la moins chère du tableau, il ne peut pas la contredire.
     statBlock("Collection floor", `${fmtEth(c.floorEth)} ETH`,
@@ -337,7 +343,7 @@ function shelfStrip(anvilEntries, floorEth) {
  * toujours combien elle cache, pour qu'un carnet coupé ne passe jamais pour
  * un carnet complet.
  */
-export function halfCell(half, side, { shown = null, step = REVEAL_STEP, limit = DEFAULT_LIMIT, key = "", filter = EMPTY_FILTER, ethUsd = null, printerUsd = null, view = VIEW_FLOOR, classValue = null } = {}) {
+export function halfCell(half, side, { shown = null, step = REVEAL_STEP, limit = DEFAULT_LIMIT, key = "", filter = EMPTY_FILTER, ethUsd = null, activationUsd = null, view = VIEW_FLOOR, classValue = null } = {}) {
   const g = `g-${side}`;
   // Sur mobile l'en-tête du tableau disparaît : la case doit alors annoncer
   // elle-même de quel côté elle parle.
@@ -355,7 +361,7 @@ export function halfCell(half, side, { shown = null, step = REVEAL_STEP, limit =
   // dont le point n'est pas calculable sortent du classement, et la case le dit
   // plutôt que de les faire disparaître en silence.
   const valued = view === VIEW_VALUE;
-  const rates = { classValue, side, ethUsd, printerUsd };
+  const rates = { classValue, side, ethUsd, activationUsd };
   const ranked = valued
     ? kept
         .map((e) => ({ ...e, perPoint: perPointUsd(e, rates), dormantHere: side === "dormant" }))
@@ -374,7 +380,9 @@ export function halfCell(half, side, { shown = null, step = REVEAL_STEP, limit =
     + (unranked ? ` · ${fmtInt(unranked)} of unknown weight, left out` : "")
     // L'activation est comptée dans le chiffre : le taire ferait passer une
     // dormante bon marché pour meilleure qu'elle n'est.
-    + (valued && side === "dormant" ? ` · <span class="incl">activation included</span>` : "");
+    + (valued && side === "dormant"
+        ? ` · <span class="incl">activation included, ${fmtUsdShort(activationUsd)}</span>`
+        : "");
 
   if (!ranked.length) {
     // « rien ne correspond ici » et « rien n'est en vente ici » ne sont pas la
@@ -494,7 +502,7 @@ function rankLine(best) {
 
 export function rowsHtml(d, { expanded = new Map(), limit = DEFAULT_LIMIT, step = REVEAL_STEP, filter = EMPTY_FILTER, view = VIEW_FLOOR } = {}) {
   const ethUsd = d.eth?.usd ?? null;
-  const printerUsd = d.printer?.usd ?? null;
+  const activationUsd = d.ink?.activationTotalUsd ?? null;
   const valued = view === VIEW_VALUE;
 
   /** Le meilleur point de la ligne, filtre compris : c'est sur lui que les
@@ -505,7 +513,7 @@ export function rowsHtml(d, { expanded = new Map(), limit = DEFAULT_LIMIT, step 
     for (const [side, cell] of [["ink", r.inked], ["dormant", r.dormant]]) {
       for (const e of cell?.entries ?? []) {
         if (!matchesFilter(e.machine, filter)) continue;
-        const p = perPointUsd(e, { classValue: r.classValue, side, ethUsd, printerUsd });
+        const p = perPointUsd(e, { classValue: r.classValue, side, ethUsd, activationUsd });
         if (p !== null && p < best.p) best = { p, side };
       }
     }
@@ -529,8 +537,8 @@ export function rowsHtml(d, { expanded = new Map(), limit = DEFAULT_LIMIT, step 
 
     return `<tr>` +
       `<td class="cls-cell"><span class="cls">${r.classLabel}</span>${rankLine(best)}${boostTraits(d.legend, r.classValue)}${census}</td>` +
-      halfCell(r.inked,   "ink",     { shown: expanded.get(inkKey) ?? limit, step, limit, key: inkKey, filter, ethUsd, printerUsd, view, classValue: r.classValue }) +
-      halfCell(r.dormant, "dormant", { shown: expanded.get(dorKey) ?? limit, step, limit, key: dorKey, filter, ethUsd, printerUsd, view, classValue: r.classValue }) +
+      halfCell(r.inked,   "ink",     { shown: expanded.get(inkKey) ?? limit, step, limit, key: inkKey, filter, ethUsd, activationUsd, view, classValue: r.classValue }) +
+      halfCell(r.dormant, "dormant", { shown: expanded.get(dorKey) ?? limit, step, limit, key: dorKey, filter, ethUsd, activationUsd, view, classValue: r.classValue }) +
     `</tr>`;
   }).join("");
 }

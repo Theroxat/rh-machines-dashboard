@@ -994,7 +994,7 @@ test("with no filter the shelf shows everything it holds", () => {
 // achète le moins cher : il faut ramener chaque annonce au prix d'un point
 // de poids, et pour une dormante ce prix inclut l'ink qu'il faudra brûler.
 
-const RATES = { ethUsd: 2000, printerUsd: 0.01 };   // activation = 5 000 × 0.01 = $50
+const RATES = { ethUsd: 2000, activationUsd: 50 };   // 5 000 $PRINTER à $0.01
 const wEntry = (tokenId, priceEth, weight) =>
   ({ ...entry(tokenId, priceEth), weight, inkMult: 1, inkPrinter: 4250 });
 
@@ -1009,11 +1009,11 @@ test("a dormant machine carries the ink it will have to burn", () => {
 });
 
 test("without an eth rate no cost per point is invented", () => {
-  assert.equal(perPointUsd(wEntry(1, 0.15, 300), { ethUsd: null, printerUsd: 0.01, side: "ink" }), null);
+  assert.equal(perPointUsd(wEntry(1, 0.15, 300), { ethUsd: null, activationUsd: 50, side: "ink" }), null);
 });
 
-test("without a printer rate a dormant machine has no knowable entry cost", () => {
-  assert.equal(perPointUsd(wEntry(1, 0.10, 0), { ethUsd: 2000, printerUsd: null, side: "dormant", classValue: 200 }), null);
+test("without a read activation cost a dormant machine has no knowable entry", () => {
+  assert.equal(perPointUsd(wEntry(1, 0.10, 0), { ethUsd: 2000, activationUsd: null, side: "dormant", classValue: 200 }), null);
 });
 
 test("a machine of unknown weight is ranked nowhere rather than at zero", () => {
@@ -1054,7 +1054,7 @@ test("an inked cell claims no activation, having nothing to burn", () => {
 });
 
 const valueRows = {
-  eth: { usd: 2000 }, printer: { usd: 0.01 },
+  eth: { usd: 2000 }, ink: { activationTotalUsd: 50 },
   rows: [
     { classValue: 100, classLabel: "x1", docCount: 1, chainCount: 1,
       inked: half({ entries: [wEntry(11, 0.10, 100)] }), dormant: half({ entries: [] }) },   // $200 /point
@@ -1094,7 +1094,7 @@ test("the value view shows the number that ranks each class, and which side it c
 
 test("a class ranked by its dormant side says so, not the other", () => {
   const rows = {
-    eth: { usd: 2000 }, printer: { usd: 0.01 },
+    eth: { usd: 2000 }, ink: { activationTotalUsd: 50 },
     rows: [{
       classValue: 200, classLabel: "x2", docCount: 1, chainCount: 1,
       inked: half({ entries: [wEntry(1, 0.20, 200)] }),        // $400 / 2 pts = $200
@@ -1115,7 +1115,7 @@ test("the floor view leaves the rarity column alone", () => {
 
 test("a class with nothing on sale is ranked nowhere and claims no price", () => {
   const rows = {
-    eth: { usd: 2000 }, printer: { usd: 0.01 },
+    eth: { usd: 2000 }, ink: { activationTotalUsd: 50 },
     rows: [
       { classValue: 100, classLabel: "x1", docCount: 1, chainCount: 1,
         inked: half({ entries: [] }), dormant: half({ entries: [] }) },
@@ -1127,4 +1127,13 @@ test("a class with nothing on sale is ranked nowhere and claims no price", () =>
   assert.ok(html.indexOf(">x3<") < html.indexOf(">x1<"), "une classe sans rien en vente tombe en bas");
   const x1 = html.slice(html.indexOf(">x1<"));
   assert.doesNotMatch(x1.slice(0, x1.indexOf("g-ink")), /cls-point/);
+});
+
+// Le montant était compté sans jamais être écrit : la case disait « activation
+// included » et laissait deviner combien. C'est précisément ce qui faisait
+// douter que le coût soit compté du tout.
+test("a dormant cell names what the activation costs, not just that it counts", () => {
+  const html = halfCell(half({ entries: [wEntry(1, 0.10, 0)] }), "dormant",
+    { view: "value", classValue: 200, ...RATES });
+  assert.match(html, /activation included, \$50/);
 });

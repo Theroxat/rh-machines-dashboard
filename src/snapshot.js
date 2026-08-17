@@ -1,5 +1,5 @@
 import { buildTraitIndex } from "./traitindex.js";
-import { TOTAL_MACHINES } from "./config.js";
+import { TOTAL_MACHINES, OPERATING_CHARGE_PRINTER } from "./config.js";
 
 /** Assemblage pur de tout ce dont la page a besoin. Une dérivation qui
  *  diviserait par une valeur non lue produit null plutôt qu'un zéro confiant. */
@@ -12,6 +12,17 @@ export function composeSnapshot({
 
   const activationUsd = activationPrinter !== null && printer?.usd ? activationPrinter * printer.usd : null;
   const activationEth = activationUsd !== null && eth?.usd ? activationUsd / eth.usd : null;
+
+  // Ce que l'ink coûte et ce que l'activation coûte sont deux montants
+  // différents — 4 250 brûlent, 750 s'ajoutent sans brûler. La page affichait
+  // le premier dans son bandeau et comptait le second dans les prix au point,
+  // sans jamais dire qu'ils n'étaient pas le même nombre.
+  const activationTotalPrinter = activationPrinter === null
+    ? null
+    : activationPrinter + OPERATING_CHARGE_PRINTER;
+  const activationTotalUsd = activationTotalPrinter !== null && printer?.usd
+    ? activationTotalPrinter * printer.usd
+    : null;
 
   // Chaque machine en vente porte sa photo et son couvre-chef. Une photo
   // absente laisse `machine: null` et ne touche à aucun prix : on n'a pas
@@ -141,6 +152,8 @@ export function composeSnapshot({
       activationPrinter,
       activationUsd,
       activationEth,
+      activationTotalPrinter,
+      activationTotalUsd,
       readAt: inkMeta?.readAt ?? null,
       failures: inkMeta?.failures ?? null,
     },
