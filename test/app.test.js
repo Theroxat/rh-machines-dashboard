@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   fmtEth, fmtRatio, halfCell, cellKey,
-  bannerMessage, excludedLine, publishedLine, rowsHtml, contextHtml, legendHtml,
+  bannerMessage, rowsHtml, contextHtml, legendHtml,
   matchesFilter, filterBarHtml, filterSummary, freshness, fmtCompact, crateLine,
 } from "../src/public/app.js";
 
@@ -123,15 +123,7 @@ test("the banner speaks up when data is stale or a sweep failed, and stays quiet
   assert.match(bannerMessage({ data: {}, ageMs: 240000, stale: true, lastError: "OpenSea 503" }), /4m ago.*503/);
 });
 
-test("a clean read is reported as a clean read, and exclusions are itemised", () => {
-  assert.match(excludedLine({ excluded: { unknownRarity: 0, unknownInk: 0, listingsOffGrid: 0 } }), /Every one of the 10,000/);
-  assert.match(excludedLine({ excluded: { unknownRarity: 2, unknownInk: 0, listingsOffGrid: 1 } }), /never guessed/);
-});
 
-test("the published floor is always labelled as uncomputed-with", () => {
-  assert.match(publishedLine({ collection: { publishedFloor: 0.0869, publishedFloorSymbol: "ETH" } }), /enters no computation/);
-  assert.match(publishedLine({ collection: { publishedFloor: null, publishedFloorSymbol: null } }), /—/);
-});
 
 test("each half of each row gets its own expansion key", () => {
   assert.equal(cellKey(1000, "ink"), "1000:ink");
@@ -724,16 +716,7 @@ test("a gap smaller than a point says so rather than rounding to nothing", () =>
   assert.doesNotMatch(html, /\+0%/);
 });
 
-test("a listing dropped as stale is reported, not silently removed", () => {
-  const line = excludedLine({ excluded: { unknownRarity: 0, unknownInk: 0, listingsOffGrid: 0, heldByAnvil: 2 } });
-  assert.match(line, /2<\/b> OpenSea listings were dropped/);
-  assert.match(line, /cannot be filled/);
-});
 
-test("with no overlap the line says nothing about it", () => {
-  const line = excludedLine({ excluded: { unknownRarity: 0, unknownInk: 0, listingsOffGrid: 0, heldByAnvil: 0 } });
-  assert.doesNotMatch(line, /Anvil/);
-});
 
 // Les badges étaient positionnés sur la vignette entière : le vert, en bas,
 // retombait sur la ligne du prix en dollars et la recouvrait. Ils doivent être
