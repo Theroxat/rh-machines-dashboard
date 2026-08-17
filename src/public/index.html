@@ -108,28 +108,36 @@
 
   /* La file d'attente de l'anvil : trois prix pour la même machine selon qu'on
      la subit, qu'on la choisit ou qu'on la tire au sort. */
-  .queue-panel { border: 1px solid var(--rule-2); padding: 10px 13px; min-width: 320px; }
-  .queue-panel .market { margin-bottom: 8px; }
-  .q-row { display: flex; align-items: baseline; gap: 9px; font-size: 12px; padding: 2px 0; }
+  /* À plat, comme tout le reste : la page sépare par des filets et n'encadre
+     jamais rien. Un panneau bordé était le seul de son espèce et se lisait
+     comme une pièce rapportée. */
+  .queue-panel { min-width: 340px; }
+  .queue-panel .market { margin-bottom: 0; }
+  .q-row {
+    display: flex;
+    align-items: baseline;
+    gap: 9px;
+    font-size: 12px;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--rule);
+  }
   .q-what { flex: 1; color: var(--muted); white-space: nowrap; }
   .q-id { color: var(--dim); font-size: 11px; min-width: 30px; }
   .q-price { font-weight: 700; color: var(--ink); font-size: 14.5px; }
   .q-unit { color: var(--muted); font-size: 10px; }
   .q-usd { font-weight: 600; color: var(--text); min-width: 44px; text-align: right; }
   .q-paused { display: block; margin-top: 6px; color: var(--alarm); font-size: 11px; }
+
+  /* Un lien, pas un bouton : souligné à l'approche, rien d'autre. */
   .q-link, .buy {
     display: inline-block;
-    margin-top: 9px;
-    padding: 3px 10px;
-    border: 1px solid var(--ink);
     color: var(--ink);
-    font-size: 11px;
     text-decoration: none;
+    border-bottom: 1px solid transparent;
   }
-  .q-link:hover, .buy:hover, .q-link:focus-visible, .buy:focus-visible {
-    background: var(--ink); color: var(--paper);
-  }
-  .buy { margin-top: 0; padding: 0 6px; font-size: 10.5px; }
+  .q-link { margin-top: 8px; font-size: 11px; }
+  .buy { font-size: 10.5px; }
+  .q-link:hover, .buy:hover, .q-link:focus-visible, .buy:focus-visible { border-bottom-color: var(--ink); }
   #filters { display: flex; flex-wrap: wrap; gap: 18px; }
 
   .fl { display: inline-flex; flex-direction: column; gap: 3px; }
