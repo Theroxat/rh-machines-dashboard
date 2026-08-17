@@ -148,3 +148,17 @@ test("both headline prices are set at the same size", () => {
   assert.equal(size(".shelf-price .usd-big"), size(".cell-floor .usd-big"));
   assert.equal(size(".shelf-price .unit"), size(".cell-floor .unit"));
 });
+
+// Le menu de vue est câblé sur un conteneur nommé : si la page perd ce
+// conteneur, app.js lève au chargement et le tableau ne s'affiche plus du tout.
+test("the page carries the container the view menu is wired to", () => {
+  assert.match(page, /id="view"/);
+  assert.match(page, /#view\s*\{/);
+});
+
+// La vue se lit dans une autre unité : sur mobile le filet vertical qui la
+// sépare des filtres devient horizontal, sinon il sépare deux choses empilées.
+test("the view keeps a rule between itself and the filters on a phone", () => {
+  const mobile = page.slice(page.indexOf("@media (max-width: 760px)"));
+  assert.match(mobile, /#view\s*\{[^}]*border-bottom/);
+});

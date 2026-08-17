@@ -159,6 +159,16 @@
     font-size: 10.5px;
   }
   .buy:hover, .buy:focus-visible { border-bottom-color: var(--ink); }
+  /* La vue n'est pas un filtre : elle ne retire aucune machine du tableau, elle
+     le relit dans une autre unité. Un filet la sépare des quatre menus qui,
+     eux, en enlèvent. */
+  #view { padding-right: 22px; border-right: 1px solid var(--rule-2); }
+  .fl.view .label { color: var(--ink); }
+  .fl.view select { min-width: 205px; }
+
+  /* L'activation comptée dans le chiffre : une note, pas un prix. */
+  .incl { color: var(--dim); }
+
   #filters { display: flex; flex-wrap: wrap; gap: 18px; }
 
   .fl { display: inline-flex; flex-direction: column; gap: 3px; }
@@ -378,6 +388,11 @@
     .fl { width: 100%; }
     .fl select { width: 100%; min-width: 0; max-width: none; }
     #filters { gap: 10px; }
+    /* Empilés, le filet vertical ne sépare plus rien : il devient horizontal. */
+    #view {
+      width: 100%; padding-right: 0; padding-bottom: 12px;
+      border-right: none; border-bottom: 1px solid var(--rule-2);
+    }
 
     /* Plus rien à faire défiler : la table se déplie en blocs. */
     .scroll { overflow-x: visible; margin-top: 14px; }
@@ -450,6 +465,7 @@
 
 <section class="filter-bar">
   <div class="filter-row">
+    <div id="view"></div>
     <div id="filters"></div>
     <div id="queue"></div>
   </div>
