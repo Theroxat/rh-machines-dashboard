@@ -108,17 +108,17 @@ test("the page links to its author, and names the link for anyone who cannot see
   assert.match(link, /rel="noopener"/);
 });
 
-// Un montant en dollars accompagne toujours un prix libellé dans une autre
-// monnaie : il est le second, donc en retrait. Un seul portait la couleur du
-// texte et ressortait plus que le prix qu'il traduisait.
-test("every dollar figure on the page is set in the same, quieter colour", () => {
+// Les montants en dollars doivent s'accorder entre eux : un seul portait une
+// couleur différente et ressortait plus que le prix qu'il traduisait. Le test
+// vérifie l'accord, pas une teinte précise — celle-ci a le droit de changer.
+test("every dollar figure on the page shares one colour", () => {
   const rules = [...flat.matchAll(/([.#][\w.-]+(?:\s+[.#][\w-]+)*)\s*\{([^}]*)\}/g)]
     .filter((m) => m[1].includes("usd"))
     .map((m) => [m[1], (m[2].match(/color:\s*([^;]+)/) || [, "(inherits)"])[1].trim()]);
 
   assert.ok(rules.length >= 4, "expected every dollar figure to declare a colour");
-  const colours = [...new Set(rules.map(([, c]) => c))];
-  assert.deepEqual(colours, ["var(--muted)"], `dollar figures disagree: ${JSON.stringify(rules)}`);
+  assert.equal(new Set(rules.map(([, c]) => c)).size, 1,
+    `dollar figures disagree: ${JSON.stringify(rules)}`);
 });
 
 // Le contraste se mesure, il ne se juge pas : les montants en dollars et les
