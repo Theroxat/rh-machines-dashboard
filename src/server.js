@@ -23,6 +23,7 @@ import { multicallOf } from "./multicall.js";
 const here = dirname(fileURLToPath(import.meta.url));
 const cfg = loadConfig(process.env, JSON.parse(readFileSync(join(here, "..", "config.json"), "utf8")));
 const app = readFileSync(join(here, "public", "app.js"), "utf8");
+const favicon = readFileSync(join(here, "public", "favicon.svg"), "utf8");
 const appHash = assetHash(app);
 const appPath = assetPath(appHash);
 // La page part avec l'adresse du script qu'elle a été construite pour exécuter.
@@ -150,6 +151,11 @@ const server = createServer((req, res) => {
   if (req.url === appPath) {
     res.writeHead(200, { "content-type": "text/javascript; charset=utf-8", ...cacheHeaders("asset"), ...securityHeaders() });
     res.end(app);
+    return;
+  }
+  if (req.url === "/favicon.svg") {
+    res.writeHead(200, { "content-type": "image/svg+xml", ...cacheHeaders("page"), ...securityHeaders() });
+    res.end(favicon);
     return;
   }
   if (req.url === "/app.js") {

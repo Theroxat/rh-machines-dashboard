@@ -95,3 +95,7 @@ test("the chip, its wrapper and the image agree on one width", () => {
   assert.deepEqual([...new Set([...widths, img])], [img],
     `chip, thumb and image disagree: ${[...widths, img].join(", ")}`);
 });
+
+test("the page declares its icon", () => {
+  assert.match(flat, /<link rel="icon" href="\/favicon\.svg" type="image\/svg\+xml">/);
+});

@@ -52,7 +52,7 @@ test("the page forbids everything it does not need", () => {
   assert.match(csp, /default-src 'none'/);
   assert.match(csp, /script-src 'self'/);
   assert.doesNotMatch(csp, /script-src[^;]*unsafe-inline/);   // aucun script en ligne : rien à autoriser
-  assert.match(csp, /img-src https:\/\/i2c\.seadn\.io/);
+  assert.match(csp, /img-src 'self' https:\/\/i2c\.seadn\.io/);
   assert.match(csp, /connect-src 'self'/);
 });
 
@@ -83,4 +83,12 @@ test("an etag identifies a snapshot, and changes only when the snapshot does", (
   assert.equal(etagOf('{"at":1000}'), a);
   assert.notEqual(etagOf('{"at":2000}'), a);
   assert.match(a, /^"[0-9a-f]+"$/);   // guillemets : la syntaxe qu'exige If-None-Match
+});
+
+// Le favicon est servi par notre propre origine : sans 'self', la CSP le
+// bloquerait, et l'onglet resterait vide sans que rien ne le signale.
+test("images are allowed from this origin and the one CDN, nothing else", () => {
+  const csp = securityHeaders()["content-security-policy"];
+  assert.match(csp, /img-src 'self' https:\/\/i2c\.seadn\.io/);
+  assert.doesNotMatch(csp, /img-src[^;]*\*/);
 });
