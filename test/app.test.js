@@ -810,22 +810,12 @@ test("a paused anvil is not invited to be gambled with", () => {
 // « floor price » le faisait passer pour un tarif, alors que le prix de file
 // est plus bas et achète une machine — juste pas celle-là.
 test("the shelf calls its price what it is: the cost of picking one", () => {
-  const html = halfCell(half({ anvilEntries: [shelfEntry({ queuePrinter: 12957, queueUsd: 157 })] }), "ink", { ethUsd: 1896 });
+  const html = halfCell(half({ anvilEntries: [shelfEntry()] }), "ink", { ethUsd: 1896 });
   assert.match(html, /to pick one/i);
   assert.doesNotMatch(html.slice(html.indexOf('class="shelf"')), /floor price/i);
 });
 
-test("the cheaper way is stated beside it, not hidden", () => {
-  const html = halfCell(half({ anvilEntries: [shelfEntry({ queuePrinter: 12957, queueUsd: 157 })] }), "ink", { ethUsd: 1896 });
-  assert.match(html, /12,957/);
-  assert.match(html, /whichever is next/i);
-});
 
-test("with no queue price read, only the named one is claimed", () => {
-  const html = halfCell(half({ anvilEntries: [shelfEntry({ queuePrinter: null })] }), "ink", { ethUsd: 1896 });
-  assert.match(html, /to pick one/i);
-  assert.doesNotMatch(html, /whichever is next/i);
-});
 
 // Deux constructeurs de vignette avaient dérivé : le badge de re-encrage
 // n'existait que du côté OpenSea, et #4173 — une x10 au plafond, donc 20x —
@@ -875,8 +865,8 @@ test("every block in the bar states a bare figure, named by its label", () => {
 // sien : un prix partagé entre raretés passerait inaperçu tant que la courbe
 // de l'anvil les rapproche.
 test("each cell shows its own shelf price, never a neighbour's", () => {
-  const cheap = halfCell(half({ anvilEntries: [shelfEntry({ tokenId: 1, askPrinter: 15217, askUsd: 133, queuePrinter: 13833 })] }), "ink", { ethUsd: 1896 });
-  const dear = halfCell(half({ anvilEntries: [shelfEntry({ tokenId: 2, askPrinter: 51128, askUsd: 447, queuePrinter: 46480 })] }), "ink", { ethUsd: 1896 });
+  const cheap = halfCell(half({ anvilEntries: [shelfEntry({ tokenId: 1, askPrinter: 15217, askUsd: 133 })] }), "ink", { ethUsd: 1896 });
+  const dear = halfCell(half({ anvilEntries: [shelfEntry({ tokenId: 2, askPrinter: 51128, askUsd: 447 })] }), "ink", { ethUsd: 1896 });
 
   assert.match(cheap, /class="price">15,217</);
   assert.match(dear, /class="price">51,128</);

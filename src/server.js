@@ -97,7 +97,6 @@ async function sweepBook() {
   const grid = buildGrid({
     listings: book.listings, traits, ink, pelotonSize: cfg.pelotonSize,
     shelf: anvil?.shelfListings,
-    shelfQueue: anvil?.shelfQueue,
   });
 
   const composed = composeSnapshot({

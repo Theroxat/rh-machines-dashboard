@@ -236,20 +236,4 @@ test("nothing is dropped when the two markets do not overlap", () => {
   assert.equal(rowOf(grid, "x1").inked.listed, 1);
 });
 
-test("a shelf machine carries both what naming it costs and what the queue costs", () => {
-  const grid = buildGrid({
-    traits: traitsOf([[1, 100]]), ink: inkOf([[1, 4250]]), listings: listingsOf([]),
-    shelf: new Map([[1, 14252]]), shelfQueue: new Map([[1, 12957]]), pelotonSize: 5,
-  });
-  const e = rowOf(grid, "x1").inked.anvilEntries[0];
-  assert.equal(e.askPrinter, 14252);
-  assert.equal(e.queuePrinter, 12957);
-});
 
-test("an unread queue price is null, never the named one standing in for it", () => {
-  const grid = buildGrid({
-    traits: traitsOf([[1, 100]]), ink: inkOf([[1, 4250]]), listings: listingsOf([]),
-    shelf: new Map([[1, 14252]]), pelotonSize: 5,
-  });
-  assert.equal(rowOf(grid, "x1").inked.anvilEntries[0].queuePrinter, null);
-});

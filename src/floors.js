@@ -33,7 +33,7 @@ function buildCell(entries, supply, pelotonSize) {
   return cell;
 }
 
-export function buildGrid({ listings, traits, ink, pelotonSize, shelf, shelfQueue }) {
+export function buildGrid({ listings, traits, ink, pelotonSize, shelf }) {
   const excluded = { unknownRarity: 0, unknownInk: 0, listingsOffGrid: 0, heldByAnvil: 0 };
   const stateOf = new Map();   // tokenId -> "inked" | "dormant"
   const classOf = new Map();   // tokenId -> weightClass
@@ -79,7 +79,7 @@ export function buildGrid({ listings, traits, ink, pelotonSize, shelf, shelfQueu
     if (state === undefined || wc === undefined) continue;
     const k = `${wc}:${state}`;
     if (!shelfByCell.has(k)) shelfByCell.set(k, []);
-    shelfByCell.get(k).push({ tokenId, askPrinter, queuePrinter: shelfQueue?.get(tokenId) ?? null });
+    shelfByCell.get(k).push({ tokenId, askPrinter });
   }
   const shelfFor = (key) =>
     (shelfByCell.get(key) ?? []).sort((a, b) => a.askPrinter - b.askPrinter || a.tokenId - b.tokenId);
