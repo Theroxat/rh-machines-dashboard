@@ -734,3 +734,23 @@ test("with no overlap the line says nothing about it", () => {
   const line = excludedLine({ excluded: { unknownRarity: 0, unknownInk: 0, listingsOffGrid: 0, heldByAnvil: 0 } });
   assert.doesNotMatch(line, /Anvil/);
 });
+
+// Les badges étaient positionnés sur la vignette entière : le vert, en bas,
+// retombait sur la ligne du prix en dollars et la recouvrait. Ils doivent être
+// ancrés sur l'image, pas sur le bloc.
+test("both badges live inside the image, not over the text", () => {
+  const html = halfCell(half({ entries: [withBid({ weight: 200, inkMult: 2 })] }), "ink", { ethUsd: 1896 });
+  const thumb = html.match(/<span class="thumb">[^]*?<\/span><\/span>/);
+  assert.ok(thumb, "the image must sit in its own positioned wrapper");
+  assert.match(thumb[0], /<img/);
+  assert.match(thumb[0], /class="reink"/);
+  assert.match(thumb[0], /class="under"/);
+  // et le prix reste dehors, donc rien ne peut le recouvrir
+  assert.doesNotMatch(thumb[0], /class="price"/);
+});
+
+test("a machine with no picture still carries its marks", () => {
+  const html = halfCell(half({ entries: [withBid({ machine: null })] }), "ink", { ethUsd: 1896 });
+  assert.match(html, /class="thumb"/);
+  assert.match(html, /class="under"/);
+});
