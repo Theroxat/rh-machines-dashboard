@@ -169,7 +169,7 @@ export function contextHtml(d) {
  * dérivé : le badge de re-encrage n'existait que du côté OpenSea, si bien
  * qu'une x10 re-inkée au plafond passait pour une x10 ordinaire sur le rayon.
  */
-function chip(e, { isFloor = false, ethUsd = null, anvil = false } = {}) {
+function chip(e, { isFloor = false, ethUsd = null, anvil = false, showPrice = true } = {}) {
   const hw = e.machine?.headwear ? ` · ${headwearLabel(e.machine.headwear)}` : "";
   const img = e.machine?.image
     ? `<img src="${esc(e.machine.image)}" alt="Machine #${e.tokenId}" loading="lazy" width="60" height="60">`
@@ -200,8 +200,8 @@ function chip(e, { isFloor = false, ethUsd = null, anvil = false } = {}) {
     ` href="${anvil ? ANVIL_URL : itemUrl(e.tokenId)}" target="_blank" rel="noopener"` +
     ` title="${esc(`#${e.tokenId}${hw}${inkStory}${bidStory}${anvilStory}`)}">` +
     `<span class="thumb">${img}${badge}${under}</span>` +
-    `<span class="price">${price}</span>` +
-    (dollars ? `<span class="usd">${dollars}</span>` : "") +
+    (showPrice ? `<span class="price">${price}</span>` : "") +
+    (showPrice && dollars ? `<span class="usd">${dollars}</span>` : "") +
     `<span class="tok">#${e.tokenId}</span>` +
   `</a>`;
 }
@@ -238,7 +238,7 @@ export function matchesFilter(machine, filter) {
  * carnet OpenSea — les fondre laisserait croire qu'une machine de l'anvil
  * s'achète comme un listing, avec la même monnaie et la même transaction.
  */
-function shelfStrip(anvilEntries) {
+function shelfStrip(anvilEntries, floorEth) {
   if (!anvilEntries?.length) return "";
 
   const first = anvilEntries[0];
@@ -251,11 +251,23 @@ function shelfStrip(anvilEntries) {
     ` <span class="unit">$PRINTER</span>` +
     (first.askUsd ? ` <span class="usd-big">${fmtUsdShort(first.askUsd)}</span>` : "") + `</span>`;
 
-  const chips = anvilEntries.map((e) => chip(e, { anvil: true })).join("");
+  // Un prix identique sur chaque vignette répète ce que l'en-tête vient de
+  // dire. Il ne s'affiche que s'il varie d'une machine à l'autre — ce qui
+  // arrive, la courbe de l'anvil pouvant séparer deux positions de file.
+  const uniform = new Set(anvilEntries.map((e) => Math.round(e.askPrinter))).size === 1;
+  const chips = anvilEntries.map((e) => chip(e, { anvil: true, showPrice: !uniform })).join("");
+
+  // La comparaison existait dans un seul sens, et ce sens dépend d'une offre
+  // d'achat que le protocole peut suspendre. Celui-ci tient dans tous les cas :
+  // le rayon vend-il moins cher que le moins cher du carnet ?
+  const under = floorEth && first.askEth && first.askEth < floorEth
+    ? `<span class="under-note">Cheaper than anything on OpenSea here — ` +
+      `${fmtEth(first.askEth)} ETH against ${fmtEth(floorEth)}.</span>`
+    : "";
 
   return `<span class="shelf">` +
     `<span class="market">On the Anvil</span>` +
-    priceLine +
+    priceLine + under +
     `<span class="strip">${chips}</span>` +
   `</span>`;
 }
@@ -294,7 +306,7 @@ export function halfCell(half, side, { shown = null, step = REVEAL_STEP, limit =
       : "Nothing is on sale in this class in this state.";
     return `<td class="${g} edge half" data-state="${state}" title="${esc(tip)}">` +
       `<span class="market">On OpenSea</span>` +
-      `<span class="depth">${why}</span>` + shelfStrip(half.anvilEntries) + `</td>`;
+      `<span class="depth">${why}</span>` + shelfStrip(half.anvilEntries, half.floorEth) + `</td>`;
   }
 
   const half_ = { ...half, entries: kept };
@@ -357,7 +369,7 @@ function renderHalf(half, g, { shown: count, step, limit, key, depth, state, eth
     underNote +
     `<span class="strip">${shown.map((e, i) => chip(e, { isFloor: i === 0, ethUsd })).join("")}</span>` +
     more +
-    shelfStrip(half.anvilEntries) +
+    shelfStrip(half.anvilEntries, half.floorEth) +
   `</td>`;
 }
 
