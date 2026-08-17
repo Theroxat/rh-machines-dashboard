@@ -169,7 +169,37 @@ export function crateLine(a) {
   `</a>`;
 }
 
-export function contextHtml(d) {
+/**
+ * Le bulletin, qui décide de la taille des parts du pot — donc du coefficient
+ * qui s'applique par desk, par-dessus le poids.
+ *
+ * Trois états qu'un tableau de zéros confondrait : pas encore ouvert, ouvert et
+ * vide, clos. Annoncer « 0% » avant l'ouverture ferait passer une attente pour
+ * un désaveu unanime.
+ */
+export function ballotBlock(vote, epoch, now) {
+  if (!vote) return statBlock("Ballot", "—", "unreadable right now");
+  if (!vote.opened) {
+    return statBlock("Ballot", "not open yet",
+      `epoch ${epoch ?? "—"} · no desk has a slice until it opens`);
+  }
+
+  const voted = vote.desks.filter((x) => x.votedWeight > 0);
+  if (!voted.length) return statBlock("Ballot", "no vote yet", "open, and not one machine has voted");
+
+  const top = voted[0];
+  const left = vote.closesAt && now ? vote.closesAt - now : null;
+  const when = left === null ? null
+    : left <= 0 ? "voting closed"
+    : left < 3600000 ? `closes in ${Math.round(left / 60000)}m`
+    : `closes in ${Math.round(left / 3600000)}h`;
+
+  return statBlock("Ballot",
+    `${top.ticker ?? `desk ${top.index}`} ${fmtRatio(top.share)}`,
+    [when, `${voted.length} of 16 desks drew votes`].filter(Boolean).join(" · "));
+}
+
+export function contextHtml(d, now = null) {
   const p = d.printer ?? {};
   const e = d.eth ?? {};
   const ink = d.ink ?? {};
@@ -209,6 +239,7 @@ export function contextHtml(d) {
     statBlock("Inked machines", fmtInt(d.totals?.inked),
       `${fmtInt(d.totals?.dormant)} dormant · ${fmtInt(d.totals?.listed)} listed`),
     anvilBlock(d.anvil),
+    ballotBlock(d.vote, d.protocol?.epoch, now),
     statBlock("Epoch", pr.epoch ?? "—", ceilingLine(pr)),
   ].join("");
 }
@@ -548,15 +579,22 @@ export function rowsHtml(d, { expanded = new Map(), limit = DEFAULT_LIMIT, step 
  * existe : savoir avant de cliquer qu'un trait n'a aucune machine sur le marché
  * évite d'aller chercher un tableau vide.
  */
-export function filterBarHtml(traitFilters, filter) {
+export function filterBarHtml(traitFilters, filter, vote = null) {
   if (!traitFilters) return "";
+
+  // Ce que chaque desk a tiré du pot cette epoch. Le desk n'est pas un trait
+  // cosmétique : c'est le seul dont la valeur change avec un vote, et le menu
+  // ne peut pas laisser croire que les seize se valent.
+  const share = new Map();
+  for (const dk of vote?.desks ?? []) if (dk.ticker && dk.share !== null) share.set(dk.ticker, dk.share);
 
   return TRAIT_TYPES.map((type) => {
     const values = traitFilters[type] ?? [];
     const options = values.map((v) => {
       const ticker = v.ticker ? ` — ${v.ticker}` : "";
+      const pot = type === "Farms" && share.has(v.value) ? ` — ${fmtRatio(share.get(v.value))} of the pot` : "";
       const chosen = filter?.[type] === v.value ? " selected" : "";
-      return `<option value="${esc(v.value)}"${chosen}>${esc(v.value)}${ticker} (${fmtInt(v.listed)} on sale of ${fmtInt(v.total)})</option>`;
+      return `<option value="${esc(v.value)}"${chosen}>${esc(v.value)}${ticker}${pot} (${fmtInt(v.listed)} on sale of ${fmtInt(v.total)})</option>`;
     }).join("");
     return `<label class="fl"><span class="label">${type}</span>` +
       `<select data-trait="${type}"><option value="">any</option>${options}</select></label>`;
@@ -673,10 +711,10 @@ if (typeof document !== "undefined") {
   /** La barre est construite une fois. Les traits sont scellés, donc la liste
    *  des valeurs ne bouge jamais ; seuls les compteurs bougent, et on les met à
    *  jour sur place pour ne pas effacer la sélection en cours. */
-  const paintFilters = (traitFilters) => {
+  const paintFilters = (traitFilters, vote) => {
     if (!traitFilters) return;
     if (!barBuilt) {
-      filtersEl.innerHTML = filterBarHtml(traitFilters, filter);
+      filtersEl.innerHTML = filterBarHtml(traitFilters, filter, vote);
       barBuilt = true;
       return;
     }
@@ -727,11 +765,14 @@ if (typeof document !== "undefined") {
 
   const refresh = async () => {
     let v;
+    // L'heure du serveur sert deux fois — la fraîcheur du snapshot et le temps
+    // qu'il reste pour voter — donc elle vit au-delà du bloc qui la lit.
+    let serverNow = null;
     try {
       const res = await fetch("/api/snapshot");
       const body = await res.json();
       // L'en-tête Date vient du serveur, comme `at` : les comparer est sûr.
-      const serverNow = Date.parse(res.headers.get("date")) || Date.now();
+      serverNow = Date.parse(res.headers.get("date")) || Date.now();
       v = { ...body, ...freshness(body, serverNow) };
     } catch {
       showBanner("Cannot reach the service. The numbers below are the last ones it served.");
@@ -742,8 +783,8 @@ if (typeof document !== "undefined") {
     if (!v.data) return;
 
     lastData = v.data;
-    $("context").innerHTML = contextHtml(v.data);
-    paintFilters(v.data.traitFilters);
+    $("context").innerHTML = contextHtml(v.data, serverNow);
+    paintFilters(v.data.traitFilters, v.data.vote);
     $("queue").innerHTML = crateLine(v.data.anvil);
     paint();
     $("legend").innerHTML = legendHtml(v.data.legend);

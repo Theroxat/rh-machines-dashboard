@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { ethers } from "ethers";
 
-import { loadConfig, RPC_URL, CHAIN_ID, ADDRESSES } from "./config.js";
+import { loadConfig, RPC_URL, CHAIN_ID, ADDRESSES, TOTAL_MACHINES } from "./config.js";
 import { fetchListings, fetchCollectionStats } from "./opensea.js";
 import { loadTraits } from "./traits.js";
 import { loadMetadata } from "./metadata.js";
@@ -14,6 +14,7 @@ import { readInk } from "./ink.js";
 import { fetchPrinter, fetchEthUsd } from "./prices.js";
 import { readProtocol } from "./protocol.js";
 import { readAnvil } from "./anvil.js";
+import { readVote, readDeskIndex, deskShares, nameDesks } from "./vote.js";
 import { buildGrid } from "./floors.js";
 import { composeSnapshot } from "./snapshot.js";
 import { createStore } from "./store.js";
@@ -65,6 +66,8 @@ let inkMeta = { readAt: null, failures: null };
 let meta = new Map();
 let legend = null;
 let bodyTickers = new Map();
+// Le desk est scellé au mint : lu une fois au démarrage, jamais réinterrogé.
+let deskIndex = new Map();
 
 async function sweepInk() {
   const { ink: fresh, weights: freshWeights, failures } = await readInk({ provider, batchSize: cfg.multicallBatchSize });
@@ -84,6 +87,12 @@ async function sweepBook() {
     fetchCollectionStats({ apiKey: cfg.openseaApiKey }),
   ]);
 
+  // Le scrutin se lit après le protocole, qui seul dit de quelle epoch il
+  // s'agit. Un bulletin illisible ne doit pas emporter la page avec lui : la
+  // part de chaque desk est une information de plus, pas une condition.
+  const vote = await readVote({ provider, epoch: protocol?.epoch })
+    .catch((e) => { console.error(`vote: ${e.message}`); return null; });
+
   // L'anvil est lu après le carnet parce qu'il faut savoir quelles machines sont
   // en vente pour lui demander ce qu'il en donnerait — et avant la grille, parce
   // que son rayon se range dans les mêmes cases.
@@ -102,7 +111,7 @@ async function sweepBook() {
   const composed = composeSnapshot({
     grid, printer, eth, protocol, stats,
     book: { listed: book.listings.size, pages: book.pages, skipped: book.skipped },
-    inkMeta, meta, legend, bodyTickers, ink, weights, anvil, now: Date.now(),
+    inkMeta, meta, legend, bodyTickers, ink, weights, anvil, deskIndex, vote, now: Date.now(),
   });
   store.succeed(composed);
 
@@ -207,6 +216,23 @@ const started = async () => {
       console.log(`desks: ${desks.byIndex.size} tickers resolved, ${named}/${bodyTickers.size} body colours named`);
     } else {
       console.error(`desks: no ticker mapping — ${desks.reason}`);
+    }
+
+    // Le desk lui-même vient désormais de la chaîne. La couleur ne fait plus que
+    // le nommer : elle range une machine dans un desk seulement si `deskOf` est
+    // illisible, et les deux se recoupent au démarrage.
+    deskIndex = await readDeskIndex({
+      aggregate3: multicallOf(provider, ADDRESSES.MULTICALL3),
+      ids: Array.from({ length: TOTAL_MACHINES }, (_, i) => i + 1),
+      batchSize: cfg.multicallBatchSize,
+    }).catch((e) => { console.error(`desks: deskOf unreadable — ${e.message}`); return new Map(); });
+    if (deskIndex.size) {
+      const { names, conflicts } = nameDesks({
+        deskIndex,
+        tickerOf: (id) => bodyTickers.get(meta.get(id)?.body) ?? null,
+      });
+      console.log(`desks: deskOf read for ${deskIndex.size} machines, ${names.size}/16 named by body colour` +
+        (conflicts.length ? `, ${conflicts.length} contradicted: ${conflicts.join(",")}` : ", none contradicted"));
     }
   } catch (e) {
     console.error(`metadata: ${e.message} — the dashboard runs without pictures`);

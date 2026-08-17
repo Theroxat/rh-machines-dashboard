@@ -1,10 +1,12 @@
 import { buildTraitIndex } from "./traitindex.js";
 import { TOTAL_MACHINES, OPERATING_CHARGE_PRINTER } from "./config.js";
+import { deskShares } from "./vote.js";
 
 /** Assemblage pur de tout ce dont la page a besoin. Une dérivation qui
  *  diviserait par une valeur non lue produit null plutôt qu'un zéro confiant. */
 export function composeSnapshot({
-  grid, printer, eth, protocol, stats, book, inkMeta, meta, legend, bodyTickers, ink, weights, anvil, now,
+  grid, printer, eth, protocol, stats, book, inkMeta, meta, legend, bodyTickers, ink, weights, anvil,
+  deskIndex, vote, now,
 }) {
   const activationPrinter = protocol?.activationInk
     ? Number(BigInt(protocol.activationInk) / 10n ** 15n) / 1000
@@ -158,6 +160,10 @@ export function composeSnapshot({
       failures: inkMeta?.failures ?? null,
     },
     protocol,
+    // Le scrutin décide de la taille des parts du pot, donc du coefficient qui
+    // s'applique par desk. Illisible, il vaut null : la page dira qu'elle ne
+    // sait pas plutôt que d'annoncer seize parts égales, qu'elles ne sont pas.
+    vote: deskShares({ vote, deskIndex, tickerOf: (id) => bodyTickers?.get(meta?.get(id)?.body) ?? null }),
     book,
     collection,
     anvil: anvil
