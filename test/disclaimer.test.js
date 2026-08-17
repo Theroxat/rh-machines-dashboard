@@ -99,3 +99,11 @@ test("the chip, its wrapper and the image agree on one width", () => {
 test("the page declares its icon", () => {
   assert.match(flat, /<link rel="icon" href="\/favicon\.svg" type="image\/svg\+xml">/);
 });
+
+test("the page links to its author, and names the link for anyone who cannot see it", () => {
+  assert.match(flat, /href="https:\/\/x\.com\/Theroxat"/);
+  assert.match(flat, /aria-label="Theroxat on X"/);
+  // le lien s'ouvre ailleurs sans donner la main à la page cible
+  const link = flat.slice(flat.indexOf('class="x-link"'), flat.indexOf("</a>", flat.indexOf('class="x-link"')));
+  assert.match(link, /rel="noopener"/);
+});

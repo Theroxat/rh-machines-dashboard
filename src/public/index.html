@@ -60,7 +60,14 @@
 
   header { border-bottom: 1px solid var(--rule-2); padding-bottom: 14px; }
 
+  .title-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
   h1 { margin: 0; font-size: 21px; font-weight: 700; letter-spacing: -0.01em; }
+
+  /* Un lien, discret : gris comme le reste des mentions, qui s'éclaire au
+     survol. Le SVG est en ligne, donc aucune requête et rien à autoriser. */
+  .x-link { display: inline-flex; color: var(--muted); flex: none; }
+  .x-link:hover, .x-link:focus-visible { color: var(--text); }
+  .x-link svg { display: block; width: 17px; height: 17px; fill: currentColor; }
   h1 .sep { color: var(--dim); font-weight: 400; }
   h1 .sub { color: var(--muted); font-weight: 400; }
 
@@ -427,7 +434,12 @@
 </style>
 
 <header>
-  <h1>RH MACHINES <span class="sep">/</span> <span class="sub">floors by rarity and ink state</span></h1>
+  <div class="title-row">
+    <h1>RH MACHINES <span class="sep">/</span> <span class="sub">floors by rarity and ink state</span></h1>
+    <a class="x-link" href="https://x.com/Theroxat" target="_blank" rel="noopener" aria-label="Theroxat on X">
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+    </a>
+  </div>
   <p class="disclaimer"><span class="tag">Unofficial</span>An independent tool, not built by, affiliated with, or endorsed by the RH MACHINES team.</p>
   <div class="context" id="context"></div>
   <div class="banner" id="banner" role="status"></div>
