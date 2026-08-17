@@ -765,3 +765,25 @@ test("the shelf names its price the way the OpenSea half does", () => {
   // et les deux moitiés portent bien le même mot
   assert.equal((html.match(/floor price/g) || []).length, 2);
 });
+
+// Une case contient deux marchés. Un seul portait son nom, donc le premier ne
+// se lisait pas comme une section — juste comme le contenu de la case.
+test("both markets in a cell carry their name", () => {
+  const html = halfCell(half({ entries: [entry(1, 0.11)], anvilEntries: [shelfEntry()] }), "ink", { ethUsd: 1896 });
+  assert.match(html, /class="market">On OpenSea</);
+  assert.match(html, /class="market">On the Anvil</);
+  assert.ok(html.indexOf("On OpenSea") < html.indexOf("On the Anvil"));
+});
+
+test("a cell with nothing on OpenSea still says which market is empty", () => {
+  const html = halfCell(half({ entries: [], listed: 0, anvilEntries: [shelfEntry()] }), "ink", { ethUsd: 1896 });
+  assert.match(html, /class="market">On OpenSea</);
+  assert.match(html, /no listing/);
+  assert.match(html, /class="market">On the Anvil</);
+});
+
+test("a cell the anvil holds nothing in names only the market that has something", () => {
+  const html = halfCell(half({ entries: [entry(1, 0.11)], anvilEntries: [] }), "ink", { ethUsd: 1896 });
+  assert.match(html, /class="market">On OpenSea</);
+  assert.doesNotMatch(html, /On the Anvil/);
+});
