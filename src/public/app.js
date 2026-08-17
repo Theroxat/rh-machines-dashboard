@@ -40,8 +40,11 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&l
  *  telle quelle sur la page, elle se lirait comme une donnée manquante. */
 const headwearLabel = (hw) => hw === "None" ? "no headwear at all" : hw;
 
-function statBlock(label, value, extra, isInk) {
-  return `<div class="stat${isInk ? " is-ink" : ""}">` +
+/** `isPrice` colore la valeur en ambre : la règle du bandeau est « ambre = un
+ *  prix ». Un comptage ou un numéro d'époque reste neutre, sans quoi la couleur
+ *  ne distingue plus rien. */
+function statBlock(label, value, extra, isPrice) {
+  return `<div class="stat${isPrice ? " is-price" : ""}">` +
     `<span class="label">${label}</span>` +
     `<span class="v">${value}</span>` +
     `<span class="x">${extra ?? ""}</span>` +
@@ -89,14 +92,14 @@ function ceilingLine(pr) {
  * Une offre suspendue doit se lire comme suspendue, jamais comme un plancher bas.
  */
 function anvilBlock(a) {
-  if (!a) return statBlock("The Anvil", "—", "unreadable right now");
+  if (!a) return statBlock("The Anvil", "—", "unreadable right now", true);
   const spot = `${fmtInt(Math.round(a.spotPrinter))} $PRINTER`;
   const extra = [
     a.spotUsd ? fmtUsdShort(a.spotUsd) : null,
     a.shelf === null || a.shelf === undefined ? null : `${fmtInt(a.shelf)} on the shelf`,
     a.bidPaused ? "bid paused" : null,
   ].filter(Boolean).join(" · ");
-  return statBlock("The Anvil", spot, extra);
+  return statBlock("The Anvil", spot, extra, true);
 }
 
 /**
@@ -140,17 +143,17 @@ export function contextHtml(d) {
     statBlock("$PRINTER", fmtUsd(p.usd, 5),
       [chg, `${fmtBig(p.marketCap)} mkt cap`, p.liquidityUsd ? `${fmtBig(p.liquidityUsd)} liquidity` : null]
         .filter(Boolean).join(" · ") +
-      ` · <a class="buy" href="${SWAP_URL}" target="_blank" rel="noopener">buy $PRINTER &#8599;</a>`),
-    statBlock("ETH", fmtUsd(e.local, 2), ethExtra),
+      ` · <a class="buy" href="${SWAP_URL}" target="_blank" rel="noopener">buy $PRINTER &#8599;</a>`, true),
+    statBlock("ETH", fmtUsd(e.local, 2), ethExtra, true),
     statBlock("Cost of ink", fmtUsd(ink.activationUsd), `${fmtInt(ink.activationPrinter)} $PRINTER · ${fmtEth(ink.activationEth)} ETH`, true),
     // Le floor vient de notre carnet, pas du chiffre publié : c'est le même
     // nombre que la case la moins chère du tableau, il ne peut pas la contredire.
     statBlock("Collection floor", `${fmtEth(c.floorEth)} ETH`,
       `${c.floorUsd === null || c.floorUsd === undefined ? "—" : fmtUsd(c.floorUsd, 0)} · ` +
-      `${fmtBig(c.marketCapUsd)} at floor × ${fmtInt(c.machines)}`),
+      `${fmtBig(c.marketCapUsd)} at floor × ${fmtInt(c.machines)}`, true),
     statBlock("Volume traded", `${c.volumeEth === null || c.volumeEth === undefined ? "—" : c.volumeEth.toFixed(1)} ETH`,
       `${fmtBig(c.volumeUsd)} · ${fmtInt(c.sales)} sales · ` +
-      `${c.volume24hEth === null || c.volume24hEth === undefined ? "—" : c.volume24hEth.toFixed(1)} ETH 24h`),
+      `${c.volume24hEth === null || c.volume24hEth === undefined ? "—" : c.volume24hEth.toFixed(1)} ETH 24h`, true),
     statBlock("Machines", `${fmtInt(d.totals?.inked)} inked`, `${fmtInt(d.totals?.dormant)} dormant · ${fmtInt(d.totals?.listed)} listed`),
     anvilBlock(d.anvil),
     statBlock("Epoch", pr.epoch ?? "—", ceilingLine(pr)),
