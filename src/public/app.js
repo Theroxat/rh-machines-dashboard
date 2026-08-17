@@ -234,7 +234,7 @@ function shelfStrip(anvilEntries) {
   }).join("");
 
   return `<span class="shelf">` +
-    `<span class="label">On the Anvil</span>` +
+    `<span class="market">On the Anvil</span>` +
     priceLine +
     `<span class="depth">${fmtInt(anvilEntries.length)} on the shelf${range ? ` · ${range}` : ""}</span>` +
     `<span class="strip">${chips}</span>` +
@@ -274,6 +274,7 @@ export function halfCell(half, side, { shown = null, step = REVEAL_STEP, limit =
       ? "Nothing on sale in this class and state carries the traits you picked."
       : "Nothing is on sale in this class in this state.";
     return `<td class="${g} edge half" data-state="${state}" title="${esc(tip)}">` +
+      `<span class="market">On OpenSea</span>` +
       `<span class="depth">${why}</span>` + shelfStrip(half.anvilEntries) + `</td>`;
   }
 
@@ -331,6 +332,7 @@ function renderHalf(half, g, { shown: count, step, limit, key, depth, state, eth
     (floorUsd ? ` <span class="usd-big">${floorUsd}</span>` : "") + `</span>`;
 
   return `<td class="${g} edge half" data-state="${state}" title="${esc(tip)}">` +
+    `<span class="market">On OpenSea</span>` +
     head +
     `<span class="depth">${depth}</span>` +
     underNote +
