@@ -64,3 +64,33 @@ test("every desktop rule that constrains a cell is named again for mobile", () =
   assert.match(mobile, /\.cls-cell \{[^}]*width: auto/);
   assert.match(mobile, /table \{ min-width: 0/);
 });
+
+// Deux tentatives de correction ont échoué en silence : des remplacements de
+// texte qui ne correspondaient à rien, laissant la vignette à 54px pendant que
+// l'image passait à 60, et le badge ancré sur le bloc entier. Ni les tests ni
+// le compte d'accolades ne l'attrapaient — la page restait valide, seulement
+// fausse. Ces trois invariants le disent maintenant.
+test("the badges are anchored to the picture, not to the whole chip", () => {
+  const rule = (sel) => {
+    const i = flat.indexOf(`${sel} {`);
+    return i === -1 ? null : flat.slice(i, flat.indexOf("}", i));
+  };
+  const thumb = rule(".thumb");
+  const chip = rule(".chip");
+
+  assert.ok(thumb, "the picture needs its own positioned wrapper");
+  assert.match(thumb, /position: relative/);
+  assert.ok(chip && !/position: relative/.test(chip),
+    "the chip must not be the anchor, or a bottom-anchored badge lands on the price");
+});
+
+test("the chip, its wrapper and the image agree on one width", () => {
+  // Seulement la partie desktop : le bloc mobile redimensionne les trois d'un
+  // coup dans une règle groupée, ce qui est légitime.
+  const desktop = flat.slice(0, flat.indexOf("@media"));
+  const widths = [...desktop.matchAll(/\.(chip|thumb) \{[^}]*width: (\d+)px/g)].map((m) => m[2]);
+  const img = desktop.match(/\.chip img, \.chip \.noimg \{[^}]*width: (\d+)px/)[1];
+  assert.ok(widths.length >= 2, "both the chip and its wrapper must state a width");
+  assert.deepEqual([...new Set([...widths, img])], [img],
+    `chip, thumb and image disagree: ${[...widths, img].join(", ")}`);
+});

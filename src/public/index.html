@@ -182,7 +182,11 @@
 
   .strip { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 8px; }
 
-  .chip { display: block; position: relative; width: 54px; text-decoration: none; color: inherit; }
+  .chip { display: block; width: 60px; text-decoration: none; color: inherit; }
+
+  /* Les badges s'ancrent sur l'image, pas sur la vignette entière : ancrés sur
+     le bloc, celui du bas retombait sur la ligne du prix et la recouvrait. */
+  .thumb { display: block; position: relative; width: 60px; height: 60px; }
 
   /* Un listing sur cent porte ce badge, et quand il le porte la machine pèse le
      double de ce que sa ligne annonce. Ambre sur fond sombre : minuscule, mais
