@@ -111,21 +111,26 @@
   /* À plat, comme tout le reste : la page sépare par des filets et n'encadre
      jamais rien. Un panneau bordé était le seul de son espèce et se lisait
      comme une pièce rapportée. */
-  .queue-panel { min-width: 340px; }
-  .queue-panel .market { margin-bottom: 0; }
-  .q-row {
-    display: flex;
-    align-items: baseline;
-    gap: 9px;
-    font-size: 12px;
-    padding: 5px 0;
-    border-bottom: 1px solid var(--rule);
+  .queue-panel .market { margin-bottom: 8px; }
+
+  /* Les trois prix côte à côte, dans la forme des cellules du bandeau du haut :
+     intitulé au-dessus, chiffre en dessous, un filet entre chacune. */
+  .q-line { display: flex; flex-wrap: wrap; }
+  .q-row { padding: 0 15px; border-left: 1px solid var(--rule); }
+  .q-row:first-child { padding-left: 0; border-left: 0; }
+  .q-what {
+    display: block;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    white-space: nowrap;
   }
-  .q-what { flex: 1; color: var(--muted); white-space: nowrap; }
-  .q-id { color: var(--dim); font-size: 11px; min-width: 30px; }
-  .q-price { font-weight: 700; color: var(--ink); font-size: 14.5px; }
-  .q-unit { color: var(--muted); font-size: 10px; }
-  .q-usd { font-weight: 600; color: var(--text); min-width: 44px; text-align: right; }
+  .q-id { color: var(--dim); letter-spacing: 0; }
+  .q-v { display: block; margin-top: 3px; white-space: nowrap; }
+  .q-price { font-weight: 700; color: var(--ink); font-size: 15.5px; }
+  .q-unit { color: var(--muted); font-size: 10px; margin-left: 4px; }
+  .q-usd { font-weight: 600; color: var(--text); font-size: 13px; margin-left: 8px; }
   .q-paused { display: block; margin-top: 6px; color: var(--alarm); font-size: 11px; }
 
   /* Un lien, pas un bouton : souligné à l'approche, rien d'autre. */

@@ -117,13 +117,16 @@ export function queueHtml(a) {
 
   if (!rows.length) return "";
 
-  const body = rows.map((r) =>
-    `<span class="q-row"><span class="q-what">${r.what}</span>` +
-    `<span class="q-id">${esc(r.id)}</span>` +
-    `<span class="q-price">${fmtInt(Math.round(r.pr))}</span>` +
-    `<span class="q-unit">$PRINTER</span>` +
-    `<span class="q-usd">${r.usd ? fmtUsdShort(r.usd) : "—"}</span></span>`
-  ).join("");
+  // Côte à côte, dans la forme des cellules du bandeau du haut : intitulé
+  // au-dessus, chiffre en dessous, séparées par un filet.
+  const body = `<span class="q-line">` + rows.map((r) =>
+    `<span class="q-row">` +
+      `<span class="q-what">${r.what}${r.id ? ` <span class="q-id">${esc(r.id)}</span>` : ""}</span>` +
+      `<span class="q-v"><span class="q-price">${fmtInt(Math.round(r.pr))}</span>` +
+      `<span class="q-unit">$PRINTER</span>` +
+      `<span class="q-usd">${r.usd ? fmtUsdShort(r.usd) : "—"}</span></span>` +
+    `</span>`
+  ).join("") + `</span>`;
 
   const note = a.paused
     ? `<span class="q-paused">The Anvil is paused — these prices are not being honoured.</span>`
