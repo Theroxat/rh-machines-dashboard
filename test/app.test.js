@@ -873,3 +873,52 @@ test("each cell shows its own shelf price, never a neighbour's", () => {
   assert.doesNotMatch(cheap, /51,128/);
   assert.doesNotMatch(dear, /15,217/);
 });
+
+// ---- les trois corrections ----
+
+// Sept vignettes portant le même prix que l'en-tête vient d'annoncer, c'est
+// quatorze nombres pour une information. Il ne se répète que s'il varie.
+test("a shelf whose machines share one price states it once", () => {
+  const same = [shelfEntry({ tokenId: 1 }), shelfEntry({ tokenId: 2 }), shelfEntry({ tokenId: 3 })];
+  const html = halfCell(half({ anvilEntries: same }), "ink", { ethUsd: 1896 });
+  const shelf = html.slice(html.indexOf('class="shelf"'));
+  // seul l'en-tête l'affiche ; les vignettes n'en portent aucune trace visible
+  assert.match(shelf, /class="price">23,465</);
+  assert.equal((shelf.match(/class="price">23,465</g) || []).length, 1);
+  assert.doesNotMatch(shelf, /class="usd">/);
+  assert.match(shelf, /#1</);   // les numéros restent
+  assert.match(shelf, /#3</);
+});
+
+test("a shelf whose prices differ keeps them on every machine", () => {
+  const mixed = [shelfEntry({ tokenId: 1, askPrinter: 23465, askUsd: 285 }),
+                 shelfEntry({ tokenId: 2, askPrinter: 23531, askUsd: 286 })];
+  const html = halfCell(half({ anvilEntries: mixed }), "ink", { ethUsd: 1896 });
+  assert.match(html, /23,465/);
+  assert.match(html, /23,531/);
+});
+
+// La comparaison ne marchait que dans un sens, et ce sens dépend d'une offre
+// d'achat que le protocole peut suspendre — comme en ce moment.
+test("the shelf says when it undercuts the book", () => {
+  const html = halfCell(half({
+    entries: [entry(1, 0.0790)],
+    anvilEntries: [shelfEntry({ askEth: 0.0787 })],
+  }), "ink", { ethUsd: 1896 });
+  assert.match(html, /cheaper than anything on OpenSea/i);
+  assert.match(html, /0\.0787/);
+  assert.match(html, /0\.0790/);
+});
+
+test("a shelf dearer than the book says nothing", () => {
+  const html = halfCell(half({
+    entries: [entry(1, 0.0740)],
+    anvilEntries: [shelfEntry({ askEth: 0.0787 })],
+  }), "ink", { ethUsd: 1896 });
+  assert.doesNotMatch(html, /cheaper than anything/i);
+});
+
+test("with nothing on OpenSea there is nothing to undercut", () => {
+  const html = halfCell(half({ entries: [], listed: 0, anvilEntries: [shelfEntry({ askEth: 0.0787 })] }), "ink", { ethUsd: 1896 });
+  assert.doesNotMatch(html, /cheaper than anything/i);
+});

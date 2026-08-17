@@ -139,3 +139,12 @@ test("every text colour clears the contrast threshold for small text", () => {
     assert.ok(ratio >= 4.5, `${name} is ${ratio.toFixed(2)}:1 against the page, under the 4.5:1 needed for small text`);
   }
 });
+
+// Les deux moitiés d'une case annoncent chacune leur prix d'entrée : elles
+// jouent le même rôle et doivent donc avoir le même corps.
+test("both headline prices are set at the same size", () => {
+  const size = (sel) => flat.match(new RegExp(sel.replace(/[.]/g, "\\.") + "\\s*\\{[^}]*font-size:\\s*([\\d.]+)px"))[1];
+  assert.equal(size(".shelf-price .price"), size(".cell-floor .price"));
+  assert.equal(size(".shelf-price .usd-big"), size(".cell-floor .usd-big"));
+  assert.equal(size(".shelf-price .unit"), size(".cell-floor .unit"));
+});
