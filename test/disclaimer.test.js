@@ -120,3 +120,22 @@ test("every dollar figure on the page is set in the same, quieter colour", () =>
   const colours = [...new Set(rules.map(([, c]) => c))];
   assert.deepEqual(colours, ["var(--muted)"], `dollar figures disagree: ${JSON.stringify(rules)}`);
 });
+
+// Le contraste se mesure, il ne se juge pas : les montants en dollars et les
+// numéros de machine étaient sous le seuil du petit texte, ce qui les rendait
+// illisibles plutôt que discrets. Rien d'autre ne l'attrape — surtout pas moi,
+// qui ne vois pas cette page.
+test("every text colour clears the contrast threshold for small text", () => {
+  const value = (name) => flat.match(new RegExp(`${name}:\\s*(#[0-9a-f]{6})`, "i"))[1];
+  const luminance = (hex) => {
+    const ch = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+      .map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2];
+  };
+  const paper = luminance(value("--paper"));
+  for (const name of ["--text", "--muted", "--dim", "--ink", "--dormant", "--under", "--alarm"]) {
+    const l = luminance(value(name));
+    const ratio = (Math.max(l, paper) + 0.05) / (Math.min(l, paper) + 0.05);
+    assert.ok(ratio >= 4.5, `${name} is ${ratio.toFixed(2)}:1 against the page, under the 4.5:1 needed for small text`);
+  }
+});
