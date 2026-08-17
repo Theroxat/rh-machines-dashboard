@@ -17,6 +17,9 @@ export const fmtUsdShort = (v) =>
 
 const MACHINES = "0xb509e195bcb3e4461e235ff152c68d66915f67b5";
 export const itemUrl = (id) => `https://opensea.io/assets/robinhood/${MACHINES}/${id}`;
+/** Une machine du rayon s'achète sur l'anvil : l'envoyer sur OpenSea mènerait
+ *  sur une page où elle n'est justement pas à vendre. */
+export const anvilUrl = (id) => `https://rh.btcmachine.gg/machines/${id}`;
 
 /** Combien de machines une case montre avant de proposer le reste. */
 export const DEFAULT_LIMIT = 8;
@@ -150,9 +153,12 @@ function chip(e, isFloor, ethUsd) {
   // La seule comparaison qui compte vraiment : ce listing s'échange-t-il sous
   // ce que le protocole lui-même en donnerait ? Ce n'est pas une opinion, ce
   // sont deux nombres publics mis côte à côte.
-  const under = e.underBid
-    ? `<span class="under">under bid</span>`
-    : "";
+  const gap = e.underBid && e.priceEth
+    ? Math.round((100 * (e.anvilBidEth - e.priceEth)) / e.priceEth)
+    : null;
+  // Un écart réel mais inférieur au point de pourcentage s'arrondissait à
+  // « +0% », ce qui se lit comme « aucun gain » — l'inverse de ce qu'il dit.
+  const under = gap === null ? "" : `<span class="under">${gap < 1 ? "&lt;1%" : `+${gap}%`}</span>`;
   const bidStory = e.anvilBidEth
     ? ` · anvil pays ${fmtEth(e.anvilBidEth)} ETH (${fmtInt(e.anvilBidPrinter)} $PRINTER, net of the sell fee)`
     : "";
@@ -201,6 +207,12 @@ function shelfStrip(anvilEntries) {
         : `≈${fmtEth(Math.min(...eths))}–${fmtEth(Math.max(...eths))} ETH`)
     : "";
 
+  const first = anvilEntries[0];
+  const priceLine =
+    `<span class="shelf-price"><span class="price">${fmtInt(Math.round(first.askPrinter))}</span>` +
+    ` <span class="unit">$PRINTER</span>` +
+    (first.askUsd ? ` <span class="usd-big">${fmtUsdShort(first.askUsd)}</span>` : "") + `</span>`;
+
   const chips = anvilEntries.map((e) => {
     const img = e.machine?.image
       ? `<img src="${esc(e.machine.image)}" alt="Machine #${e.tokenId}" loading="lazy" width="40" height="40">`
@@ -209,7 +221,7 @@ function shelfStrip(anvilEntries) {
       (e.askUsd ? ` · ${fmtUsdShort(e.askUsd)}` : "") +
       (e.askEth ? ` · ≈${fmtEth(e.askEth)} ETH` : "") +
       " — sold by the Anvil, paid in $PRINTER";
-    return `<a class="chip anvil" href="${itemUrl(e.tokenId)}" target="_blank" rel="noopener" title="${esc(tip)}">` +
+    return `<a class="chip anvil" href="${anvilUrl(e.tokenId)}" target="_blank" rel="noopener" title="${esc(tip)}">` +
       img +
       `<span class="price">${fmtInt(Math.round(e.askPrinter))}</span>` +
       (e.askUsd ? `<span class="usd">${fmtUsdShort(e.askUsd)}</span>` : "") +
@@ -218,7 +230,9 @@ function shelfStrip(anvilEntries) {
   }).join("");
 
   return `<span class="shelf">` +
-    `<span class="label">On the Anvil · ${fmtInt(anvilEntries.length)} in $PRINTER${range ? ` · ${range}` : ""}</span>` +
+    `<span class="label">On the Anvil</span>` +
+    priceLine +
+    `<span class="depth">${fmtInt(anvilEntries.length)} on the shelf${range ? ` · ${range}` : ""}</span>` +
     `<span class="strip">${chips}</span>` +
   `</span>`;
 }
@@ -291,6 +305,17 @@ function renderHalf(half, g, { shown: count, step, limit, key, depth, state, eth
         ? `<button class="more" type="button" data-key="${esc(key)}" data-next="${limit}">▴ show fewer</button>`
         : "");
 
+  // « under bid » ne disait rien à personne : la case l'explique une fois, en
+  // toutes lettres et avec le chiffre, plutôt que de compter sur un badge de
+  // deux mots pour porter une idée entière.
+  const underBidEntries = half.entries.filter((e) => e.underBid);
+  const underNote = underBidEntries.length
+    ? `<span class="under-note">${fmtInt(underBidEntries.length)} of these sell below the Anvil's ` +
+      `standing bid of ${fmtEth(underBidEntries[0].anvilBidEth)} ETH` +
+      (ethUsd ? ` (${fmtUsdShort(usdOf(underBidEntries[0].anvilBidEth, ethUsd))})` : "") +
+      ` — the green mark is how much more it would pay.</span>`
+    : "";
+
   // Le floor en tête, en grand et nommé : c'est le chiffre qu'on vient chercher.
   // Sous un filtre ce n'est plus le floor de la classe mais le moins cher de la
   // sélection, et l'étiquette le dit plutôt que de laisser croire au premier.
@@ -304,6 +329,7 @@ function renderHalf(half, g, { shown: count, step, limit, key, depth, state, eth
   return `<td class="${g} edge half" data-state="${state}" title="${esc(tip)}">` +
     head +
     `<span class="depth">${depth}</span>` +
+    underNote +
     `<span class="strip">${shown.map((e, i) => chip(e, i === 0, ethUsd)).join("")}</span>` +
     more +
     shelfStrip(half.anvilEntries) +

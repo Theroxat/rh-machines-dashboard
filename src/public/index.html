@@ -209,6 +209,15 @@
   .chip .usd   { display: block; font-size: 9.5px; color: var(--muted); }
   .chip .tok   { display: block; font-size: 9.5px; color: var(--dim); }
 
+  /* Le badge porte l'écart ; la phrase au-dessus de la bande dit ce qu'il veut
+     dire. Deux mots de jargon ne portaient pas l'idée. */
+  .under-note {
+    display: block;
+    margin-top: 5px;
+    font-size: 10.5px;
+    color: var(--under);
+  }
+
   .under {
     position: absolute;
     left: 0; bottom: 0;
@@ -233,7 +242,15 @@
      son en-tête. Deux marchés dans deux monnaies ne se mélangent pas. */
   .shelf { display: block; margin-top: 12px; padding-top: 9px; border-top: 1px dashed var(--rule-2); }
   .shelf > .label { display: block; color: var(--muted); }
-  .shelf .strip { margin-top: 6px; }
+  /* Le prix du rayon est libellé en $PRINTER : il s'annonce comme un prix, au
+     même rang que le floor, et dans la couleur de l'encre puisque c'est la
+     monnaie du jeton. */
+  .shelf-price { display: block; line-height: 1.15; }
+  .shelf-price .price { font-size: 19px; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); }
+  .shelf-price .unit { font-size: 10px; color: var(--muted); }
+  .shelf-price .usd-big { font-size: 12px; font-weight: 600; color: var(--muted); margin-left: 6px; }
+  .shelf .depth { margin-top: 1px; }
+  .shelf .strip { margin-top: 7px; }
   .chip.anvil .price { font-size: 10px; }
   .chip.anvil img, .chip.anvil .noimg { border-style: dashed; }
 

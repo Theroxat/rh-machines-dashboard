@@ -672,3 +672,54 @@ test("what is still folded away is still counted, re-inked machines included", (
   const html = halfCell(half({ entries: plain, listed: 60 }), "ink", { limit: 8, shown: 8, step: 40, key: "100:ink" });
   assert.match(html, /1 re-inked/);
 });
+
+// ---- les trois corrections ----
+
+// Une machine du rayon s'achète sur l'anvil, pas sur OpenSea : l'y envoyer
+// menait sur une page où elle n'est pas à vendre.
+test("an anvil machine links to the anvil, not to OpenSea", () => {
+  const html = halfCell(half({ anvilEntries: [shelfEntry()] }), "ink", { ethUsd: 1896 });
+  assert.match(html, /href="https:\/\/rh\.btcmachine\.gg\/machines\/9036"/);
+  const shelf = html.slice(html.indexOf('class="shelf"'));
+  assert.doesNotMatch(shelf, /opensea\.io/);
+});
+
+test("an OpenSea listing still links to OpenSea", () => {
+  const html = halfCell(half({ entries: [entry(1234, 0.105)] }), "ink", { ethUsd: 1896 });
+  assert.match(html, /href="https:\/\/opensea\.io\/assets\/robinhood/);
+});
+
+// Le prix du rayon est libellé en $PRINTER : il doit s'annoncer comme un prix,
+// au même rang que le floor juste au-dessus, pas se perdre dans une légende.
+test("the shelf states its price like a price, in the token's own colour", () => {
+  const html = halfCell(half({ anvilEntries: [shelfEntry()] }), "ink", { ethUsd: 1896 });
+  assert.match(html, /class="shelf-price"/);
+  assert.match(html, /23,465/);
+  assert.match(html, /\$PRINTER/);
+  assert.match(html, /\$285/);
+});
+
+// « under bid » ne disait rien à personne : la case explique une fois, et
+// chaque vignette porte l'écart plutôt qu'un mot de jargon.
+test("a cell explains once what the green marks mean", () => {
+  const html = halfCell(half({ entries: [withBid()] }), "ink", { ethUsd: 1896 });
+  assert.match(html, /sell below the Anvil/i);
+  assert.match(html, /0\.1170 ETH/);
+});
+
+test("each marked machine carries the gap rather than a phrase", () => {
+  const html = halfCell(half({ entries: [withBid()] }), "ink", { ethUsd: 1896 });
+  assert.match(html, /class="under">\+11%</);
+  assert.doesNotMatch(html, />under bid</);
+});
+
+test("a cell with nothing under the bid explains nothing", () => {
+  const html = halfCell(half({ entries: [withBid({ underBid: false })] }), "ink", { ethUsd: 1896 });
+  assert.doesNotMatch(html, /sell below the Anvil/i);
+});
+
+test("a gap smaller than a point says so rather than rounding to nothing", () => {
+  const html = halfCell(half({ entries: [withBid({ priceEth: 0.1169, anvilBidEth: 0.1170 })] }), "ink", { ethUsd: 1896 });
+  assert.match(html, /&lt;1%/);
+  assert.doesNotMatch(html, /\+0%/);
+});
