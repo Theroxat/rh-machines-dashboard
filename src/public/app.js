@@ -21,6 +21,12 @@ export const itemUrl = (id) => `https://opensea.io/assets/robinhood/${MACHINES}/
 /** Combien de machines une case montre avant de proposer le reste. */
 export const DEFAULT_LIMIT = 8;
 
+/** Combien un clic en révèle de plus. Un dépliage d'un seul coup mettait 375
+ *  vignettes d'un bloc sur les x1 dormantes : la page devenait impraticable et
+ *  le navigateur chargeait autant d'images. Par tranches, on garde l'accès à
+ *  l'intégralité sans le mur. */
+export const REVEAL_STEP = 40;
+
 export const cellKey = (classValue, side) => `${classValue}:${side}`;
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -223,7 +229,7 @@ function shelfStrip(anvilEntries) {
  * toujours combien elle cache, pour qu'un carnet coupé ne passe jamais pour
  * un carnet complet.
  */
-export function halfCell(half, side, { expanded = false, limit = DEFAULT_LIMIT, key = "", filter = EMPTY_FILTER, ethUsd = null } = {}) {
+export function halfCell(half, side, { shown = null, step = REVEAL_STEP, limit = DEFAULT_LIMIT, key = "", filter = EMPTY_FILTER, ethUsd = null } = {}) {
   const g = `g-${side}`;
   // Sur mobile l'en-tête du tableau disparaît : la case doit alors annoncer
   // elle-même de quel côté elle parle.
@@ -254,16 +260,17 @@ export function halfCell(half, side, { expanded = false, limit = DEFAULT_LIMIT, 
   }
 
   const half_ = { ...half, entries: kept };
-  return renderHalf(half_, g, { expanded, limit, key, depth, state, ethUsd, floorLabel: active ? "cheapest match" : "floor price" });
+  return renderHalf(half_, g, { shown: shown ?? limit, step, limit, key, depth, state, ethUsd, floorLabel: active ? "cheapest match" : "floor price" });
 }
 
-function renderHalf(half, g, { expanded, limit, key, depth, state, ethUsd, floorLabel }) {
+function renderHalf(half, g, { shown: count, step, limit, key, depth, state, ethUsd, floorLabel }) {
 
   const tip = half.pelotonEth === null
     ? `${half.listed} listings — too few for a peloton, so no median is shown`
     : `peloton ${fmtEth(half.pelotonEth)} ETH · ${fmtRatio(half.listedRatio)} of this class is listed`;
 
-  const shown = expanded ? half.entries : half.entries.slice(0, limit);
+  const visible = Math.max(limit, Math.min(count, half.entries.length));
+  const shown = half.entries.slice(0, visible);
   const hidden = half.entries.length - shown.length;
 
   // Une machine re-inkée repliée dans le « + N more » est justement celle qu'on
@@ -271,10 +278,17 @@ function renderHalf(half, g, { expanded, limit, key, depth, state, ethUsd, floor
   const hiddenReinked = half.entries.slice(shown.length).filter((e) => e.inkMult > 1.0001 && e.weight).length;
   const note = hiddenReinked ? `, ${fmtInt(hiddenReinked)} re-inked` : "";
 
-  const more = expanded
-    ? `<button class="more" type="button" data-key="${esc(key)}">▴ show fewer</button>`
-    : (hidden > 0
-        ? `<button class="more" type="button" data-key="${esc(key)}">+ ${fmtInt(hidden)} more${note} ▾</button>`
+  // Le bouton dit exactement ce qu'un clic va faire, et combien restera après :
+  // « show 40 more · 367 left » plutôt qu'un « + 367 more » qui les déverse tous.
+  const next = Math.min(step, hidden);
+  const label = hidden > step
+    ? `show ${fmtInt(next)} more${note} · ${fmtInt(hidden)} left ▾`
+    : `show the last ${fmtInt(hidden)}${note} ▾`;
+
+  const more = hidden > 0
+    ? `<button class="more" type="button" data-key="${esc(key)}" data-next="${visible + next}">${label}</button>`
+    : (visible > limit
+        ? `<button class="more" type="button" data-key="${esc(key)}" data-next="${limit}">▴ show fewer</button>`
         : "");
 
   // Le floor en tête, en grand et nommé : c'est le chiffre qu'on vient chercher.
@@ -308,7 +322,7 @@ function boostTraits(legend, classValue) {
   return `<span class="grants" title="${esc(full)}">${esc(shown)}</span>`;
 }
 
-export function rowsHtml(d, { expanded = new Set(), limit = DEFAULT_LIMIT, filter = EMPTY_FILTER } = {}) {
+export function rowsHtml(d, { expanded = new Map(), limit = DEFAULT_LIMIT, step = REVEAL_STEP, filter = EMPTY_FILTER } = {}) {
   const ethUsd = d.eth?.usd ?? null;
   return d.rows.map((r) => {
     const census = r.chainCount === r.docCount
@@ -320,8 +334,8 @@ export function rowsHtml(d, { expanded = new Set(), limit = DEFAULT_LIMIT, filte
 
     return `<tr>` +
       `<td class="cls-cell"><span class="cls">${r.classLabel}</span>${boostTraits(d.legend, r.classValue)}${census}</td>` +
-      halfCell(r.inked,   "ink",     { expanded: expanded.has(inkKey), limit, key: inkKey, filter, ethUsd }) +
-      halfCell(r.dormant, "dormant", { expanded: expanded.has(dorKey), limit, key: dorKey, filter, ethUsd }) +
+      halfCell(r.inked,   "ink",     { shown: expanded.get(inkKey) ?? limit, step, limit, key: inkKey, filter, ethUsd }) +
+      halfCell(r.dormant, "dormant", { shown: expanded.get(dorKey) ?? limit, step, limit, key: dorKey, filter, ethUsd }) +
     `</tr>`;
   }).join("");
 }
@@ -466,7 +480,7 @@ if (typeof document !== "undefined") {
   // Les cases dépliées et le filtre vivent ici plutôt que dans le DOM : la table
   // est reconstruite toutes les quinze secondes, et ni une case ouverte ni un
   // filtre posé ne doivent survivre à ça par accident.
-  const expanded = new Set();
+  const expanded = new Map();
   const filter = { ...EMPTY_FILTER };
   const filtersEl = $("filters");
   const summaryEl = $("filter-summary");
@@ -523,8 +537,8 @@ if (typeof document !== "undefined") {
   rowsEl.addEventListener("click", (e) => {
     const btn = e.target.closest(".more");
     if (!btn) return;
-    const key = btn.dataset.key;
-    if (expanded.has(key)) expanded.delete(key); else expanded.add(key);
+    const next = Number(btn.dataset.next);
+    if (Number.isFinite(next)) expanded.set(btn.dataset.key, next);
     paint();
   });
 

@@ -47,15 +47,16 @@ test("the machine setting the floor is marked as such", () => {
 test("a long book is cut to the limit and offers the rest", () => {
   const html = halfCell(half({ entries: manyEntries(191), supply: 4388 }), "ink", { limit: 8, key: "100:ink" });
   assert.equal(countChips(html), 8);
-  assert.match(html, /\+ 183 more/);
+  assert.match(html, /show 40 more/);
+  assert.match(html, /183 left/);
   assert.match(html, /data-key="100:ink"/);
 });
 
 test("an expanded cell shows every machine and offers the way back", () => {
-  const html = halfCell(half({ entries: manyEntries(191), supply: 4388 }), "ink", { limit: 8, expanded: true, key: "100:ink" });
+  const html = halfCell(half({ entries: manyEntries(191), supply: 4388 }), "ink", { limit: 8, shown: 191, key: "100:ink" });
   assert.equal(countChips(html), 191);
   assert.match(html, /show fewer/);
-  assert.doesNotMatch(html, /more<\/button>/);
+  assert.doesNotMatch(html, /show \d+ more/);
 });
 
 test("a book that fits under the limit offers nothing to expand", () => {
@@ -144,11 +145,11 @@ test("only the cells asked to expand do so", () => {
     dormant: half({ entries: manyEntries(20) }),
   });
   const html = rowsHtml({ rows: [row(100, "x1"), row(1000, "x10")] },
-    { expanded: new Set(["100:ink"]), limit: 8 });
+    { expanded: new Map([["100:ink", 20]]), limit: 8 });
 
   assert.equal(html.match(/<tr>/g).length, 2);
   assert.equal(countChips(html), 20 + 8 + 8 + 8);   // one cell expanded, three cut
-  assert.match(html, /\+ 12 more/);                 // the cut cells still offer the rest
+  assert.match(html, /show the last 12/);           // the cut cells still offer the rest
 });
 
 test("a census that disagrees with the documentation is shown, not hidden", () => {
@@ -508,19 +509,19 @@ test("the expander says when it is hiding a re-inked machine", () => {
   plain[15] = { ...plain[15], weight: 200, inkMult: 2 };
   plain[18] = { ...plain[18], weight: 200, inkMult: 2 };
   const html = halfCell(half({ entries: plain, listed: 20 }), "ink", { limit: 8, key: "100:ink" });
-  assert.match(html, /\+ 12 more, 2 re-inked/);
+  assert.match(html, /show the last 12, 2 re-inked/);
 });
 
 test("an expander hiding nothing special stays plain", () => {
   const plain = manyEntries(20).map((e) => ({ ...e, weight: 100, inkMult: 1 }));
   const html = halfCell(half({ entries: plain, listed: 20 }), "ink", { limit: 8, key: "100:ink" });
-  assert.match(html, /\+ 12 more/);
+  assert.match(html, /show the last 12/);
   assert.doesNotMatch(html, /re-inked/);
 });
 
 test("once expanded there is nothing left hidden to announce", () => {
   const plain = manyEntries(20).map((e) => ({ ...e, weight: 200, inkMult: 2 }));
-  const html = halfCell(half({ entries: plain, listed: 20 }), "ink", { limit: 8, expanded: true, key: "100:ink" });
+  const html = halfCell(half({ entries: plain, listed: 20 }), "ink", { limit: 8, shown: 20, key: "100:ink" });
   assert.match(html, /show fewer/);
   assert.doesNotMatch(html, /re-inked</);
 });
@@ -621,4 +622,53 @@ test("an empty OpenSea cell still shows what the anvil holds there", () => {
   assert.match(html, /no listing/);
   assert.match(html, /class="shelf"/);
   assert.match(html, /23,465/);
+});
+
+// ---- dépliage par paliers ----
+
+// Un clic dépliait tout : sur les 375 x1 dormantes, c'était 375 images d'un
+// bloc. On garde l'accès à l'intégralité, par tranches.
+test("the first click reveals a slice, not the whole book", () => {
+  const html = halfCell(half({ entries: manyEntries(375), listed: 375 }), "ink",
+    { limit: 8, shown: 8, step: 40, key: "100:ink" });
+  assert.equal(countChips(html), 8);
+  assert.match(html, /show 40 more/);
+  assert.match(html, /367 left/);
+});
+
+test("each further click adds another slice", () => {
+  const html = halfCell(half({ entries: manyEntries(375), listed: 375 }), "ink",
+    { limit: 8, shown: 48, step: 40, key: "100:ink" });
+  assert.equal(countChips(html), 48);
+  assert.match(html, /show 40 more/);
+  assert.match(html, /327 left/);
+});
+
+test("the last slice says it is the last, rather than promising forty", () => {
+  const html = halfCell(half({ entries: manyEntries(20), listed: 20 }), "ink",
+    { limit: 8, shown: 8, step: 40, key: "100:ink" });
+  assert.match(html, /show the last 12/);
+  assert.doesNotMatch(html, /left/);
+});
+
+test("once everything is out, only the way back remains", () => {
+  const html = halfCell(half({ entries: manyEntries(20), listed: 20 }), "ink",
+    { limit: 8, shown: 20, step: 40, key: "100:ink" });
+  assert.equal(countChips(html), 20);
+  assert.match(html, /show fewer/);
+  assert.doesNotMatch(html, /show 40 more/);
+});
+
+test("a book that fits under the limit offers nothing at all", () => {
+  const html = halfCell(half({ entries: manyEntries(5), listed: 5 }), "ink", { limit: 8, shown: 8, step: 40 });
+  assert.equal(countChips(html), 5);
+  assert.doesNotMatch(html, /more/);
+  assert.doesNotMatch(html, /show fewer/);
+});
+
+test("what is still folded away is still counted, re-inked machines included", () => {
+  const plain = manyEntries(60).map((e) => ({ ...e, weight: 100, inkMult: 1 }));
+  plain[50] = { ...plain[50], weight: 200, inkMult: 2 };
+  const html = halfCell(half({ entries: plain, listed: 60 }), "ink", { limit: 8, shown: 8, step: 40, key: "100:ink" });
+  assert.match(html, /1 re-inked/);
 });
