@@ -137,15 +137,14 @@
   .crate-note { color: var(--muted); font-size: 11px; white-space: nowrap; }
 
   /* Un lien, pas un bouton : souligné à l'approche, rien d'autre. */
-  .q-link, .buy {
+  .buy {
     display: inline-block;
     color: var(--ink);
     text-decoration: none;
     border-bottom: 1px solid transparent;
+    font-size: 10.5px;
   }
-  .q-link { margin-top: 8px; font-size: 11px; }
-  .buy { font-size: 10.5px; }
-  .q-link:hover, .buy:hover, .q-link:focus-visible, .buy:focus-visible { border-bottom-color: var(--ink); }
+  .buy:hover, .buy:focus-visible { border-bottom-color: var(--ink); }
   #filters { display: flex; flex-wrap: wrap; gap: 18px; }
 
   .fl { display: inline-flex; flex-direction: column; gap: 3px; }
