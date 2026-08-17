@@ -213,10 +213,13 @@ function gapLabel(e) {
   return gap < 1 ? "&lt;1%" : `+${gap}%`;
 }
 
-export const TRAIT_TYPES = Object.freeze(["Headwear", "Body", "Eyes"]);
-const FIELD = Object.freeze({ Headwear: "headwear", Body: "body", Eyes: "eyes" });
+/** « Farms » d'abord : le desk vient du Body, il est scellé au mint, et la
+ *  machine touche le double sur la part achetée pour ce desk. C'est la seule
+ *  des quatre dimensions qui change ce que la machine rapporte. */
+export const TRAIT_TYPES = Object.freeze(["Farms", "Headwear", "Body", "Eyes"]);
+const FIELD = Object.freeze({ Farms: "ticker", Headwear: "headwear", Body: "body", Eyes: "eyes" });
 
-export const EMPTY_FILTER = Object.freeze({ Headwear: null, Body: null, Eyes: null });
+export const EMPTY_FILTER = Object.freeze({ Farms: null, Headwear: null, Body: null, Eyes: null });
 
 export const filterIsActive = (filter) => TRAIT_TYPES.some((t) => filter?.[t]);
 
@@ -286,6 +289,10 @@ export function halfCell(half, side, { shown = null, step = REVEAL_STEP, limit =
   const active = filterIsActive(filter);
   const all = half.entries ?? [];
   const kept = active ? all.filter((e) => matchesFilter(e.machine, filter)) : all;
+  // Le rayon subit le même filtre : sans ça une case pouvait annoncer aucune
+  // correspondance tout en affichant les machines de l'anvil sous la ligne.
+  const allShelf = half.anvilEntries ?? [];
+  const keptShelf = active ? allShelf.filter((e) => matchesFilter(e.machine, filter)) : allShelf;
 
   // Deux faits distincts, énoncés séparément. « 5 of 249 listed » se lisait
   // « 5 affichées sur 249 disponibles » et faisait chercher un bouton de
@@ -306,10 +313,10 @@ export function halfCell(half, side, { shown = null, step = REVEAL_STEP, limit =
       : "Nothing is on sale in this class in this state.";
     return `<td class="${g} edge half" data-state="${state}" title="${esc(tip)}">` +
       `<span class="market">On OpenSea</span>` +
-      `<span class="depth">${why}</span>` + shelfStrip(half.anvilEntries, half.floorEth) + `</td>`;
+      `<span class="depth">${why}</span>` + shelfStrip(keptShelf, half.floorEth) + `</td>`;
   }
 
-  const half_ = { ...half, entries: kept };
+  const half_ = { ...half, entries: kept, anvilEntries: keptShelf };
   return renderHalf(half_, g, { shown: shown ?? limit, step, limit, key, depth, state, ethUsd, floorLabel: active ? "cheapest match" : "floor price" });
 }
 
