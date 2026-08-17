@@ -154,3 +154,53 @@ test("every one of the seven classes is present even with no data at all", () =>
   assert.equal(grid.rows[0].inked.floorEth, null);
   assert.equal(grid.rows[0].inked.listedRatio, null); // pas de supply : un ratio serait une division par zéro
 });
+
+// ---- le rayon de l'anvil ----
+
+// Un second marché, dans une autre monnaie : il se range dans les mêmes cases
+// mais il ne se mélange pas au carnet OpenSea. Une machine que l'anvil détient
+// n'est pas « en vente sur OpenSea », et les comptages ne doivent pas bouger.
+test("shelf machines land in the cell their rarity and ink put them in", () => {
+  const grid = buildGrid({
+    traits: traitsOf([[1, 100], [2, 100], [3, 200]]),
+    ink: inkOf([[1, 4250], [2, 0], [3, 4250]]),
+    listings: listingsOf([]),
+    shelf: new Map([[1, 23465], [2, 23465], [3, 27733]]),
+    pelotonSize: 5,
+  });
+  assert.deepEqual(rowOf(grid, "x1").inked.anvilEntries.map((e) => e.tokenId), [1]);
+  assert.deepEqual(rowOf(grid, "x1").dormant.anvilEntries.map((e) => e.tokenId), [2]);
+  assert.deepEqual(rowOf(grid, "x2").inked.anvilEntries.map((e) => e.tokenId), [3]);
+  assert.equal(rowOf(grid, "x1").inked.anvilEntries[0].askPrinter, 23465);
+});
+
+test("the shelf never inflates what the OpenSea book says is on sale", () => {
+  const grid = buildGrid({
+    traits: traitsOf([[1, 100], [2, 100]]),
+    ink: inkOf([[1, 4250], [2, 4250]]),
+    listings: listingsOf([[1, 0.105]]),
+    shelf: new Map([[2, 23465]]),
+    pelotonSize: 5,
+  });
+  const cell = rowOf(grid, "x1").inked;
+  assert.equal(cell.listed, 1);            // seule #1 est sur OpenSea
+  assert.equal(cell.entries.length, 1);
+  assert.equal(cell.anvilEntries.length, 1);
+  assert.equal(cell.floorEth, 0.105);      // le floor reste celui du carnet ETH
+});
+
+test("shelf machines come cheapest first, like everything else", () => {
+  const grid = buildGrid({
+    traits: traitsOf([[1, 100], [2, 100], [3, 100]]),
+    ink: inkOf([[1, 4250], [2, 4250], [3, 4250]]),
+    listings: listingsOf([]),
+    shelf: new Map([[1, 30000], [2, 20000], [3, 25000]]),
+    pelotonSize: 5,
+  });
+  assert.deepEqual(rowOf(grid, "x1").inked.anvilEntries.map((e) => e.askPrinter), [20000, 25000, 30000]);
+});
+
+test("with no shelf at all every cell simply holds none", () => {
+  const grid = buildGrid({ traits: new Map(), ink: new Map(), listings: new Map(), pelotonSize: 5 });
+  assert.deepEqual(grid.rows[0].inked.anvilEntries, []);
+});

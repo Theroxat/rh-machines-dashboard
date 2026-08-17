@@ -9,7 +9,7 @@ export function median(values) {
 
 const EMPTY = () => ({
   floorEth: null, floorTokenId: null, pelotonEth: null,
-  listed: 0, supply: 0, listedRatio: null, entries: [],
+  listed: 0, supply: 0, listedRatio: null, entries: [], anvilEntries: [],
 });
 
 function buildCell(entries, supply, pelotonSize) {
@@ -33,7 +33,7 @@ function buildCell(entries, supply, pelotonSize) {
   return cell;
 }
 
-export function buildGrid({ listings, traits, ink, pelotonSize }) {
+export function buildGrid({ listings, traits, ink, pelotonSize, shelf }) {
   const excluded = { unknownRarity: 0, unknownInk: 0, listingsOffGrid: 0 };
   const stateOf = new Map();   // tokenId -> "inked" | "dormant"
   const classOf = new Map();   // tokenId -> weightClass
@@ -63,9 +63,27 @@ export function buildGrid({ listings, traits, ink, pelotonSize }) {
     byCell.get(k).push(entry);
   }
 
+  // Le rayon de l'anvil est un second marché, libellé en $PRINTER. Il se range
+  // dans les mêmes cases mais reste à part : une machine que l'anvil détient
+  // n'est pas en vente sur OpenSea, et les comptages du carnet ne doivent pas
+  // l'inclure.
+  const shelfByCell = new Map();
+  for (const [tokenId, askPrinter] of shelf ?? []) {
+    const state = stateOf.get(tokenId);
+    const wc = classOf.get(tokenId);
+    if (state === undefined || wc === undefined) continue;
+    const k = `${wc}:${state}`;
+    if (!shelfByCell.has(k)) shelfByCell.set(k, []);
+    shelfByCell.get(k).push({ tokenId, askPrinter });
+  }
+  const shelfFor = (key) =>
+    (shelfByCell.get(key) ?? []).sort((a, b) => a.askPrinter - b.askPrinter || a.tokenId - b.tokenId);
+
   const rows = CLASSES.map((c) => {
     const inked = buildCell(byCell.get(`${c.value}:inked`) ?? [], supply.get(`${c.value}:inked`) ?? 0, pelotonSize);
     const dormant = buildCell(byCell.get(`${c.value}:dormant`) ?? [], supply.get(`${c.value}:dormant`) ?? 0, pelotonSize);
+    inked.anvilEntries = shelfFor(`${c.value}:inked`);
+    dormant.anvilEntries = shelfFor(`${c.value}:dormant`);
     return {
       classValue: c.value,
       classLabel: c.label,

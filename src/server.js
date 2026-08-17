@@ -83,16 +83,20 @@ async function sweepBook() {
     fetchCollectionStats({ apiKey: cfg.openseaApiKey }),
   ]);
 
-  const grid = buildGrid({ listings: book.listings, traits, ink, pelotonSize: cfg.pelotonSize });
-
   // L'anvil est lu après le carnet parce qu'il faut savoir quelles machines sont
-  // en vente pour lui demander ce qu'il en donnerait.
+  // en vente pour lui demander ce qu'il en donnerait — et avant la grille, parce
+  // que son rayon se range dans les mêmes cases.
   const anvil = await readAnvil({
     provider,
     aggregate3: multicallOf(provider, ADDRESSES.MULTICALL3),
     tokenIds: [...book.listings.keys()],
     batchSize: cfg.multicallBatchSize,
   }).catch((e) => { console.error(`anvil: ${e.message}`); return null; });
+
+  const grid = buildGrid({
+    listings: book.listings, traits, ink, pelotonSize: cfg.pelotonSize,
+    shelf: anvil?.shelfListings,
+  });
 
   const composed = composeSnapshot({
     grid, printer, eth, protocol, stats,

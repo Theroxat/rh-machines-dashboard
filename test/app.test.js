@@ -581,3 +581,44 @@ test("an unreadable anvil says so instead of vanishing from the bar", () => {
   assert.match(html, /Anvil/i);
   assert.match(html, /unreadable/i);
 });
+
+// ---- le rayon de l'anvil dans la case ----
+
+const shelfEntry = (over = {}) => ({
+  tokenId: 9036, askPrinter: 23464.734, askUsd: 285, askEth: 0.1502,
+  machine: machineOf(), ...over,
+});
+
+test("a cell shows what the anvil holds, as its own strip", () => {
+  const html = halfCell(half({ anvilEntries: [shelfEntry()] }), "ink", { ethUsd: 1896 });
+  assert.match(html, /class="shelf"/);
+  assert.match(html, /On the Anvil/i);
+  assert.match(html, /23,465/);        // le montant en $PRINTER
+  assert.match(html, /\$285/);
+});
+
+// Deux marchés, deux monnaies : les fondre laisserait croire qu'une machine de
+// l'anvil s'achète comme un listing OpenSea, ce qui est faux.
+test("the anvil's machines never join the OpenSea strip", () => {
+  const html = halfCell(half({ entries: [entry(1, 0.105)], anvilEntries: [shelfEntry()] }), "ink", { ethUsd: 1896 });
+  const openSeaStrip = html.slice(html.indexOf('class="strip"'), html.indexOf('class="shelf"'));
+  assert.match(openSeaStrip, /#1</);
+  assert.doesNotMatch(openSeaStrip, /#9036</);
+});
+
+test("the strip states the ETH each would cost, so the two markets compare", () => {
+  const html = halfCell(half({ anvilEntries: [shelfEntry()] }), "ink", { ethUsd: 1896 });
+  assert.match(html, /0\.1502 ETH/);
+});
+
+test("a cell the anvil holds nothing in shows no strip at all", () => {
+  const html = halfCell(half({ anvilEntries: [] }), "ink", { ethUsd: 1896 });
+  assert.doesNotMatch(html, /class="shelf"/);
+});
+
+test("an empty OpenSea cell still shows what the anvil holds there", () => {
+  const html = halfCell(half({ entries: [], listed: 0, anvilEntries: [shelfEntry()] }), "ink", { ethUsd: 1896 });
+  assert.match(html, /no listing/);
+  assert.match(html, /class="shelf"/);
+  assert.match(html, /23,465/);
+});

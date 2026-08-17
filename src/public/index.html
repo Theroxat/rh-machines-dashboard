@@ -229,6 +229,14 @@
   td.g-ink     .chip .price, td.g-ink     .chip.floor { color: var(--ink); }
   td.g-dormant .chip .price, td.g-dormant .chip.floor { color: var(--dormant); }
 
+  /* Le rayon de l'anvil : sa propre bande, séparée par un filet et annoncée par
+     son en-tête. Deux marchés dans deux monnaies ne se mélangent pas. */
+  .shelf { display: block; margin-top: 12px; padding-top: 9px; border-top: 1px dashed var(--rule-2); }
+  .shelf > .label { display: block; color: var(--muted); }
+  .shelf .strip { margin-top: 6px; }
+  .chip.anvil .price { font-size: 10px; }
+  .chip.anvil img, .chip.anvil .noimg { border-style: dashed; }
+
   .more {
     display: inline-block;
     margin-top: 9px;

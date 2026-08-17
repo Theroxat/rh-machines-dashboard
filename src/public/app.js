@@ -180,6 +180,44 @@ export function matchesFilter(machine, filter) {
 }
 
 /**
+ * Le rayon de l'anvil dans cette case : un second marché, libellé en $PRINTER.
+ * Il a sa propre bande et son propre en-tête plutôt que d'être fondu dans le
+ * carnet OpenSea — les fondre laisserait croire qu'une machine de l'anvil
+ * s'achète comme un listing, avec la même monnaie et la même transaction.
+ */
+function shelfStrip(anvilEntries) {
+  if (!anvilEntries?.length) return "";
+
+  const eths = anvilEntries.map((e) => e.askEth).filter((v) => v !== null && v !== undefined);
+  const range = eths.length
+    ? (Math.min(...eths).toFixed(4) === Math.max(...eths).toFixed(4)
+        ? `≈${fmtEth(eths[0])} ETH each`
+        : `≈${fmtEth(Math.min(...eths))}–${fmtEth(Math.max(...eths))} ETH`)
+    : "";
+
+  const chips = anvilEntries.map((e) => {
+    const img = e.machine?.image
+      ? `<img src="${esc(e.machine.image)}" alt="Machine #${e.tokenId}" loading="lazy" width="40" height="40">`
+      : `<span class="noimg" aria-hidden="true"></span>`;
+    const tip = `#${e.tokenId} · ${fmtInt(Math.round(e.askPrinter))} $PRINTER` +
+      (e.askUsd ? ` · ${fmtUsdShort(e.askUsd)}` : "") +
+      (e.askEth ? ` · ≈${fmtEth(e.askEth)} ETH` : "") +
+      " — sold by the Anvil, paid in $PRINTER";
+    return `<a class="chip anvil" href="${itemUrl(e.tokenId)}" target="_blank" rel="noopener" title="${esc(tip)}">` +
+      img +
+      `<span class="price">${fmtInt(Math.round(e.askPrinter))}</span>` +
+      (e.askUsd ? `<span class="usd">${fmtUsdShort(e.askUsd)}</span>` : "") +
+      `<span class="tok">#${e.tokenId}</span>` +
+    `</a>`;
+  }).join("");
+
+  return `<span class="shelf">` +
+    `<span class="label">On the Anvil · ${fmtInt(anvilEntries.length)} in $PRINTER${range ? ` · ${range}` : ""}</span>` +
+    `<span class="strip">${chips}</span>` +
+  `</span>`;
+}
+
+/**
  * Une moitié de ligne : tout le carnet de cette case, du moins cher au plus
  * cher. Huit machines par défaut, le reste derrière un bouton — la case dit
  * toujours combien elle cache, pour qu'un carnet coupé ne passe jamais pour
@@ -211,7 +249,8 @@ export function halfCell(half, side, { expanded = false, limit = DEFAULT_LIMIT, 
     const tip = active
       ? "Nothing on sale in this class and state carries the traits you picked."
       : "Nothing is on sale in this class in this state.";
-    return `<td class="${g} edge half" data-state="${state}" title="${esc(tip)}"><span class="depth">${why}</span></td>`;
+    return `<td class="${g} edge half" data-state="${state}" title="${esc(tip)}">` +
+      `<span class="depth">${why}</span>` + shelfStrip(half.anvilEntries) + `</td>`;
   }
 
   const half_ = { ...half, entries: kept };
@@ -253,6 +292,7 @@ function renderHalf(half, g, { expanded, limit, key, depth, state, ethUsd, floor
     `<span class="depth">${depth}</span>` +
     `<span class="strip">${shown.map((e, i) => chip(e, i === 0, ethUsd)).join("")}</span>` +
     more +
+    shelfStrip(half.anvilEntries) +
   `</td>`;
 }
 

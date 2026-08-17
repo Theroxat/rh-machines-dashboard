@@ -233,3 +233,39 @@ test("the anvil's own numbers ride along in both currencies", () => {
   assert.ok(Math.abs(s.anvil.spotUsd - 16082 * 0.0126) < 0.01);
   assert.equal(s.anvil.shelf, 30);
 });
+
+test("shelf machines carry their price in all three currencies and their picture", () => {
+  const withShelf = {
+    ...withAnvil,
+    grid: {
+      ...withAnvil.grid,
+      rows: withAnvil.grid.rows.map((r, i) => i === 0
+        ? { ...r, inked: { ...r.inked, anvilEntries: [{ tokenId: 1253, askPrinter: 23465 }] } }
+        : r),
+    },
+  };
+  const s = composeSnapshot(withShelf);
+  const a = s.rows[0].inked.anvilEntries[0];
+  assert.equal(a.askPrinter, 23465);
+  assert.ok(Math.abs(a.askUsd - 23465 * 0.0126) < 0.01);
+  assert.ok(Math.abs(a.askEth - (23465 * 0.0126) / 1883.24) < 0.0001);
+  assert.equal(a.machine.headwear, "Blueberries");
+});
+
+test("with no token price read, a shelf price stays in $PRINTER alone", () => {
+  const withShelf = {
+    ...withAnvil,
+    printer: { usd: null },
+    grid: {
+      ...withAnvil.grid,
+      rows: withAnvil.grid.rows.map((r, i) => i === 0
+        ? { ...r, inked: { ...r.inked, anvilEntries: [{ tokenId: 1253, askPrinter: 23465 }] } }
+        : r),
+    },
+  };
+  const s = composeSnapshot(withShelf);
+  const a = s.rows[0].inked.anvilEntries[0];
+  assert.equal(a.askPrinter, 23465);
+  assert.equal(a.askUsd, null);
+  assert.equal(a.askEth, null);
+});

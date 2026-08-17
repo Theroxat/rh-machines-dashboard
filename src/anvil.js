@@ -26,6 +26,7 @@ export const ANVIL_ABI = new ethers.Interface([
   "function bidPaused() view returns (bool)",
   "function sellPrice(uint256) view returns (uint256)",
   "function buyPrice(uint256) view returns (uint256)",
+  "function listing(uint256,uint256) view returns (uint256[],uint256[])",
 ]);
 
 const PRINTER = 10n ** 18n;
@@ -43,6 +44,26 @@ async function readView(provider, fn) {
   }
 }
 
+/** Le rayon : les machines que l'anvil détient et propose, avec leur prix
+ *  demandé. C'est un second marché, libellé en $PRINTER — pas un carnet
+ *  OpenSea de plus. */
+async function readShelf(provider, count) {
+  if (!count) return new Map();
+  try {
+    const raw = await provider.call({
+      to: ADDRESSES.VAULT,
+      data: ANVIL_ABI.encodeFunctionData("listing", [0, count]),
+    });
+    if (raw === "0x") return new Map();
+    const [ids, prices] = ANVIL_ABI.decodeFunctionResult("listing", raw);
+    const shelf = new Map();
+    ids.forEach((id, i) => shelf.set(Number(id), toPrinter(prices[i])));
+    return shelf;
+  } catch {
+    return new Map();
+  }
+}
+
 export async function readAnvil({ provider, aggregate3, tokenIds, batchSize = 400 }) {
   const [spot, spreadBps, stepBps, snipeBps, inventoryLength, cratePrice, shelfAverage, paused, bidPaused] =
     await Promise.all(["spot", "spreadBps", "stepBps", "snipeBps", "inventoryLength", "cratePrice", "shelfAverage", "paused", "bidPaused"]
@@ -57,6 +78,8 @@ export async function readAnvil({ provider, aggregate3, tokenIds, batchSize = 40
   const bids = new Map();
   for (const [id, v] of values) bids.set(id, toPrinter(v));
 
+  const shelfListings = await readShelf(provider, inventoryLength === null ? 0 : Number(inventoryLength));
+
   return {
     spotPrinter: toPrinter(spot),
     spreadBps: spreadBps === null ? null : Number(spreadBps),
@@ -68,5 +91,6 @@ export async function readAnvil({ provider, aggregate3, tokenIds, batchSize = 40
     paused: paused === null ? null : Boolean(paused),
     bidPaused: bidPaused === null ? null : Boolean(bidPaused),
     bids,
+    shelfListings,
   };
 }
