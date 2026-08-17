@@ -464,50 +464,6 @@ export function legendHtml(legend) {
   return `<div class="lg">${rows}</div>${warn}`;
 }
 
-/** Ce que l'anvil est et pourquoi son prix compte, dit une fois en bas plutôt
- *  qu'en abrégé sur chaque vignette. */
-export function anvilLine(d) {
-  const a = d.anvil;
-  if (!a) return `<b>The Anvil</b> — the protocol's own market maker — could not be read on this sweep.`;
-  const fee = a.sellFeeBps === null || a.sellFeeBps === undefined ? null : (a.sellFeeBps / 100).toFixed(1);
-  return `<b>The Anvil</b> is the protocol's own market maker: it publishes a standing offer to buy any Machine, ` +
-    `paid in $PRINTER, and it is the real floor under this market. ` +
-    (a.bidPaused
-      ? `Its bid is <b>paused</b> right now, so nothing below is compared against it.`
-      : `A Machine marked <b>under bid</b> is listed for less than the Anvil itself would pay for it` +
-        (fee ? `, after the ${fee}% fee charged on selling $PRINTER back` : "") +
-        `. Both numbers are public; the comparison is not advice, and $PRINTER moves fast enough to close or open the gap within minutes.`);
-}
-
-export function bookLine(d) {
-  const sk = d.book?.skipped ?? {};
-  return `Book read to exhaustion: <b>${fmtInt(d.book?.listed)}</b> distinct Machines listed across <b>${fmtInt(d.book?.pages)}</b> pages` +
-    (sk.foreignCurrency || sk.unreadable
-      ? `, ${fmtInt(sk.foreignCurrency)} priced in another currency and ${fmtInt(sk.unreadable)} unreadable.`
-      : `, none skipped.`);
-}
-
-export function excludedLine(d) {
-  const ex = d.excluded ?? {};
-  const stale = ex.heldByAnvil
-    ? ` <b>${fmtInt(ex.heldByAnvil)}</b> OpenSea listing${ex.heldByAnvil > 1 ? "s were" : " was"} dropped for ` +
-      `Machines the Anvil now holds: it owns them, so nobody else can sell them and the listing cannot be filled.`
-    : "";
-
-  if (ex.unknownRarity || ex.unknownInk || ex.listingsOffGrid) {
-    return `Excluded from every count: <b>${fmtInt(ex.unknownRarity)}</b> with an unreadable rarity, ` +
-      `<b>${fmtInt(ex.unknownInk)}</b> whose ink was never read, ` +
-      `<b>${fmtInt(ex.listingsOffGrid)}</b> listings that could not be placed. An unread value is never guessed.` + stale;
-  }
-  return `Every one of the 10,000 Machines was read: no rarity or ink value had to be excluded.` + stale;
-}
-
-export function publishedLine(d) {
-  const c = d.collection ?? {};
-  return `OpenSea publishes a collection floor of <b>${c.publishedFloor === null || c.publishedFloor === undefined ? "—" : c.publishedFloor.toFixed(4)} ${c.publishedFloorSymbol ?? ""}</b>. ` +
-    `It is shown for comparison and <b>enters no computation on this page</b> — on this chain it has been measured at ten times the real book.`;
-}
-
 /**
  * L'âge du snapshot, mesuré entre deux horloges du serveur : `at`, posé au
  * moment du calcul, et l'heure de la réponse. L'horloge du visiteur n'entre pas
@@ -637,10 +593,6 @@ if (typeof document !== "undefined") {
     $("queue").innerHTML = crateLine(v.data.anvil);
     paint();
     $("legend").innerHTML = legendHtml(v.data.legend);
-    $("anvil-line").innerHTML = anvilLine(v.data);
-    $("book-line").innerHTML = bookLine(v.data);
-    $("excluded-line").innerHTML = excludedLine(v.data);
-    $("published-line").innerHTML = publishedLine(v.data);
   };
 
   refresh();
