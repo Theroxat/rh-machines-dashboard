@@ -154,7 +154,8 @@ export function contextHtml(d) {
     statBlock("Volume traded", `${c.volumeEth === null || c.volumeEth === undefined ? "—" : c.volumeEth.toFixed(1)} ETH`,
       `${fmtBig(c.volumeUsd)} · ${fmtInt(c.sales)} sales · ` +
       `${c.volume24hEth === null || c.volume24hEth === undefined ? "—" : c.volume24hEth.toFixed(1)} ETH 24h`, true),
-    statBlock("Machines", `${fmtInt(d.totals?.inked)} inked`, `${fmtInt(d.totals?.dormant)} dormant · ${fmtInt(d.totals?.listed)} listed`),
+    statBlock("Inked machines", fmtInt(d.totals?.inked),
+      `${fmtInt(d.totals?.dormant)} dormant · ${fmtInt(d.totals?.listed)} listed`),
     anvilBlock(d.anvil),
     statBlock("Epoch", pr.epoch ?? "—", ceilingLine(pr)),
   ].join("");

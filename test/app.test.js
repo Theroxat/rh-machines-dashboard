@@ -862,5 +862,16 @@ test("every price in the bar is amber, and only the prices", () => {
   const plain = blocks.filter((b) => !b.startsWith(" is-price")).map((b) => b.match(/class="label">([^<]*)/)[1]);
 
   assert.deepEqual(amber.sort(), ["$PRINTER", "Collection floor", "Cost of ink", "ETH", "The Anvil", "Volume traded"]);
-  assert.deepEqual(plain.sort(), ["Epoch", "Machines"]);
+  assert.deepEqual(plain.sort(), ["Epoch", "Inked machines"]);
+});
+
+// Le seul bloc dont la valeur mêlait un chiffre et un mot : « Machines /
+// 6,632 inked ». Partout ailleurs l'intitulé nomme et la valeur est un nombre.
+test("every block in the bar states a bare figure, named by its label", () => {
+  const html = contextHtml({ ...CTX, anvil: { spotPrinter: 14100, spotUsd: 168, shelf: 18, bidPaused: false } });
+  const machines = html.split('<div class="stat').find((b) => b.includes("Inked machines"));
+  assert.ok(machines, "the block should be named for what it counts");
+  assert.match(machines, /class="v">6,216<\/span>/);
+  assert.match(machines, /3,784 dormant/);
+  assert.doesNotMatch(html, />[\d,]+ inked</);
 });
