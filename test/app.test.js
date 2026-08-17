@@ -1080,3 +1080,51 @@ test("the view is a choice the reader makes, and the current one is marked", () 
   assert.match(html, /value"\s+selected|selected[^>]*>[^<]*weight point/);
   assert.match(html, /floor price/i);
 });
+
+// Deux marchés indépendants dans une même ligne : aucun tri ne peut rendre les
+// deux colonnes croissantes. Le rang se lit donc sur le chiffre qui l'a décidé,
+// affiché à gauche — sans lui l'ordre paraît arbitraire, parce que le nombre
+// qui range la ligne peut se trouver dans la colonne qu'on ne regarde pas.
+test("the value view shows the number that ranks each class, and which side it came from", () => {
+  const html = rowsHtml(valueRows, { view: "value" });
+  const x3 = html.slice(html.indexOf(">x3<"), html.indexOf(">x1<"));
+  assert.match(x3, /\$100/);
+  assert.match(x3, /inked/i);
+});
+
+test("a class ranked by its dormant side says so, not the other", () => {
+  const rows = {
+    eth: { usd: 2000 }, printer: { usd: 0.01 },
+    rows: [{
+      classValue: 200, classLabel: "x2", docCount: 1, chainCount: 1,
+      inked: half({ entries: [wEntry(1, 0.20, 200)] }),        // $400 / 2 pts = $200
+      dormant: half({ entries: [wEntry(2, 0.10, 0)] }),        // ($200+$50) / 2 = $125
+    }],
+  };
+  const cell = rowsHtml(rows, { view: "value" });
+  const left = cell.slice(cell.indexOf("cls-cell"), cell.indexOf("g-ink"));
+  assert.match(left, /\$125/);
+  assert.match(left, /dormant/i);
+  assert.doesNotMatch(left, /\$200/);
+});
+
+test("the floor view leaves the rarity column alone", () => {
+  const html = rowsHtml(valueRows, { view: "floor" });
+  assert.doesNotMatch(html, /cls-point/);
+});
+
+test("a class with nothing on sale is ranked nowhere and claims no price", () => {
+  const rows = {
+    eth: { usd: 2000 }, printer: { usd: 0.01 },
+    rows: [
+      { classValue: 100, classLabel: "x1", docCount: 1, chainCount: 1,
+        inked: half({ entries: [] }), dormant: half({ entries: [] }) },
+      { classValue: 300, classLabel: "x3", docCount: 1, chainCount: 1,
+        inked: half({ entries: [wEntry(33, 0.15, 300)] }), dormant: half({ entries: [] }) },
+    ],
+  };
+  const html = rowsHtml(rows, { view: "value" });
+  assert.ok(html.indexOf(">x3<") < html.indexOf(">x1<"), "une classe sans rien en vente tombe en bas");
+  const x1 = html.slice(html.indexOf(">x1<"));
+  assert.doesNotMatch(x1.slice(0, x1.indexOf("g-ink")), /cls-point/);
+});

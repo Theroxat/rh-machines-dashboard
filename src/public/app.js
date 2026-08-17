@@ -479,6 +479,19 @@ function boostTraits(legend, classValue) {
   return `<span class="grants" title="${esc(full)}">${esc(shown)}</span>`;
 }
 
+/**
+ * Le chiffre qui range la ligne, écrit à côté de la classe. Sans lui l'ordre
+ * paraît arbitraire : les deux colonnes sont deux marchés indépendants, aucun
+ * tri ne peut les rendre toutes deux croissantes, et le nombre qui décide du
+ * rang se trouve donc une fois sur deux dans la colonne qu'on ne regarde pas.
+ */
+function rankLine(best) {
+  if (!best || !Number.isFinite(best.p)) return "";
+  return `<span class="cls-point">${fmtUsdShort(best.p)}` +
+    `<span class="per">per point</span>` +
+    `<span class="from">${best.side === "dormant" ? "dormant" : "inked"}</span></span>`;
+}
+
 export function rowsHtml(d, { expanded = new Map(), limit = DEFAULT_LIMIT, step = REVEAL_STEP, filter = EMPTY_FILTER, view = VIEW_FLOOR } = {}) {
   const ethUsd = d.eth?.usd ?? null;
   const printerUsd = d.printer?.usd ?? null;
@@ -488,12 +501,12 @@ export function rowsHtml(d, { expanded = new Map(), limit = DEFAULT_LIMIT, step 
    *  lignes se rangent en vue « valeur ». Une classe sans rien de calculable
    *  tombe en bas plutôt que de prendre une place qu'elle ne mérite pas. */
   const bestPoint = (r) => {
-    let best = Infinity;
+    let best = { p: Infinity, side: null };
     for (const [side, cell] of [["ink", r.inked], ["dormant", r.dormant]]) {
       for (const e of cell?.entries ?? []) {
         if (!matchesFilter(e.machine, filter)) continue;
         const p = perPointUsd(e, { classValue: r.classValue, side, ethUsd, printerUsd });
-        if (p !== null && p < best) best = p;
+        if (p !== null && p < best.p) best = { p, side };
       }
     }
     return best;
@@ -503,10 +516,10 @@ export function rowsHtml(d, { expanded = new Map(), limit = DEFAULT_LIMIT, step 
   // la doc — et devient un classement en vue « valeur » : c'est là qu'on voit
   // d'un coup d'œil que la x3 achète le poids moins cher que la x10.
   const rows = valued
-    ? d.rows.map((r) => ({ r, p: bestPoint(r) })).sort((a, b) => (a.p - b.p) || 0).map((x) => x.r)
-    : d.rows;
+    ? d.rows.map((r) => ({ r, best: bestPoint(r) })).sort((a, b) => (a.best.p - b.best.p) || 0)
+    : d.rows.map((r) => ({ r, best: null }));
 
-  return rows.map((r) => {
+  return rows.map(({ r, best }) => {
     const census = r.chainCount === r.docCount
       ? `<span class="census">${fmtInt(r.chainCount)} machines</span>`
       : `<span class="census mismatch" title="The chain returned ${r.chainCount}; the documentation says ${r.docCount}.">${fmtInt(r.chainCount)} ≠ ${fmtInt(r.docCount)}</span>`;
@@ -515,7 +528,7 @@ export function rowsHtml(d, { expanded = new Map(), limit = DEFAULT_LIMIT, step 
     const dorKey = cellKey(r.classValue, "dormant");
 
     return `<tr>` +
-      `<td class="cls-cell"><span class="cls">${r.classLabel}</span>${boostTraits(d.legend, r.classValue)}${census}</td>` +
+      `<td class="cls-cell"><span class="cls">${r.classLabel}</span>${rankLine(best)}${boostTraits(d.legend, r.classValue)}${census}</td>` +
       halfCell(r.inked,   "ink",     { shown: expanded.get(inkKey) ?? limit, step, limit, key: inkKey, filter, ethUsd, printerUsd, view, classValue: r.classValue }) +
       halfCell(r.dormant, "dormant", { shown: expanded.get(dorKey) ?? limit, step, limit, key: dorKey, filter, ethUsd, printerUsd, view, classValue: r.classValue }) +
     `</tr>`;

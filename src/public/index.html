@@ -223,6 +223,18 @@
   .cls-cell { width: 158px; }
   .grants { display: block; font-size: 12px; color: var(--text); margin-top: 2px; line-height: 1.25; }
   .cls { font-size: 24px; font-weight: 700; display: block; letter-spacing: -0.02em; line-height: 1.1; }
+  /* Le prix qui range la ligne. Il vaut la peine d'être gros : c'est le seul
+     chiffre de la colonne de gauche qui explique l'ordre du tableau. */
+  .cls-point { display: block; margin: 5px 0 6px; line-height: 1.15; }
+  .cls-point .per,
+  .cls-point .from {
+    display: block; font-size: 9.5px; letter-spacing: 0.13em;
+    text-transform: uppercase; font-weight: 400;
+  }
+  .cls-point { font-size: 21px; font-weight: 700; color: var(--ink); }
+  .cls-point .per { color: var(--muted); }
+  .cls-point .from { color: var(--dim); }
+
   .census { color: var(--dim); font-size: 11.5px; }
   .census.mismatch { color: var(--alarm); }
 
@@ -418,6 +430,11 @@
     }
     .cls { display: inline; font-size: 21px; margin-right: 9px; }
     .grants { display: inline; margin-right: 9px; }
+    /* L'en-tête de carte est une ligne : le prix qui range la classe s'y range
+       aussi, plutôt que d'empiler trois lignes au-dessus des vignettes. */
+    .cls-point, .cls-point .per, .cls-point .from { display: inline; }
+    .cls-point { font-size: 18px; margin: 0 9px 0 0; }
+    .cls-point .per, .cls-point .from { margin-left: 4px; }
 
     /* Le filet vertical séparait des colonnes qui n'existent plus. */
     .edge { border-left: 0; }
