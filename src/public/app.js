@@ -241,19 +241,10 @@ export function matchesFilter(machine, filter) {
 function shelfStrip(anvilEntries) {
   if (!anvilEntries?.length) return "";
 
-  const eths = anvilEntries.map((e) => e.askEth).filter((v) => v !== null && v !== undefined);
-  const range = eths.length
-    ? (Math.min(...eths).toFixed(4) === Math.max(...eths).toFixed(4)
-        ? `≈${fmtEth(eths[0])} ETH each`
-        : `≈${fmtEth(Math.min(...eths))}–${fmtEth(Math.max(...eths))} ETH`)
-    : "";
-
   const first = anvilEntries[0];
-  // Le même mot que la moitié OpenSea : sans lui, le montant du rayon se lit
-  // comme un chiffre sans nom à côté d'un floor qui, lui, se présente.
-  // Ce prix inclut la prime de 10% pour désigner sa machine : l'appeler « floor
-  // price » le ferait passer pour un tarif. Le prix de file achète une machine
-  // aussi, juste pas celle-là, et il est annoncé à côté plutôt que tu.
+  // « to pick one » plutôt que « floor price » : ce montant inclut la prime de
+  // 10% pour désigner sa machine, et l'appeler un floor le ferait passer pour
+  // un tarif d'entrée.
   const priceLine =
     `<span class="shelf-price"><span class="label">to pick one</span>` +
     `<span class="price">${fmtInt(Math.round(first.askPrinter))}</span>` +
@@ -265,11 +256,6 @@ function shelfStrip(anvilEntries) {
   return `<span class="shelf">` +
     `<span class="market">On the Anvil</span>` +
     priceLine +
-    `<span class="depth">${fmtInt(anvilEntries.length)} on the shelf` +
-      (first.queuePrinter
-        ? ` · <b>${fmtInt(Math.round(first.queuePrinter))} $PRINTER</b> for whichever is next`
-        : "") +
-      `${range ? ` · ${range}` : ""}</span>` +
     `<span class="strip">${chips}</span>` +
   `</span>`;
 }

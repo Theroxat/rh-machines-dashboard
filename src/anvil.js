@@ -80,19 +80,6 @@ export async function readAnvil({ provider, aggregate3, tokenIds, batchSize = 40
 
   const shelfListings = await readShelf(provider, inventoryLength === null ? 0 : Number(inventoryLength));
 
-  // `listing()` renvoie le prix « snipe » : celui pour désigner cette machine
-  // précise, prime comprise. Le prix de file — prendre celle qui vient — est
-  // plus bas, et l'écart entre les deux est ce que l'anvil vend. Afficher le
-  // premier sans le second ferait passer une prime pour un tarif.
-  const queuePrices = shelfListings.size
-    ? (await readUintMap({
-        aggregate3, iface: ANVIL_ABI, target: ADDRESSES.VAULT, fn: "buyPrice",
-        ids: [...shelfListings.keys()], batchSize,
-      })).values
-    : new Map();
-  const shelfQueue = new Map();
-  for (const [id, v] of queuePrices) shelfQueue.set(id, toPrinter(v));
-
   return {
     spotPrinter: toPrinter(spot),
     spreadBps: spreadBps === null ? null : Number(spreadBps),
@@ -105,6 +92,5 @@ export async function readAnvil({ provider, aggregate3, tokenIds, batchSize = 40
     bidPaused: bidPaused === null ? null : Boolean(bidPaused),
     bids,
     shelfListings,
-    shelfQueue,
   };
 }
