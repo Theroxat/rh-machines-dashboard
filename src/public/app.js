@@ -815,37 +815,61 @@ export function dropNote(d) {
  * pour rendre le conseil plus vendeur ferait croire à un levier qui n'existe
  * pas. Ce qui déplace vraiment une part, c'est l'issue du scrutin.
  */
-export function walletPanelHtml(w) {
-  if (!w) return "";
-  if (w.error) return `<p class="w-empty">${esc(w.error)}</p>`;
+export function walletCardHtml(w) {
+  const label = `<span class="label">Your wallet</span>`;
+  // Tant qu'on n'a rien demandé, la carte est le champ. Elle ne prend donc
+  // aucune place de plus que les dix autres.
+  if (!w) {
+    return label +
+      `<form id="wallet-form" autocomplete="off">` +
+      `<input id="wallet-input" type="text" inputmode="latin" spellcheck="false"` +
+      ` placeholder="0x…" aria-label="Wallet address">` +
+      `<button type="submit" class="w-go" aria-label="Look this wallet up">→</button></form>` +
+      `<span class="x">paste an address — nothing to sign</span>`;
+  }
+  if (w.pending) return label + `<span class="v">…</span><span class="x">reading the chain</span>`;
+  if (w.error) return label + `<span class="v">—</span><span class="x">${esc(w.error)} <button class="w-again" type="button">try again</button></span>`;
 
   const short = `${w.address.slice(0, 6)}…${w.address.slice(-4)}`;
   if (!w.machines.length) {
-    return `<p class="w-empty"><b>${esc(short)}</b> holds no Machine — nothing to advise.</p>`;
+    return label + `<span class="v">none</span>` +
+      `<span class="x">${esc(short)} holds no Machine <button class="w-again" type="button">try again</button></span>`;
   }
 
+  const best = w.advice?.best;
+  const verdict = best ? `Vote ${esc(best.ticker)}` : "no ballot";
+  return label + `<span class="v">${verdict}</span>` +
+    `<span class="x"><b>${(w.weight / 100).toFixed(2)}x</b> · ` +
+    (w.cutUsd === null ? "—" : `${fmtUsd(w.cutUsd)} of the pot`) +
+    ` <button class="w-again" type="button">change</button></span>`;
+}
+
+/**
+ * Le détail : chaque machine, son desk, le ticker qu'il porte cette epoch, et
+ * ce qu'elle rapporte. Plus la phrase que la carte n'a pas la place de dire —
+ * un bulletin isolé rapporte des centimes, et le taire ferait croire à un
+ * levier qui n'existe pas.
+ */
+export function walletDetailHtml(w) {
+  if (!w || w.error || w.pending || !w.machines?.length) return "";
+
+  const short = `${w.address.slice(0, 6)}…${w.address.slice(-4)}`;
   const held = w.dormant
     ? `${fmtInt(w.awake)} earning · ${fmtInt(w.dormant)} dormant`
     : `${fmtInt(w.machines.length)} Machines`;
 
-  const head = `<p class="w-who"><b>${esc(short)}</b> — ${held} · ` +
-    `<b>${(w.weight / 100).toFixed(2)}x</b> of the fleet` +
-    (w.share === null ? "" : ` · ${fmtShare(w.share)}`) +
-    (w.cutUsd === null ? "" : ` · about <b class="w-cut">${fmtUsd(w.cutUsd)}</b> of the pot`) + `</p>`;
+  const head = `<p class="w-who"><b>${esc(short)}</b> — ${held}` +
+    (w.share === null ? "" : ` · ${fmtShare(w.share)} of the fleet`) + `</p>`;
 
   const best = w.advice?.best;
-  const call = !best
-    ? `<p class="w-empty">No ballot is open, so there is nothing to vote for yet.</p>`
-    : `<p class="w-call"><span class="w-verb">Vote</span> ` +
-      `<b class="w-ticker">${esc(best.ticker)}</b>` +
-      `<span class="w-why">${esc(best.desk)} — ` +
+  const why = !best
+    ? `<p class="w-small">No ballot is open, so there is nothing to vote for yet.</p>`
+    : `<p class="w-small"><b>${esc(best.desk)}</b> — ` +
       (best.heldWeight
-        ? `${(best.heldWeight / 100).toFixed(2)}x of your ${(w.weight / 100).toFixed(2)}x sit there`
-        : `you hold nothing there, but it is still your best slice`) +
-      `</span></p>` +
-      // Le gain d'un bulletin isolé, dit sans fard.
-      `<p class="w-small">Voting it is worth <b>${fmtUsd(best.gainUsd)}</b> to you against not voting — ` +
-      `a single wallet barely moves a ballot. What moves your share is where the vote lands.</p>`;
+        ? `${(best.heldWeight / 100).toFixed(2)}x of your ${(w.weight / 100).toFixed(2)}x sit there. `
+        : `you hold nothing there, but it is still your best slice. `) +
+      `Voting it is worth <b>${fmtUsd(best.gainUsd)}</b> against not voting — one wallet barely moves a ` +
+      `ballot. What moves your share is where the vote lands.</p>`;
 
   const list = w.machines.map((m) => {
     const desk = m.desk ? `${esc(m.desk)}${m.ticker ? ` · ${esc(m.ticker)}` : ""}` : "no desk read";
@@ -855,7 +879,7 @@ export function walletPanelHtml(w) {
       `<span class="w-earn">${m.epochUsd === null ? "—" : fmtUsd(m.epochUsd)}</span></li>`;
   }).join("");
 
-  return head + call + `<ul class="w-list">${list}</ul>`;
+  return head + why + `<ul class="w-list">${list}</ul>`;
 }
 
 /** Ce que le filtre laisse passer, sur l'ensemble du carnet. Silencieux tant
@@ -1025,27 +1049,51 @@ if (typeof document !== "undefined") {
     paint();
   });
 
-  // Le portefeuille du visiteur. L'adresse ne quitte jamais la page autrement
-  // que vers notre propre service, et elle est publique sur la chaîne de toute
-  // façon : c'est une lecture, pas une connexion.
-  const walletForm = $("wallet-form");
+  // Le portefeuille du visiteur.
+  //
+  // La carte vit dans le bandeau, qui se redessine toutes les quinze secondes.
+  // Le nœud est donc gardé en référence et réattaché après chaque redessin :
+  // sans ça, une adresse à moitié tapée disparaîtrait sous les doigts, et ses
+  // écouteurs avec elle.
+  const contextEl = $("context");
+  const walletCard = $("wallet-card");
   const walletOut = $("wallet-out");
-  if (walletForm) {
-    walletForm.addEventListener("submit", async (e) => {
+  // null = la carte est le champ. Sinon : en cours, en erreur, ou la réponse.
+  let wallet = null;
+
+  const paintWallet = () => {
+    walletCard.innerHTML = walletCardHtml(wallet);
+    walletOut.innerHTML = walletDetailHtml(wallet);
+  };
+
+  const lookup = async (value) => {
+    // Le même garde qu'au serveur, ici pour éviter un aller-retour inutile.
+    if (!/^0x[0-9a-fA-F]{40}$/.test(value)) {
+      wallet = { error: "that is not an address" };
+      paintWallet();
+      return;
+    }
+    wallet = { pending: true };
+    paintWallet();
+    try {
+      const res = await fetch(`/api/wallet?address=${encodeURIComponent(value)}`);
+      wallet = res.ok ? await res.json() : { error: "could not read that address" };
+    } catch {
+      wallet = { error: "could not reach the service" };
+    }
+    paintWallet();
+  };
+
+  if (walletCard) {
+    paintWallet();
+    walletCard.addEventListener("submit", (e) => {
       e.preventDefault();
-      const value = $("wallet-input").value.trim();
-      if (!/^0x[0-9a-fA-F]{40}$/.test(value)) {
-        walletOut.innerHTML = walletPanelHtml({ error: "That is not a wallet address — paste the 0x… one." });
-        return;
-      }
-      walletOut.innerHTML = `<p class="w-empty">Reading the chain…</p>`;
-      try {
-        const res = await fetch(`/api/wallet?address=${encodeURIComponent(value)}`);
-        walletOut.innerHTML = walletPanelHtml(res.ok ? await res.json()
-          : { error: "The service could not read that address." });
-      } catch {
-        walletOut.innerHTML = walletPanelHtml({ error: "Could not reach the service." });
-      }
+      lookup($("wallet-input")?.value.trim() ?? "");
+    });
+    walletCard.addEventListener("click", (e) => {
+      if (!e.target.closest(".w-again")) return;
+      wallet = null;
+      paintWallet();
     });
   }
 
@@ -1092,7 +1140,9 @@ if (typeof document !== "undefined") {
     if (!v.data) return;
 
     lastData = v.data;
-    $("context").innerHTML = contextHtml(v.data, serverNow);
+    contextEl.innerHTML = contextHtml(v.data, serverNow);
+    // Réattachée après coup : `innerHTML` l'avait détachée, pas détruite.
+    if (walletCard) contextEl.appendChild(walletCard);
     paintFilters(v.data.traitFilters, v.data.vote);
     $("queue").innerHTML = crateLine(v.data.anvil);
     $("drop-note").innerHTML = dropNote(v.data);

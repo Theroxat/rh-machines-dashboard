@@ -193,8 +193,10 @@ test("the band's heading holds on one line, like every rarity heading", () => {
 // Le champ demande une adresse publique et ne fait lire que la chaîne. Il ne
 // doit jamais ressembler à un « connect wallet » : rien à signer, rien à approuver.
 test("the wallet field asks to read an address, never to connect one", () => {
-  assert.match(page, /id="wallet-form"/);
-  assert.match(page, /id="wallet-input"/);
+  // Le champ est bâti par le script : la page ne porte que la carte qui
+  // l'accueille, et la feuille de style qui l'habille.
+  assert.match(page, /id="wallet-card"/);
+  assert.match(page, /#wallet-input\s*\{/);
   assert.doesNotMatch(page, /connect wallet/i);
   assert.doesNotMatch(page, /type="password"/);
 });
@@ -202,7 +204,18 @@ test("the wallet field asks to read an address, never to connect one", () => {
 // Le portefeuille précède les filtres : on demande d'abord « qui es-tu », on
 // filtre le marché ensuite. L'inverse mettait la question personnelle après
 // quatre menus qui ne la concernent pas.
-test("the wallet field comes before the filters", () => {
-  assert.ok(page.indexOf('class="wallet"') < page.indexOf('class="filter-bar"'));
+test("the wallet card sits in the context bar, before the filters", () => {
+  const card = page.indexOf('id="wallet-card"');
+  assert.ok(card > 0, "la carte doit exister");
+  // Dans le bandeau, donc entre son ouverture et sa fermeture.
+  assert.ok(page.indexOf('class="context" id="context"') < card);
+  assert.ok(card < page.indexOf('class="filter-bar"'));
   assert.ok(page.indexOf('class="filter-bar"') < page.indexOf('class="scroll"'));
+});
+
+// Le bandeau se redessine toutes les quinze secondes. Si la carte n'était pas
+// réattachée après coup, l'adresse en cours de saisie disparaîtrait sous les doigts.
+test("the card is put back after the context bar is redrawn", () => {
+  const app = readFileSync(new URL("../src/public/app.js", import.meta.url), "utf8");
+  assert.match(app, /contextEl\.innerHTML = contextHtml[\s\S]{0,220}appendChild\(walletCard\)/);
 });
