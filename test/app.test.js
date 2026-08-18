@@ -4,7 +4,7 @@ import {
   fmtEth, fmtRatio, halfCell, cellKey,
   bannerMessage, rowsHtml, contextHtml, legendHtml,
   matchesFilter, filterBarHtml, filterSummary, freshness, fmtCompact, crateLine,
-  perPointUsd, viewBarHtml, ballotBlock, dropNote, bestRow, yieldOf,
+  perPointUsd, viewBarHtml, ballotBlock, dropNote, bestRow, yieldOf, BEST_LIMIT, DEFAULT_LIMIT,
 } from "../src/public/app.js";
 
 const entry = (tokenId, priceEth, image = `https://img/${tokenId}.webp`) => ({
@@ -1348,18 +1348,31 @@ test("the top strip obeys the filter like everything else", () => {
   assert.equal(filtered, "");
 });
 
-// Une dormante classée sur ce qu'elle rapporterait ne peut pas afficher $0.00 :
-// un zéro en troisième place d'un classement de rendement se lit comme un bug.
-test("a dormant machine in the top strip shows what it would earn, marked as such", () => {
+// Une machine qui ne gagne rien ne peut pas être « la meilleure ». Et ce n'est
+// pas qu'une question de mot : inkée aujourd'hui elle serait « Lit », donc elle
+// ne toucherait rien de ce pot-ci. La classer dessus promettrait un versement
+// qu'elle ne recevra pas.
+test("a machine that earns nothing is never among the best", () => {
   const withDormant = {
     ...BEST,
     rows: [{ classValue: 1000, classLabel: "x10", docCount: 1, chainCount: 1,
-      inked: half({ entries: [] }),
-      dormant: half({ entries: [{ ...entry(7, 0.10), weight: 0, epochUsd: 0 }] }) }],
+      inked: half({ entries: [{ ...entry(1, 0.10), weight: 100, epochUsd: 10 }] }),
+      dormant: half({ entries: [{ ...entry(7, 0.01), weight: 0, epochUsd: 0 }] }) }],
   };
   const html = bestRow(withDormant, { ethUsd: 2000 });
-  assert.match(html, /class="earns is-potential">\$100\.00<\/span><span class="per">once inked/);
-  assert.doesNotMatch(html, /\$0\.00/);
+  assert.match(html, /#1</);
+  assert.doesNotMatch(html, /#7</);   // dix fois moins chère, et pourtant absente
+  assert.doesNotMatch(html, /once inked/);
+});
+
+test("a band with nothing earning in it does not appear at all", () => {
+  const allDormant = {
+    ...BEST,
+    rows: [{ classValue: 1000, classLabel: "x10", docCount: 1, chainCount: 1,
+      inked: half({ entries: [] }),
+      dormant: half({ entries: [{ ...entry(7, 0.01), weight: 0, epochUsd: 0 }] }) }],
+  };
+  assert.equal(bestRow(allDormant, { ethUsd: 2000 }), "");
 });
 
 // Dans les lignes de rareté en revanche, zéro est la vérité : une dormante ne
@@ -1372,8 +1385,32 @@ test("outside the top strip a dormant machine still earns nothing, and says so",
 
 // « earns $0.00 an epoch at weight 0x » est une façon absurde de dire qu'une
 // machine dort. L'infobulle annonce ce qui la réveillerait.
-test("a dormant machine's tooltip says what would wake it, not that it earns zero", () => {
+test("a dormant machine's tooltip names the delay, not just the zero", () => {
   const html = halfCell(half({ entries: [{ ...entry(7, 0.1), weight: 0, epochUsd: 0 }] }), "dormant", { ethUsd: 2000 });
   assert.match(html, /earns nothing until it is inked/);
+  assert.match(html, /only starts earning at the next one/);
   assert.doesNotMatch(html, /at weight 0x/);
+});
+
+// La bande tient sur les deux colonnes : huit vignettes y laissaient les deux
+// tiers de la ligne vides, alors que les lignes de rareté, elles, n'ont qu'une
+// colonne à remplir.
+test("the top band shows enough machines to fill the width it spans", () => {
+  const many = Array.from({ length: 40 }, (_, i) => ({
+    ...entry(1000 + i, 0.10 + i / 1000), weight: 100, epochUsd: 10,
+  }));
+  const html = bestRow({ ...BEST, rows: [{ classValue: 100, classLabel: "x1", docCount: 1, chainCount: 1,
+    inked: half({ entries: many }), dormant: half({ entries: [] }) }] }, { ethUsd: 2000 });
+  assert.equal(countChips(html), BEST_LIMIT);
+  assert.ok(BEST_LIMIT > DEFAULT_LIMIT, "elle en montre plus qu'une case de rareté");
+});
+
+test("the band still offers the rest behind its own button", () => {
+  const many = Array.from({ length: 40 }, (_, i) => ({
+    ...entry(1000 + i, 0.10 + i / 1000), weight: 100, epochUsd: 10,
+  }));
+  const html = bestRow({ ...BEST, rows: [{ classValue: 100, classLabel: "x1", docCount: 1, chainCount: 1,
+    inked: half({ entries: many }), dormant: half({ entries: [] }) }] }, { ethUsd: 2000 });
+  assert.match(html, /data-key="best"/);
+  assert.match(html, /20 left/);
 });
