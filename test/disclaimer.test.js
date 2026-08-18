@@ -183,3 +183,9 @@ test("the page carries the line that explains the green figure", () => {
   assert.match(page, /id="drop-note"/);
   assert.match(page, /#drop-note\s*\{/);
 });
+
+// L'en-tête de la bande porte deux fois plus de caractères que « x1.5 » : sans
+// garde il se coupe en deux lignes et cesse de ressembler aux sept autres.
+test("the band's heading holds on one line, like every rarity heading", () => {
+  assert.match(page, /\.best-row \.cls \{[^}]*white-space: nowrap/);
+});

@@ -250,7 +250,9 @@
      une x10 se comparent. Un filet plus marqué la sépare des sept lignes de
      rareté, sans quoi elle se lirait comme une huitième classe. */
   .best-row td { border-bottom: 2px solid var(--rule-2); }
-  .best-row .cls { color: var(--under); }
+  /* « Best ROI » est deux fois plus long que « x1.5 » : sans ça il se coupe en
+     deux lignes et la bande n'a plus le même en-tête que les sept autres. */
+  .best-row .cls { color: var(--under); font-size: 20px; white-space: nowrap; }
   .best-row .cls-point { color: var(--under); }
   td.half.best { border-left: 0; }
   .census.mismatch { color: var(--alarm); }

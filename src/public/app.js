@@ -681,9 +681,9 @@ export function bestRow(d, { limit = BEST_LIMIT, step = REVEAL_STEP, shown = nul
       strip(shelf.slice(0, limit)) + `</span>`
     : "";
 
-  const label = active ? "best of your pick" : "best value";
+  const label = active ? "best ROI of your pick" : "best ROI";
   return `<tr class="best-row">` +
-    `<td class="cls-cell"><span class="cls">Best</span>` +
+    `<td class="cls-cell"><span class="cls">Best ROI</span>` +
       `<span class="cls-point">${fmtRatio(head.y)}` +
       `<span class="per">of its price</span><span class="from">already waiting</span></span>` +
       `<span class="census">${fmtInt(book.length)} ranked</span></td>` +

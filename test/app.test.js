@@ -1451,3 +1451,18 @@ test("the band's reveal step is a whole band, so every row stays full", () => {
   assert.equal((band.match(/class="chip/g) ?? []).length, 19);
   assert.match(band, /data-next="38"/);
 });
+
+// « Best » ne disait pas best de quoi. « ROI » est exactement ce que la bande
+// classe : ce que la machine rapporte sur ce qu'elle coûte. Pas « RR » — un
+// rapport risque/rendement supposerait une mesure de risque que rien ici ne calcule.
+test("the band says what it ranks, not merely that something is best", () => {
+  const html = bestRow(BEST, { ethUsd: 2000 });
+  assert.match(html, /class="cls">Best ROI</);
+  assert.match(html, /best ROI</);
+  assert.doesNotMatch(html, /class="cls">Best</);
+});
+
+test("the band claims no risk measure it does not compute", () => {
+  const html = bestRow(BEST, { ethUsd: 2000 });
+  assert.doesNotMatch(html, /\bRR\b|risk/i);
+});
