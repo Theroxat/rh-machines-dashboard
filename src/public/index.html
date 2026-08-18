@@ -201,7 +201,11 @@
   /* Une lecture, pas une connexion : on demande une adresse publique, on ne
      demande jamais de signer quoi que ce soit. Le champ le dit par sa forme —
      un champ de recherche, pas un bouton d'appairage de portefeuille. */
-  .wallet { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--rule-2); }
+  .wallet {
+    margin-top: 22px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--rule-2);
+  }
   .wallet form { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; }
   #wallet-input {
     font-family: inherit; font-size: 13px; color: var(--text);
@@ -570,16 +574,6 @@
   <div class="banner" id="banner" role="status"></div>
 </header>
 
-<section class="filter-bar">
-  <div class="filter-row">
-    <div id="view"></div>
-    <div id="filters"></div>
-    <div id="queue"></div>
-  </div>
-  <p id="filter-summary"></p>
-  <p id="drop-note"></p>
-</section>
-
 <section class="wallet">
   <form id="wallet-form" autocomplete="off">
     <label class="fl"><span class="label">Your wallet</span>
@@ -589,6 +583,16 @@
     <button type="submit" class="w-go">what should I vote?</button>
   </form>
   <div id="wallet-out"></div>
+</section>
+
+<section class="filter-bar">
+  <div class="filter-row">
+    <div id="view"></div>
+    <div id="filters"></div>
+    <div id="queue"></div>
+  </div>
+  <p id="filter-summary"></p>
+  <p id="drop-note"></p>
 </section>
 
 <div class="scroll">

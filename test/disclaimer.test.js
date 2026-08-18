@@ -198,3 +198,11 @@ test("the wallet field asks to read an address, never to connect one", () => {
   assert.doesNotMatch(page, /connect wallet/i);
   assert.doesNotMatch(page, /type="password"/);
 });
+
+// Le portefeuille précède les filtres : on demande d'abord « qui es-tu », on
+// filtre le marché ensuite. L'inverse mettait la question personnelle après
+// quatre menus qui ne la concernent pas.
+test("the wallet field comes before the filters", () => {
+  assert.ok(page.indexOf('class="wallet"') < page.indexOf('class="filter-bar"'));
+  assert.ok(page.indexOf('class="filter-bar"') < page.indexOf('class="scroll"'));
+});
