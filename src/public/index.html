@@ -202,6 +202,12 @@
      qu'on n'a rien demandé elle est le champ ; interrogée, elle porte le verdict
      et le détail s'ouvre sous le bandeau. Une lecture, jamais une connexion :
      on demande une adresse publique et on ne fait rien signer. */
+  /* La seule carte du bandeau sur laquelle on agit : elle passe en tête, prend
+     une fois et demie la largeur des autres, et son intitulé est en ambre —
+     dernière et à la largeur commune, elle finissait au bord droit et personne
+     ne la voyait. */
+  .wcard { flex: 1.5 1 265px; border-left: 2px solid var(--ink); }
+  .wcard .label { color: var(--ink); }
   .wcard .v { color: var(--under); }
   .wcard form { display: flex; gap: 5px; margin: 3px 0 2px; }
   #wallet-input {
@@ -211,7 +217,7 @@
   #wallet-input:focus-visible { outline: 1px solid var(--ink); outline-offset: 1px; }
   .w-go {
     font-family: inherit; font-size: 13px; line-height: 1; color: var(--paper); background: var(--ink);
-    border: 0; border-radius: 0; padding: 0 9px; cursor: pointer; font-weight: 700;
+    border: 0; border-radius: 0; padding: 0 11px; cursor: pointer; font-weight: 700; white-space: nowrap;
   }
   .w-go:hover { filter: brightness(1.12); }
   /* Un lien, pas un bouton : il ne fait que ramener au champ. */

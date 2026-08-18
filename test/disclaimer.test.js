@@ -217,5 +217,14 @@ test("the wallet card sits in the context bar, before the filters", () => {
 // réattachée après coup, l'adresse en cours de saisie disparaîtrait sous les doigts.
 test("the card is put back after the context bar is redrawn", () => {
   const app = readFileSync(new URL("../src/public/app.js", import.meta.url), "utf8");
-  assert.match(app, /contextEl\.innerHTML = contextHtml[\s\S]{0,220}appendChild\(walletCard\)/);
+  assert.match(app, /contextEl\.innerHTML = contextHtml[\s\S]{0,320}insertBefore\(walletCard/);
+});
+
+// Dernière et à la largeur commune, la carte finissait au bord droit du bandeau
+// avec un champ écrasé, et personne ne la voyait. C'est pourtant la seule sur
+// laquelle on agit : elle passe en tête, plus large, et marquée.
+test("the wallet card is the widest and the marked one in the bar", () => {
+  assert.match(page, /\.wcard \{[^}]*flex: 1\.5/);
+  assert.match(page, /\.wcard \{[^}]*border-left: 2px solid var\(--ink\)/);
+  assert.match(page, /\.wcard \.label \{[^}]*var\(--ink\)/);
 });

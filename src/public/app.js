@@ -1141,8 +1141,10 @@ if (typeof document !== "undefined") {
 
     lastData = v.data;
     contextEl.innerHTML = contextHtml(v.data, serverNow);
-    // Réattachée après coup : `innerHTML` l'avait détachée, pas détruite.
-    if (walletCard) contextEl.appendChild(walletCard);
+    // Réattachée en tête : `innerHTML` l'avait détachée, pas détruite. En
+    // dernière position elle finissait au bord droit du bandeau, écrasée, et
+    // personne ne la voyait — c'est la seule carte sur laquelle on agit.
+    if (walletCard) contextEl.insertBefore(walletCard, contextEl.firstChild);
     paintFilters(v.data.traitFilters, v.data.vote);
     $("queue").innerHTML = crateLine(v.data.anvil);
     $("drop-note").innerHTML = dropNote(v.data);
