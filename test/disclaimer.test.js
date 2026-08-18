@@ -204,27 +204,28 @@ test("the wallet field asks to read an address, never to connect one", () => {
 // Le portefeuille précède les filtres : on demande d'abord « qui es-tu », on
 // filtre le marché ensuite. L'inverse mettait la question personnelle après
 // quatre menus qui ne la concernent pas.
-test("the wallet card sits in the context bar, before the filters", () => {
-  const card = page.indexOf('id="wallet-card"');
-  assert.ok(card > 0, "la carte doit exister");
-  // Dans le bandeau, donc entre son ouverture et sa fermeture.
-  assert.ok(page.indexOf('class="context" id="context"') < card);
-  assert.ok(card < page.indexOf('class="filter-bar"'));
-  assert.ok(page.indexOf('class="filter-bar"') < page.indexOf('class="scroll"'));
+test("the wallet field sits between the filters and the table", () => {
+  const field = page.indexOf('id="wallet-card"');
+  assert.ok(field > 0, "le champ doit exister");
+  assert.ok(page.indexOf('class="filter-bar"') < field);
+  assert.ok(field < page.indexOf('class="scroll"'));
 });
 
-// Le bandeau se redessine toutes les quinze secondes. Si la carte n'était pas
-// réattachée après coup, l'adresse en cours de saisie disparaîtrait sous les doigts.
-test("the card is put back after the context bar is redrawn", () => {
-  const app = readFileSync(new URL("../src/public/app.js", import.meta.url), "utf8");
-  assert.match(app, /contextEl\.innerHTML = contextHtml[\s\S]{0,320}insertBefore\(walletCard/);
+// Hors du bandeau, rien ne le redessine : une adresse à moitié tapée ne peut
+// pas disparaître sous les doigts, et il n'y a aucun nœud à réattacher.
+test("the field lives outside the bar that redraws itself", () => {
+  const bar = page.indexOf('class="context" id="context"');
+  const field = page.indexOf('id="wallet-card"');
+  assert.ok(bar < field, "le champ vient après le bandeau");
+  assert.doesNotMatch(page.slice(bar, bar + 200), /wallet-card/);
 });
 
-// Dernière et à la largeur commune, la carte finissait au bord droit du bandeau
-// avec un champ écrasé, et personne ne la voyait. C'est pourtant la seule sur
-// laquelle on agit : elle passe en tête, plus large, et marquée.
-test("the wallet card is the widest and the marked one in the bar", () => {
-  assert.match(page, /\.wcard \{[^}]*flex: 1\.5/);
-  assert.match(page, /\.wcard \{[^}]*border-left: 2px solid var\(--ink\)/);
-  assert.match(page, /\.wcard \.label \{[^}]*var\(--ink\)/);
+// Il se fond dans la masse : même intitulé, même champ, même bordure que les
+// filtres. En carte marquée dans le bandeau il se lisait comme une publicité
+// posée au milieu des chiffres.
+test("the field is built like the filters, not like a banner", () => {
+  assert.match(page, /#wallet-input \{[^}]*var\(--paper-2\)/);
+  assert.match(page, /#wallet-input \{[^}]*1px solid var\(--rule-2\)/);
+  // Un bouton bordé, comme « clear » — pas un aplat ambre.
+  assert.doesNotMatch(page, /\.w-go[^{]*\{[^}]*background: var\(--ink\)/);
 });

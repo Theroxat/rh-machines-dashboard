@@ -817,31 +817,32 @@ export function dropNote(d) {
  */
 export function walletCardHtml(w) {
   const label = `<span class="label">Your wallet</span>`;
-  // Tant qu'on n'a rien demandé, la carte est le champ. Elle ne prend donc
-  // aucune place de plus que les dix autres.
-  if (!w) {
-    return label +
-      `<form id="wallet-form" autocomplete="off">` +
-      `<input id="wallet-input" type="text" inputmode="latin" spellcheck="false"` +
-      ` placeholder="0x…" aria-label="Wallet address">` +
-      `<button type="submit" class="w-go" aria-label="Look this wallet up">→</button></form>` +
-      `<span class="x">paste an address — nothing to sign</span>`;
-  }
-  if (w.pending) return label + `<span class="v">…</span><span class="x">reading the chain</span>`;
-  if (w.error) return label + `<span class="v">—</span><span class="x">${esc(w.error)} <button class="w-again" type="button">try again</button></span>`;
+  const field = (note) =>
+    label +
+    `<form id="wallet-form" autocomplete="off">` +
+    `<input id="wallet-input" type="text" inputmode="latin" spellcheck="false"` +
+    ` placeholder="0x… — paste an address, nothing to sign" aria-label="Wallet address">` +
+    `<button type="submit" class="w-go">what should I vote?</button>` +
+    (note ? `<span class="x">${note}</span>` : "") + `</form>`;
+
+  // Tant qu'on n'a rien demandé, la ligne n'est que le champ : elle se lit
+  // comme une commande de plus, pas comme un encart.
+  if (!w) return field("");
+  if (w.pending) return field("reading the chain…");
+  if (w.error) return field(esc(w.error));
 
   const short = `${w.address.slice(0, 6)}…${w.address.slice(-4)}`;
   if (!w.machines.length) {
-    return label + `<span class="v">none</span>` +
-      `<span class="x">${esc(short)} holds no Machine <button class="w-again" type="button">try again</button></span>`;
+    return label + `<span class="w-said"><span class="x">${esc(short)} holds no Machine</span>` +
+      `<button class="w-again" type="button">try another</button></span>`;
   }
 
   const best = w.advice?.best;
-  const verdict = best ? `Vote ${esc(best.ticker)}` : "no ballot";
-  return label + `<span class="v">${verdict}</span>` +
-    `<span class="x"><b>${(w.weight / 100).toFixed(2)}x</b> · ` +
-    (w.cutUsd === null ? "—" : `${fmtUsd(w.cutUsd)} of the pot`) +
-    ` <button class="w-again" type="button">change</button></span>`;
+  return label + `<span class="w-said">` +
+    `<span class="v">${best ? `Vote ${esc(best.ticker)}` : "No ballot open"}</span>` +
+    `<span class="x">${esc(short)} · <b>${(w.weight / 100).toFixed(2)}x</b>` +
+    (w.cutUsd === null ? "" : ` · <b>${fmtUsd(w.cutUsd)}</b> of the pot`) + `</span>` +
+    `<button class="w-again" type="button">another wallet</button></span>`;
 }
 
 /**
@@ -1051,10 +1052,9 @@ if (typeof document !== "undefined") {
 
   // Le portefeuille du visiteur.
   //
-  // La carte vit dans le bandeau, qui se redessine toutes les quinze secondes.
-  // Le nœud est donc gardé en référence et réattaché après chaque redessin :
-  // sans ça, une adresse à moitié tapée disparaîtrait sous les doigts, et ses
-  // écouteurs avec elle.
+  // Il vit hors du bandeau, qui se redessine toutes les quinze secondes : une
+  // adresse à moitié tapée ne peut donc pas disparaître sous les doigts, et il
+  // n'y a aucun nœud à réattacher après coup.
   const contextEl = $("context");
   const walletCard = $("wallet-card");
   const walletOut = $("wallet-out");
@@ -1141,10 +1141,6 @@ if (typeof document !== "undefined") {
 
     lastData = v.data;
     contextEl.innerHTML = contextHtml(v.data, serverNow);
-    // Réattachée en tête : `innerHTML` l'avait détachée, pas détruite. En
-    // dernière position elle finissait au bord droit du bandeau, écrasée, et
-    // personne ne la voyait — c'est la seule carte sur laquelle on agit.
-    if (walletCard) contextEl.insertBefore(walletCard, contextEl.firstChild);
     paintFilters(v.data.traitFilters, v.data.vote);
     $("queue").innerHTML = crateLine(v.data.anvil);
     $("drop-note").innerHTML = dropNote(v.data);

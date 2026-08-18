@@ -198,37 +198,37 @@
 
   /* ---- le portefeuille du visiteur ---- */
 
-  /* Une carte de plus dans le bandeau, au même rythme que les dix autres. Tant
-     qu'on n'a rien demandé elle est le champ ; interrogée, elle porte le verdict
-     et le détail s'ouvre sous le bandeau. Une lecture, jamais une connexion :
-     on demande une adresse publique et on ne fait rien signer. */
-  /* La seule carte du bandeau sur laquelle on agit : elle passe en tête, prend
-     une fois et demie la largeur des autres, et son intitulé est en ambre —
-     dernière et à la largeur commune, elle finissait au bord droit et personne
-     ne la voyait. */
-  .wcard { flex: 1.5 1 265px; border-left: 2px solid var(--ink); }
-  .wcard .label { color: var(--ink); }
-  .wcard .v { color: var(--under); }
-  .wcard form { display: flex; gap: 5px; margin: 3px 0 2px; }
+  /* Posé juste au-dessus de l'en-tête du tableau, et bâti comme les filtres :
+     même intitulé, même champ, même bordure. C'est une commande de plus, pas
+     un encart — en carte marquée dans le bandeau il se lisait comme une
+     publicité au milieu des chiffres. */
+  .wallet-line { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; margin-top: 20px; }
+  .wallet-line .label { flex: none; padding-bottom: 5px; }
   #wallet-input {
-    font-family: inherit; font-size: 12.5px; color: var(--text); min-width: 0; flex: 1;
-    background: var(--paper-2); border: 1px solid var(--rule-2); border-radius: 0; padding: 3px 6px;
+    font-family: inherit; font-size: 13px; color: var(--text);
+    background: var(--paper-2); border: 1px solid var(--rule-2); border-radius: 0;
+    padding: 4px 8px; min-width: 400px; max-width: 100%;
   }
+  #wallet-input:hover { border-color: var(--muted); }
   #wallet-input:focus-visible { outline: 1px solid var(--ink); outline-offset: 1px; }
-  .w-go {
-    font-family: inherit; font-size: 13px; line-height: 1; color: var(--paper); background: var(--ink);
-    border: 0; border-radius: 0; padding: 0 11px; cursor: pointer; font-weight: 700; white-space: nowrap;
+  .wallet-line form { display: flex; gap: 10px; align-items: center; }
+  /* Le même bouton discret que « clear » : bordé, pas rempli. */
+  .w-go, .w-again {
+    font-family: inherit; font-size: 12px; color: var(--muted);
+    background: transparent; border: 1px solid var(--rule-2); border-radius: 0;
+    padding: 3px 10px; cursor: pointer; white-space: nowrap;
   }
-  .w-go:hover { filter: brightness(1.12); }
-  /* Un lien, pas un bouton : il ne fait que ramener au champ. */
-  .w-again {
-    font-family: inherit; font-size: 11px; color: var(--dim); background: none;
-    border: 0; border-bottom: 1px solid var(--rule-2); padding: 0; cursor: pointer;
+  .w-go:hover, .w-again:hover, .w-go:focus-visible, .w-again:focus-visible {
+    color: var(--text); border-color: var(--muted);
   }
-  .w-again:hover { color: var(--ink); border-bottom-color: var(--ink); }
+  /* Le verdict s'écrit sur la même ligne, à la suite du champ. */
+  .w-said { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; font-size: 13px; }
+  .w-said .v { font-size: 17px; font-weight: 700; color: var(--under); }
+  .w-said .x { color: var(--muted); font-size: 12.5px; }
+  .w-said b { color: var(--text); font-weight: 600; }
 
-  /* Le détail, sous le bandeau, et seulement s'il y a quelque chose à dire. */
-  #wallet-out { margin-top: 12px; }
+  /* Le détail, sous la ligne, et seulement s'il y a quelque chose à dire. */
+  #wallet-out { margin-top: 10px; }
   #wallet-out:empty { display: none; }
   .w-who { color: var(--muted); font-size: 13px; margin: 0 0 5px; }
   .w-who b { color: var(--text); font-weight: 600; }
@@ -497,6 +497,8 @@
     .w-ticker { font-size: 26px; }
     #filters { gap: 10px; }
     /* Empilés, le filet vertical ne sépare plus rien : il devient horizontal. */
+    #wallet-input { min-width: 0; width: 100%; }
+    .wallet-line form { width: 100%; }
     #view {
       width: 100%; padding-right: 0; padding-bottom: 12px;
       border-right: none; border-bottom: 1px solid var(--rule-2);
@@ -572,12 +574,7 @@
     </a>
   </div>
   <p class="disclaimer"><span class="tag">Unofficial</span>An independent tool, not built by, affiliated with, or endorsed by the RH MACHINES team.</p>
-  <div class="context" id="context">
-    <!-- Ce nœud survit aux redessins du bandeau : il est conservé et réattaché,
-         sinon chaque rafraîchissement effacerait l'adresse en cours de saisie. -->
-    <div class="stat wcard" id="wallet-card"></div>
-  </div>
-  <div id="wallet-out"></div>
+  <div class="context" id="context"></div>
   <div class="banner" id="banner" role="status"></div>
 </header>
 
@@ -590,6 +587,9 @@
   <p id="filter-summary"></p>
   <p id="drop-note"></p>
 </section>
+
+<div class="wallet-line" id="wallet-card"></div>
+<div id="wallet-out"></div>
 
 <div class="scroll">
   <table>

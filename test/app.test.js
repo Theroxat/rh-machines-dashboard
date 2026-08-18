@@ -1479,16 +1479,17 @@ const WALLET = {
   advice: { base: 39.09, best: { index: 10, desk: "real estate", ticker: "SPCX", held: true, heldWeight: 200, cutUsd: 39.12, gainUsd: 0.046 }, options: [] },
 };
 
-test("the card carries the verdict, in the space of one stat", () => {
+test("the line carries the verdict, on one line, with the field's own words", () => {
   const html = walletCardHtml(WALLET);
   assert.match(html, /class="v">Vote SPCX</);
   assert.match(html, /3\.00x/);
-  assert.match(html, /\$39\.12 of the pot/);
+  assert.match(html, /\$39\.12<\/b> of the pot/);
+  assert.match(html, /another wallet/);
 });
 
 // Tant que rien n'est demandé, la carte est le champ : elle ne prend pas une
 // ligne de plus que les dix autres cartes du bandeau.
-test("with nothing asked the card is simply the field", () => {
+test("with nothing asked the line is simply the field", () => {
   const html = walletCardHtml(null);
   assert.match(html, /id="wallet-input"/);
   assert.match(html, /nothing to sign/);
@@ -1523,7 +1524,7 @@ test("a wallet holding nothing is told so, rather than shown an empty table", ()
 });
 
 test("with no ballot open nothing is advised rather than guessed", () => {
-  assert.match(walletCardHtml({ ...WALLET, advice: null }), /class="v">no ballot</);
+  assert.match(walletCardHtml({ ...WALLET, advice: null }), /class="v">No ballot open</);
   assert.match(walletDetailHtml({ ...WALLET, advice: null }), /No ballot is open/);
 });
 
@@ -1551,7 +1552,7 @@ test("nothing from the response reaches the page unescaped", () => {
 test("an error is shown in the card, and opens no empty detail", () => {
   const card = walletCardHtml({ error: "that is not an address" });
   assert.match(card, /not an address/);
-  assert.match(card, /try again/);
+  assert.match(card, /id="wallet-input"/);
   assert.equal(walletDetailHtml({ error: "that is not an address" }), "");
 });
 
