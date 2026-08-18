@@ -4,7 +4,7 @@ import {
   fmtEth, fmtRatio, halfCell, cellKey,
   bannerMessage, rowsHtml, contextHtml, legendHtml,
   matchesFilter, filterBarHtml, filterSummary, freshness, fmtCompact, crateLine,
-  perPointUsd, viewBarHtml, ballotBlock,
+  perPointUsd, viewBarHtml, ballotBlock, dropNote,
 } from "../src/public/app.js";
 
 const entry = (tokenId, priceEth, image = `https://img/${tokenId}.webp`) => ({
@@ -1223,4 +1223,47 @@ test("a ticker is escaped on its way into the page, wherever it came from", () =
   }, 1, 1000);
   assert.doesNotMatch(block, /<img src=x/);
   assert.match(block, /&lt;img src=x/);
+});
+
+// Trois nombres empilés dont deux en dollars : sans un mot, le vert ne se
+// devine pas. La vignette le nomme, et une ligne dit d'où il sort.
+test("the green figure names itself on every machine", () => {
+  const html = halfCell(half({ entries: [{ ...entry(1, 0.1), weight: 100, epochUsd: 12.6 }] }), "ink", { ethUsd: 1900 });
+  assert.match(html, /class="earns">\$12\.60<\/span><span class="per">an epoch/);
+});
+
+test("a machine with no readable return shows no green figure at all", () => {
+  const html = halfCell(half({ entries: [{ ...entry(1, 0.1), weight: 100, epochUsd: null }] }), "ink", { ethUsd: 1900 });
+  assert.doesNotMatch(html, /class="earns"/);
+  assert.doesNotMatch(html, /an epoch/);
+});
+
+test("the note says where the money comes from and that weight splits it", () => {
+  const note = dropNote({ pot: { usd: 160790 }, vote: { opened: false } });
+  assert.match(note, /Sell fees/);
+  assert.match(note, /\$161k/);
+  assert.match(note, /by weight/);
+  assert.match(note, /green/);
+});
+
+// Le pot ne tombe pas toutes les 3,5 jours : il tombe quand un bulletin se
+// clôt. Annoncer une cadence que le protocole ne tient pas serait pire que se taire.
+test("the note promises no rhythm the protocol does not keep", () => {
+  const waiting = dropNote({ pot: { usd: 160790 }, vote: { opened: false } });
+  assert.match(waiting, /keeps piling up until one closes/);
+  const open = dropNote({ pot: { usd: 160790 }, vote: { opened: true } });
+  assert.match(open, /pays out when that ballot closes/);
+});
+
+test("with no pot read the note stays silent rather than explaining nothing", () => {
+  assert.equal(dropNote({ pot: { usd: null } }), "");
+  assert.equal(dropNote(null), "");
+});
+
+// Les centimes ne sont pas du détail : c'est le chiffre que le porteur compare
+// à celui du terminal officiel, qui affiche $84.60. Arrondir à $85 ferait
+// douter de la source alors que les deux calculs concordent.
+test("the return keeps its cents, so it can be checked against the terminal", () => {
+  const html = halfCell(half({ entries: [{ ...entry(1, 0.1), weight: 600, epochUsd: 84.6023 }] }), "ink", { ethUsd: 1900 });
+  assert.match(html, /class="earns">\$84\.60</);
 });

@@ -178,3 +178,8 @@ test("a re-inked machine is ringed, in a colour used for nothing else", () => {
 test("what a machine earns is coloured apart from what it costs", () => {
   assert.match(page, /\.chip \.earns[^}]*var\(--under\)/);
 });
+
+test("the page carries the line that explains the green figure", () => {
+  assert.match(page, /id="drop-note"/);
+  assert.match(page, /#drop-note\s*\{/);
+});

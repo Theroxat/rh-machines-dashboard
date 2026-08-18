@@ -262,7 +262,7 @@ export function contextHtml(d, now = null) {
 function chip(e, { isFloor = false, ethUsd = null, anvil = false, showPrice = true, perPoint = null } = {}) {
   const hw = e.machine?.headwear ? ` · ${headwearLabel(e.machine.headwear)}` : "";
   const img = e.machine?.image
-    ? `<img src="${esc(e.machine.image)}" alt="Machine #${e.tokenId}" loading="lazy" width="60" height="60">`
+    ? `<img src="${esc(e.machine.image)}" alt="Machine #${e.tokenId}" loading="lazy" width="78" height="78">`
     : `<span class="noimg" aria-hidden="true"></span>`;
 
   // En vue « valeur » le grand chiffre est le coût du point, et le petit reste
@@ -283,7 +283,8 @@ function chip(e, { isFloor = false, ethUsd = null, anvil = false, showPrice = tr
   // reçoit. Une dormante affiche zéro, ce qui est vrai et non pas manquant.
   const earns = e.epochUsd === null || e.epochUsd === undefined
     ? ""
-    : `<span class="earns">${e.epochUsd >= 1 ? fmtUsd(e.epochUsd, 0) : fmtUsd(e.epochUsd, 2)}</span>`;
+    : `<span class="earns">${fmtUsd(e.epochUsd)}</span>` +
+      `<span class="per">an epoch</span>`;
   const inkStory = reinked
     ? ` · re-inked ×${e.inkMult.toFixed(2)} — ${fmtInt(e.inkPrinter)} $PRINTER burned · weight ${e.weight / 100}x`
     : "";
@@ -301,7 +302,7 @@ function chip(e, { isFloor = false, ethUsd = null, anvil = false, showPrice = tr
 
   const earnStory = e.epochUsd === null || e.epochUsd === undefined
     ? ""
-    : ` · earns ${fmtUsd(e.epochUsd)} a drop at weight ${e.weight / 100}x` +
+    : ` · earns ${fmtUsd(e.epochUsd)} an epoch at weight ${e.weight / 100}x` +
       ` — up to ${fmtUsd(e.epochUsd * 2)} if the vote lands on its desk`;
 
   const pointStory = perPoint !== null
@@ -625,6 +626,29 @@ export function filterBarHtml(traitFilters, filter, vote = null) {
   }).join("");
 }
 
+/**
+ * D'où vient l'argent, dit une fois et en toutes lettres.
+ *
+ * Les vignettes portent le mot « an epoch » sous chaque montant vert, mais un
+ * mot ne dit pas d'où sort la somme. Cette ligne le dit : le pot est fait des
+ * frais de vente, il est partagé au prorata du poids, et il ne tombe pas au
+ * rythme des epochs — il tombe quand un bulletin se clôt. Promettre une cadence
+ * que le protocole ne tient pas serait pire que ne rien dire.
+ */
+export function dropNote(d) {
+  const pot = d?.pot?.usd;
+  if (!pot) return "";
+
+  const waiting = fmtBig(pot);
+  const when = d?.vote?.opened
+    ? "A ballot is open — it pays out when that ballot closes."
+    : "No ballot is open yet, so it keeps piling up until one closes.";
+
+  return `Sell fees pile up as USDG — <b>${waiting}</b> so far — and buy the stock the desks vote for. ` +
+    `Every Machine takes a share of it by weight: that is the green figure on each one. ` +
+    when;
+}
+
 /** Ce que le filtre laisse passer, sur l'ensemble du carnet. Silencieux tant
  *  qu'aucun filtre n'est posé : un compteur permanent serait du bruit. */
 export function filterSummary(d, filter) {
@@ -810,6 +834,7 @@ if (typeof document !== "undefined") {
     $("context").innerHTML = contextHtml(v.data, serverNow);
     paintFilters(v.data.traitFilters, v.data.vote);
     $("queue").innerHTML = crateLine(v.data.anvil);
+    $("drop-note").innerHTML = dropNote(v.data);
     paint();
     $("legend").innerHTML = legendHtml(v.data.legend);
   };
