@@ -72,9 +72,29 @@ export const anvilUrl = () => ANVIL_URL;
 export const DEFAULT_LIMIT = 8;
 
 /** La bande de tête tient sur les deux colonnes : huit vignettes y laissaient
- *  les deux tiers de la ligne vides. Elle en montre assez pour remplir toute la
- *  largeur sur un écran de bureau, et déborde proprement sur les autres. */
+ *  les deux tiers de la ligne vides. Ce nombre ne sert que de repli — la page
+ *  mesure la bande et remplit des rangées entières. */
 export const BEST_LIMIT = 20;
+
+/** Largeur d'une vignette et écart entre deux, tels que la feuille de style les
+ *  fixe. S'ils y changent, ils changent ici : la bande se compterait faux et
+ *  laisserait à nouveau une orpheline en bas. */
+export const CHIP_PX = 78;
+export const STRIP_GAP_PX = 7;
+
+/**
+ * Combien de vignettes tiennent dans la bande, en rangées pleines.
+ *
+ * Vingt vignettes dans une bande qui en loge dix-neuf laissaient une orpheline
+ * seule sur une seconde ligne. Un compte fixe ne peut pas convenir : la bande
+ * traverse les deux colonnes, donc sa largeur suit celle de l'écran. On mesure,
+ * et on n'affiche que des rangées complètes.
+ */
+export function bestFit({ availablePx, chipPx = CHIP_PX, gapPx = STRIP_GAP_PX, rows = 2 }) {
+  if (!availablePx || availablePx <= 0) return BEST_LIMIT;
+  const perRow = Math.max(1, Math.floor((availablePx + gapPx) / (chipPx + gapPx)));
+  return perRow * Math.max(1, rows);
+}
 
 /** Combien un clic en révèle de plus. Un dépliage d'un seul coup mettait 375
  *  vignettes d'un bloc sur les x1 dormantes : la page devenait impraticable et
@@ -679,7 +699,7 @@ export function bestRow(d, { limit = BEST_LIMIT, step = REVEAL_STEP, shown = nul
   `</tr>`;
 }
 
-export function rowsHtml(d, { expanded = new Map(), limit = DEFAULT_LIMIT, step = REVEAL_STEP, filter = EMPTY_FILTER, view = VIEW_FLOOR } = {}) {
+export function rowsHtml(d, { expanded = new Map(), limit = DEFAULT_LIMIT, step = REVEAL_STEP, filter = EMPTY_FILTER, view = VIEW_FLOOR, bestLimit = BEST_LIMIT } = {}) {
   const ethUsd = d.eth?.usd ?? null;
   const activationUsd = d.ink?.activationTotalUsd ?? null;
   const valued = view === VIEW_VALUE;
@@ -708,7 +728,12 @@ export function rowsHtml(d, { expanded = new Map(), limit = DEFAULT_LIMIT, step 
 
   // La bande de tête est épinglée : elle ne suit pas le tri des lignes, parce
   // qu'elle ne parle d'aucune classe en particulier.
-  const bestHtml = bestRow(d, { step, shown: expanded.get("best") ?? BEST_LIMIT, filter, ethUsd });
+  // Le pas de dépliage vaut la bande elle-même : un clic ajoute deux rangées
+  // pleines, jamais une rangée et demie.
+  const bestHtml = bestRow(d, {
+    limit: bestLimit, step: bestLimit,
+    shown: expanded.get("best") ?? bestLimit, filter, ethUsd,
+  });
 
   return bestHtml + rows.map(({ r, best }) => {
     const census = r.chainCount === r.docCount
@@ -869,12 +894,32 @@ if (typeof document !== "undefined") {
   let painted = "";
   let barBuilt = false;
 
+  // Combien de vignettes la bande de tête peut montrer en rangées pleines. On
+  // ne peut pas le savoir avant d'avoir peint une fois : la bande n'existe pas
+  // encore. Premier rendu au repli, mesure, puis on repeint si le compte change.
+  let bestLimit = BEST_LIMIT;
+  const measureBest = () => {
+    const strip = rowsEl.querySelector(".best-row .strip");
+    if (!strip) return false;
+    const next = bestFit({ availablePx: strip.clientWidth });
+    if (next === bestLimit) return false;
+    bestLimit = next;
+    return true;
+  };
+
   const paint = () => {
     if (!lastData) return;
-    const html = rowsHtml(lastData, { expanded, filter, view });
+    const html = rowsHtml(lastData, { expanded, filter, view, bestLimit });
     if (html !== painted) {
       rowsEl.innerHTML = html;
       painted = html;
+      // Une seule reprise : la seconde mesure porte sur la bande redimensionnée
+      // et retombe sur elle-même, donc il n'y a pas de boucle à craindre.
+      if (measureBest()) {
+        const again = rowsHtml(lastData, { expanded, filter, view, bestLimit });
+        rowsEl.innerHTML = again;
+        painted = again;
+      }
     }
     const summary = filterSummary(lastData, filter);
     summaryEl.innerHTML = summary
@@ -920,6 +965,14 @@ if (typeof document !== "undefined") {
     for (const type of TRAIT_TYPES) filter[type] = null;
     for (const select of filtersEl.querySelectorAll("select")) select.value = "";
     paint();
+  });
+
+  // L'écran change de largeur : la bande doit se recompter, sinon elle garde le
+  // découpage d'une fenêtre qui n'existe plus.
+  let resizeTimer = null;
+  addEventListener("resize", () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => { if (measureBest()) { painted = ""; paint(); } }, 150);
   });
 
   rowsEl.addEventListener("click", (e) => {

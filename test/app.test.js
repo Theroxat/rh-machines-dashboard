@@ -4,7 +4,7 @@ import {
   fmtEth, fmtRatio, halfCell, cellKey,
   bannerMessage, rowsHtml, contextHtml, legendHtml,
   matchesFilter, filterBarHtml, filterSummary, freshness, fmtCompact, crateLine,
-  perPointUsd, viewBarHtml, ballotBlock, dropNote, bestRow, yieldOf, BEST_LIMIT, DEFAULT_LIMIT,
+  perPointUsd, viewBarHtml, ballotBlock, dropNote, bestRow, yieldOf, BEST_LIMIT, DEFAULT_LIMIT, bestFit,
 } from "../src/public/app.js";
 
 const entry = (tokenId, priceEth, image = `https://img/${tokenId}.webp`) => ({
@@ -1413,4 +1413,41 @@ test("the band still offers the rest behind its own button", () => {
     inked: half({ entries: many }), dormant: half({ entries: [] }) }] }, { ethUsd: 2000 });
   assert.match(html, /data-key="best"/);
   assert.match(html, /20 left/);
+});
+
+// Vingt vignettes dans une bande qui en loge dix-neuf laissaient une orpheline
+// seule sur une seconde ligne. La bande traverse les deux colonnes, donc sa
+// largeur suit l'écran : un compte fixe ne peut pas convenir.
+test("the band fills whole rows, never leaving one machine alone below", () => {
+  // 19 tiennent dans 1615px : 19 × 78 + 18 × 7 = 1608
+  assert.equal(bestFit({ availablePx: 1615 }), 38);
+  assert.equal(bestFit({ availablePx: 1615, rows: 1 }), 19);
+});
+
+test("a narrow screen still gets whole rows, just fewer per row", () => {
+  assert.equal(bestFit({ availablePx: 340 }), 8);   // 4 par rangée
+  assert.equal(bestFit({ availablePx: 78 }), 2);    // 1 par rangée
+});
+
+test("a width too small for one machine still shows one rather than none", () => {
+  assert.equal(bestFit({ availablePx: 20 }), 2);
+});
+
+// Sans mesure — le premier rendu, avant que la bande n'existe — on retombe sur
+// le repli plutôt que sur zéro vignette.
+test("with nothing to measure the band falls back rather than emptying", () => {
+  assert.equal(bestFit({ availablePx: 0 }), BEST_LIMIT);
+  assert.equal(bestFit({ availablePx: null }), BEST_LIMIT);
+});
+
+test("the band's reveal step is a whole band, so every row stays full", () => {
+  const many = Array.from({ length: 200 }, (_, i) => ({
+    ...entry(1000 + i, 0.10 + i / 10000), weight: 100, epochUsd: 10,
+  }));
+  const data = { ...BEST, rows: [{ classValue: 100, classLabel: "x1", docCount: 1, chainCount: 1,
+    inked: half({ entries: many }), dormant: half({ entries: [] }) }] };
+  const html = rowsHtml(data, { bestLimit: 19 });
+  const band = html.slice(0, html.indexOf("</tr>"));
+  assert.equal((band.match(/class="chip/g) ?? []).length, 19);
+  assert.match(band, /data-next="38"/);
 });
