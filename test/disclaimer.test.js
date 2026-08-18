@@ -162,3 +162,19 @@ test("the view keeps a rule between itself and the filters on a phone", () => {
   const mobile = page.slice(page.indexOf("@media (max-width: 760px)"));
   assert.match(mobile, /#view\s*\{[^}]*border-bottom/);
 });
+
+// Une x3 re-inkée pèse comme une x6 et se vendait au prix d'une x3 sans que
+// rien ne le crie. Elle est cerclée, et c'est la seule chose entourée de la page.
+test("a re-inked machine is ringed, in a colour used for nothing else", () => {
+  assert.match(page, /--reink:/);
+  assert.match(page, /\.chip\.is-reinked img[^{]*\{[^}]*var\(--reink\)/);
+  const uses = (page.match(/var\(--reink\)/g) ?? []).length;
+  assert.ok(uses >= 3, "le cercle, son doublage et le badge");
+  // Si le rouge du re-encrage servait aussi aux erreurs, un poids doublé se
+  // lirait comme une panne.
+  assert.doesNotMatch(page, /\.(census|banner)[^{]*\{[^}]*var\(--reink\)/);
+});
+
+test("what a machine earns is coloured apart from what it costs", () => {
+  assert.match(page, /\.chip \.earns[^}]*var\(--under\)/);
+});

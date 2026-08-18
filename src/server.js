@@ -9,12 +9,13 @@ import { fetchListings, fetchCollectionStats } from "./opensea.js";
 import { loadTraits } from "./traits.js";
 import { loadMetadata } from "./metadata.js";
 import { deriveHeadwearLegend } from "./rarity.js";
-import { deriveDeskTickers, deriveBodyTickers } from "./desks.js";
 import { readInk } from "./ink.js";
 import { fetchPrinter, fetchEthUsd } from "./prices.js";
 import { readProtocol } from "./protocol.js";
 import { readAnvil } from "./anvil.js";
-import { readVote, readDeskIndex, deskShares, nameDesks } from "./vote.js";
+import { readVote, readDeskIndex } from "./vote.js";
+import { readPot } from "./pot.js";
+import { deskName } from "./desks.js";
 import { buildGrid } from "./floors.js";
 import { composeSnapshot } from "./snapshot.js";
 import { createStore } from "./store.js";
@@ -65,7 +66,6 @@ let weights = new Map();
 let inkMeta = { readAt: null, failures: null };
 let meta = new Map();
 let legend = null;
-let bodyTickers = new Map();
 // Le desk est scellé au mint : lu une fois au démarrage, jamais réinterrogé.
 let deskIndex = new Map();
 
@@ -93,6 +93,10 @@ async function sweepBook() {
   const vote = await readVote({ provider, epoch: protocol?.epoch })
     .catch((e) => { console.error(`vote: ${e.message}`); return null; });
 
+  // Le pot en attente : le solde USDG de celui qui achètera. Aucun contrat ne
+  // le nomme, et sans lui la page ne peut annoncer aucun retour.
+  const potUsd = await readPot({ provider }).catch(() => null);
+
   // L'anvil est lu après le carnet parce qu'il faut savoir quelles machines sont
   // en vente pour lui demander ce qu'il en donnerait — et avant la grille, parce
   // que son rayon se range dans les mêmes cases.
@@ -111,7 +115,7 @@ async function sweepBook() {
   const composed = composeSnapshot({
     grid, printer, eth, protocol, stats,
     book: { listed: book.listings.size, pages: book.pages, skipped: book.skipped },
-    inkMeta, meta, legend, bodyTickers, ink, weights, anvil, deskIndex, vote, now: Date.now(),
+    inkMeta, meta, legend, ink, weights, anvil, deskIndex, vote, potUsd, now: Date.now(),
   });
   store.succeed(composed);
 
@@ -206,34 +210,16 @@ const started = async () => {
       (loaded.filled ? `, ${loaded.filled} backfilled one by one` : "") + ")" +
       (amb ? `, ${amb} ambiguous headwear` : ", headwear maps cleanly to class"));
 
-    // Aucun contrat ne dit quel ticker porte le desk 7 : la correspondance se
-    // déduit en appariant les comptages de la chaîne au recensement publié.
-    // Si elle ne tient plus, on le dit et on n'affiche aucun ticker.
-    const desks = deriveDeskTickers(traits);
-    if (desks.ok) {
-      bodyTickers = deriveBodyTickers({ traits, meta, byIndex: desks.byIndex });
-      const named = [...bodyTickers.values()].filter(Boolean).length;
-      console.log(`desks: ${desks.byIndex.size} tickers resolved, ${named}/${bodyTickers.size} body colours named`);
-    } else {
-      console.error(`desks: no ticker mapping — ${desks.reason}`);
-    }
-
-    // Le desk lui-même vient désormais de la chaîne. La couleur ne fait plus que
-    // le nommer : elle range une machine dans un desk seulement si `deskOf` est
-    // illisible, et les deux se recoupent au démarrage.
+    // Le desk est scellé au mint et la chaîne le publie : lu une fois, jamais
+    // réinterrogé. La page le déduisait de la couleur du corps et le nommait
+    // d'après des tickers — c'était faux, et la déduction a disparu avec.
     deskIndex = await readDeskIndex({
       aggregate3: multicallOf(provider, ADDRESSES.MULTICALL3),
       ids: Array.from({ length: TOTAL_MACHINES }, (_, i) => i + 1),
       batchSize: cfg.multicallBatchSize,
     }).catch((e) => { console.error(`desks: deskOf unreadable — ${e.message}`); return new Map(); });
-    if (deskIndex.size) {
-      const { names, conflicts } = nameDesks({
-        deskIndex,
-        tickerOf: (id) => bodyTickers.get(meta.get(id)?.body) ?? null,
-      });
-      console.log(`desks: deskOf read for ${deskIndex.size} machines, ${names.size}/16 named by body colour` +
-        (conflicts.length ? `, ${conflicts.length} contradicted: ${conflicts.join(",")}` : ", none contradicted"));
-    }
+    const named = new Set([...deskIndex.values()].map(deskName).filter(Boolean));
+    console.log(`desks: ${deskIndex.size} machines placed across ${named.size} sectors`);
   } catch (e) {
     console.error(`metadata: ${e.message} — the dashboard runs without pictures`);
   }

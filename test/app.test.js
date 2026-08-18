@@ -171,8 +171,8 @@ test("the context strip survives a protocol read that came back empty", () => {
 
 // ---- filtres par trait ----
 
-const machineOf = (over = {}) => ({ image: "u", headwear: "Halo", body: "Sky", eyes: "UwU", ticker: "MSFT", ...over });
-const NO_FILTER = { Headwear: null, Body: null, Eyes: null };
+const machineOf = (over = {}) => ({ image: "u", headwear: "Halo", body: "Sky", eyes: "UwU", desk: "health", ...over });
+const NO_FILTER = { Desk: null, Headwear: null, Body: null, Eyes: null };
 
 test("with no filter set, every machine matches", () => {
   assert.equal(matchesFilter(machineOf(), NO_FILTER), true);
@@ -222,14 +222,14 @@ test("a cell where nothing matches says so, which is not the same as no listing"
 
 test("the filter bar offers every value with what is on sale and what exists", () => {
   const html = filterBarHtml({
-    Farms: [{ value: "MSFT", listed: 12, total: 886 }],
+    Desk: [{ value: "health", listed: 12, total: 1322 }],
     Headwear: [{ value: "Halo", listed: 9, total: 37 }],
-    Body: [{ value: "Sky", listed: 12, total: 501, ticker: "MSFT" }],
+    Body: [{ value: "Sky", listed: 12, total: 501 }],
     Eyes: [{ value: "UwU", listed: 3, total: 600 }],
   }, NO_FILTER);
   assert.match(html, /data-trait="Headwear"/);
   assert.match(html, /Halo.*9.*37/);
-  assert.match(html, /Sky.*MSFT/);          // le corps annonce le desk qu'il farme
+  assert.match(html, /health.*1,322/);
   assert.match(html, /UwU/);
   assert.equal((html.match(/<select/g) ?? []).length, 4);
 });
@@ -848,7 +848,7 @@ test("the shelf never carries the under-bid mark", () => {
 // milieu de six colorés se lisaient comme des oublis, pas comme une règle.
 test("every value in the bar is amber", () => {
   const html = contextHtml({ ...CTX, anvil: { spotPrinter: 14100, spotUsd: 168, shelf: 18, bidPaused: false } });
-  assert.equal(html.match(/<div class="stat">/g).length, 9);
+  assert.equal(html.match(/<div class="stat">/g).length, 10);
   assert.doesNotMatch(html, /is-price/);
 });
 
@@ -928,31 +928,31 @@ test("with nothing on OpenSea there is nothing to undercut", () => {
 // ---- filtrer par stock ----
 
 test("filtering by stock keeps the machines that farm it", () => {
-  const msft = machineOf({ ticker: "MSFT" });
-  const cost = machineOf({ ticker: "COST" });
-  assert.equal(matchesFilter(msft, { ...NO_FILTER, Farms: "MSFT" }), true);
-  assert.equal(matchesFilter(cost, { ...NO_FILTER, Farms: "MSFT" }), false);
+  const msft = machineOf({ desk: "health" });
+  const cost = machineOf({ desk: "utilities" });
+  assert.equal(matchesFilter(msft, { ...NO_FILTER, Desk: "health" }), true);
+  assert.equal(matchesFilter(cost, { ...NO_FILTER, Desk: "health" }), false);
 });
 
 test("a machine whose desk could not be resolved never satisfies a stock filter", () => {
-  assert.equal(matchesFilter(machineOf({ ticker: null }), { ...NO_FILTER, Farms: "MSFT" }), false);
+  assert.equal(matchesFilter(machineOf({ desk: null }), { ...NO_FILTER, Desk: "health" }), false);
 });
 
 test("the stock filter combines with the cosmetic ones", () => {
-  const f = { ...NO_FILTER, Farms: "MSFT", Headwear: "Halo" };
+  const f = { ...NO_FILTER, Desk: "health", Headwear: "Halo" };
   assert.equal(matchesFilter(machineOf({ ticker: "MSFT", headwear: "Halo" }), f), true);
   assert.equal(matchesFilter(machineOf({ ticker: "MSFT", headwear: "Blade" }), f), false);
 });
 
 test("the bar offers the stock menu first, before the cosmetic three", () => {
   const html = filterBarHtml({
-    Farms: [{ value: "MSFT", listed: 12, total: 886 }],
+    Desk: [{ value: "MSFT", listed: 12, total: 886 }],
     Headwear: [{ value: "Halo", listed: 9, total: 37 }],
     Body: [{ value: "Sky", listed: 12, total: 501, ticker: "MSFT" }],
     Eyes: [{ value: "UwU", listed: 3, total: 600 }],
   }, NO_FILTER);
   assert.equal((html.match(/<select/g) || []).length, 4);
-  assert.ok(html.indexOf('data-trait="Farms"') < html.indexOf('data-trait="Headwear"'));
+  assert.ok(html.indexOf('data-trait="Desk"') < html.indexOf('data-trait="Headwear"'));
   assert.match(html, /MSFT/);
 });
 
@@ -963,10 +963,10 @@ test("a filter narrows the shelf as well as the book", () => {
     entries: [],
     listed: 0,
     anvilEntries: [
-      shelfEntry({ tokenId: 1, machine: machineOf({ ticker: "MSFT" }) }),
-      shelfEntry({ tokenId: 2, machine: machineOf({ ticker: "COST" }) }),
+      shelfEntry({ tokenId: 1, machine: machineOf({ desk: "health" }) }),
+      shelfEntry({ tokenId: 2, machine: machineOf({ desk: "utilities" }) }),
     ],
-  }), "ink", { ethUsd: 1896, filter: { ...NO_FILTER, Farms: "MSFT" } });
+  }), "ink", { ethUsd: 1896, filter: { ...NO_FILTER, Desk: "health" } });
   assert.match(html, /#1</);
   assert.doesNotMatch(html, /#2</);
 });
@@ -974,8 +974,8 @@ test("a filter narrows the shelf as well as the book", () => {
 test("a shelf with nothing matching disappears rather than contradicting the count", () => {
   const html = halfCell(half({
     entries: [], listed: 0,
-    anvilEntries: [shelfEntry({ tokenId: 2, machine: machineOf({ ticker: "COST" }) })],
-  }), "ink", { ethUsd: 1896, filter: { ...NO_FILTER, Farms: "MSFT" } });
+    anvilEntries: [shelfEntry({ tokenId: 2, machine: machineOf({ desk: "utilities" }) })],
+  }), "ink", { ethUsd: 1896, filter: { ...NO_FILTER, Desk: "health" } });
   assert.doesNotMatch(html, /class="shelf"/);
 });
 
@@ -1146,9 +1146,9 @@ test("a dormant cell names what the activation costs, not just that it counts", 
 const ballot = (over = {}) => ({
   opened: true, finalized: false, closesAt: 1000 + 30 * 3600e3, conflicts: [],
   desks: [
-    { index: 0, ticker: "NVDA", votedWeight: 6000, share: 0.6 },
-    { index: 5, ticker: "AAPL", votedWeight: 4000, share: 0.4 },
-    { index: 13, ticker: "USAR", votedWeight: 0, share: 0 },
+    { index: 0, desk: "energy", votedWeight: 6000, share: 0.6 },
+    { index: 5, desk: "health", votedWeight: 4000, share: 0.4 },
+    { index: 13, desk: "retail", votedWeight: 0, share: 0 },
   ], ...over,
 });
 
@@ -1161,15 +1161,15 @@ test("a ballot nobody could open announces no share at all", () => {
 
 test("an open ballot leads with the desk that drew most, and the time left", () => {
   const html = ballotBlock(ballot(), 1, 1000);
-  assert.match(html, /NVDA 60\.0%/);
+  assert.match(html, /energy 60\.0%/);
   assert.match(html, /closes in 30h/);
   assert.match(html, /2 of 16 desks drew votes/);   // USAR à zéro n'en est pas
 });
 
 test("an open ballot with not one vote says so, rather than showing a winner", () => {
-  const html = ballotBlock(ballot({ desks: [{ index: 0, ticker: "NVDA", votedWeight: 0, share: null }] }), 1, 1000);
+  const html = ballotBlock(ballot({ desks: [{ index: 0, desk: "energy", votedWeight: 0, share: null }] }), 1, 1000);
   assert.match(html, /no vote yet/);
-  assert.doesNotMatch(html, /NVDA/);
+  assert.doesNotMatch(html, /energy/);
 });
 
 test("a ballot that could not be read says so, never that nothing was voted", () => {
@@ -1180,26 +1180,26 @@ test("a ballot that could not be read says so, never that nothing was voted", ()
 
 test("the stock menu carries what each desk drew out of the pot", () => {
   const html = filterBarHtml(
-    { Farms: [{ value: "NVDA", listed: 116, total: 1245 }, { value: "AAPL", listed: 150, total: 1322 }],
+    { Desk: [{ value: "energy", listed: 116, total: 1245 }, { value: "health", listed: 150, total: 1322 }],
       Headwear: [], Body: [], Eyes: [] },
     NO_FILTER, ballot());
-  assert.match(html, /NVDA — 60\.0% of the pot \(116 on sale of 1,245\)/);
-  assert.match(html, /AAPL — 40\.0% of the pot/);
+  assert.match(html, /energy — 60\.0% of the pot \(116 on sale of 1,245\)/);
+  assert.match(html, /health — 40\.0% of the pot/);
 });
 
 // Le desk n'a de valeur mesurable que pendant une epoch votée. Hors bulletin le
 // menu ne doit rien laisser entendre : une part absente n'est pas une part nulle.
 test("with no ballot the stock menu claims no share", () => {
   const html = filterBarHtml(
-    { Farms: [{ value: "NVDA", listed: 116, total: 1245 }], Headwear: [], Body: [], Eyes: [] },
+    { Desk: [{ value: "energy", listed: 116, total: 1245 }], Headwear: [], Body: [], Eyes: [] },
     NO_FILTER, null);
-  assert.match(html, /NVDA \(116 on sale of 1,245\)/);
+  assert.match(html, /energy \(116 on sale of 1,245\)/);
   assert.doesNotMatch(html, /of the pot/);
 });
 
 test("only the stock menu speaks of the pot; the cosmetic three cannot", () => {
   const html = filterBarHtml(
-    { Farms: [{ value: "NVDA", listed: 1, total: 1 }], Headwear: [{ value: "NVDA", listed: 1, total: 1 }],
+    { Desk: [{ value: "energy", listed: 1, total: 1 }], Headwear: [{ value: "energy", listed: 1, total: 1 }],
       Body: [], Eyes: [] },
     NO_FILTER, ballot());
   assert.equal((html.match(/of the pot/g) ?? []).length, 1);
@@ -1212,14 +1212,14 @@ test("only the stock menu speaks of the pot; the cosmetic three cannot", () => {
 test("a ticker is escaped on its way into the page, wherever it came from", () => {
   const evil = '<img src=x onerror=alert(1)>';
   const bar = filterBarHtml(
-    { Farms: [{ value: "X", listed: 1, total: 1, ticker: evil }], Headwear: [], Body: [], Eyes: [] },
+    { Desk: [{ value: evil, listed: 1, total: 1 }], Headwear: [], Body: [], Eyes: [] },
     NO_FILTER);
   assert.doesNotMatch(bar, /<img src=x/);
   assert.match(bar, /&lt;img src=x/);
 
   const block = ballotBlock({
     opened: true, closesAt: null, finalized: false, conflicts: [],
-    desks: [{ index: 0, ticker: evil, votedWeight: 10, share: 1 }],
+    desks: [{ index: 0, desk: evil, votedWeight: 10, share: 1 }],
   }, 1, 1000);
   assert.doesNotMatch(block, /<img src=x/);
   assert.match(block, /&lt;img src=x/);

@@ -1,6 +1,7 @@
 import { ethers } from "ethers";
 import { ADDRESSES } from "./config.js";
 import { readUintMap } from "./multicall.js";
+import { deskName } from "./desks.js";
 
 /**
  * Le scrutin — contrat VOTE, `0x315A3aef…`.
@@ -99,31 +100,15 @@ export async function readVote({ provider, epoch }) {
 }
 
 /**
- * Ce que chaque desk a tiré du pot, nommé.
+ * Ce que chaque desk a tiré du pot.
  *
- * L'index vient de `MINE.deskOf`, qui fait autorité ; le nom vient de la
- * couleur du corps, seule source qui les nomme. Les deux se recoupent machine
- * par machine : un index qui porterait deux noms serait une contradiction, et
- * elle est signalée plutôt que tranchée au hasard.
+ * L'index vient de la chaîne, le nom de la table des secteurs. Il n'y a plus
+ * rien à recouper : la page nommait ces desks d'après des tickers déduits, et
+ * la déduction était fausse.
  */
-export function nameDesks({ deskIndex, tickerOf }) {
-  const names = new Map();
-  const conflicts = new Set();
-  for (const [tokenId, index] of deskIndex ?? []) {
-    const ticker = tickerOf?.(tokenId);
-    if (!ticker) continue;
-    const seen = names.get(index);
-    if (seen === undefined) names.set(index, ticker);
-    else if (seen !== ticker) conflicts.add(index);
-  }
-  for (const index of conflicts) names.delete(index);
-  return { names, conflicts: [...conflicts].sort((a, b) => a - b) };
-}
-
-export function deskShares({ vote, deskIndex, tickerOf }) {
+export function deskShares({ vote }) {
   if (!vote) return null;
 
-  const { names, conflicts } = nameDesks({ deskIndex, tickerOf });
   const total = vote.totalVotes;
   const desks = [];
   for (let index = 0; index < DESK_SLOTS; index++) {
@@ -131,9 +116,9 @@ export function deskShares({ vote, deskIndex, tickerOf }) {
     if (weight === undefined) continue;
     desks.push({
       index,
-      ticker: names.get(index) ?? null,
-      // Le poids voté, en points de poids : une machine vote avec son poids,
-      // pas pour une voix.
+      desk: deskName(index),
+      // Le poids voté, en points : une machine vote avec son poids, pas pour
+      // une voix.
       votedWeight: Number(weight / 100n),
       // Sans une seule voix il n'y a pas de part à annoncer — pas une part nulle.
       share: total > 0n ? Number((weight * 1000000n) / total) / 1000000 : null,
@@ -141,5 +126,5 @@ export function deskShares({ vote, deskIndex, tickerOf }) {
   }
 
   desks.sort((a, b) => b.votedWeight - a.votedWeight || a.index - b.index);
-  return { desks, conflicts, opened: vote.opened, finalized: vote.finalized, closesAt: vote.closesAt };
+  return { desks, opened: vote.opened, finalized: vote.finalized, closesAt: vote.closesAt };
 }

@@ -195,7 +195,7 @@ export function ballotBlock(vote, epoch, now) {
     : `closes in ${Math.round(left / 3600000)}h`;
 
   return statBlock("Ballot",
-    `${top.ticker ? esc(top.ticker) : `desk ${top.index}`} ${fmtRatio(top.share)}`,
+    `${top.desk ? esc(top.desk) : `desk ${top.index}`} ${fmtRatio(top.share)}`,
     [when, `${voted.length} of 16 desks drew votes`].filter(Boolean).join(" · "));
 }
 
@@ -239,6 +239,13 @@ export function contextHtml(d, now = null) {
     statBlock("Inked machines", fmtInt(d.totals?.inked),
       `${fmtInt(d.totals?.dormant)} dormant · ${fmtInt(d.totals?.listed)} listed`),
     anvilBlock(d.anvil),
+    // Le pot et le poids de la flotte : les deux nombres qui transforment le
+    // poids d'une machine en dollars. Sans eux le rendement affiché sur chaque
+    // vignette serait un chiffre sorti de nulle part.
+    statBlock("Pot waiting", d.pot?.usd ? fmtBig(d.pot.usd) : "—",
+      d.pot?.fleetWeight
+        ? `sell fees in USDG · split across ${fmtInt(Math.round(d.pot.fleetWeight / 100))}x of live weight`
+        : "sell fees in USDG, waiting on a ballot"),
     ballotBlock(d.vote, d.protocol?.epoch, now),
     statBlock("Epoch", pr.epoch ?? "—", ceilingLine(pr)),
   ].join("");
@@ -266,8 +273,17 @@ function chip(e, { isFloor = false, ethUsd = null, anvil = false, showPrice = tr
   const dollars = anvil ? fmtUsdShort(e.askUsd) : fmtUsdShort(usdOf(e.priceEth, ethUsd));
 
   // Une machine re-inkée pèse plus que ne le dit sa ligne — vrai des deux côtés.
+  // Elle est cerclée : c'est la seule anomalie utile du tableau, une x3 qui
+  // pèse comme une x6 se noie sinon au milieu des x3 au même prix.
   const reinked = e.inkMult > 1.0001 && e.weight;
   const badge = reinked ? `<span class="reink">${e.weight / 100}x</span>` : "";
+
+  // Ce que la machine toucherait si le pot tombait maintenant. C'est le chiffre
+  // qu'on vient chercher : le prix est ce qu'on paie, celui-ci est ce qu'on
+  // reçoit. Une dormante affiche zéro, ce qui est vrai et non pas manquant.
+  const earns = e.epochUsd === null || e.epochUsd === undefined
+    ? ""
+    : `<span class="earns">${e.epochUsd >= 1 ? fmtUsd(e.epochUsd, 0) : fmtUsd(e.epochUsd, 2)}</span>`;
   const inkStory = reinked
     ? ` · re-inked ×${e.inkMult.toFixed(2)} — ${fmtInt(e.inkPrinter)} $PRINTER burned · weight ${e.weight / 100}x`
     : "";
@@ -283,18 +299,24 @@ function chip(e, { isFloor = false, ethUsd = null, anvil = false, showPrice = tr
       (e.askEth ? ` · ≈${fmtEth(e.askEth)} ETH` : "")
     : "";
 
+  const earnStory = e.epochUsd === null || e.epochUsd === undefined
+    ? ""
+    : ` · earns ${fmtUsd(e.epochUsd)} a drop at weight ${e.weight / 100}x` +
+      ` — up to ${fmtUsd(e.epochUsd * 2)} if the vote lands on its desk`;
+
   const pointStory = perPoint !== null
     ? ` · ${fmtUsd(perPoint, 0)} per weight point` +
       (e.dormantHere ? ", activation included" : "") +
       ` · asking ${fmtEth(e.priceEth)} ETH`
     : "";
 
-  return `<a class="chip${isFloor ? " floor" : ""}${anvil ? " anvil" : ""}${!anvil && e.underBid ? " is-under" : ""}"` +
+  return `<a class="chip${isFloor ? " floor" : ""}${anvil ? " anvil" : ""}${!anvil && e.underBid ? " is-under" : ""}${reinked ? " is-reinked" : ""}"` +
     ` href="${anvil ? ANVIL_URL : itemUrl(e.tokenId)}" target="_blank" rel="noopener"` +
-    ` title="${esc(`#${e.tokenId}${hw}${pointStory}${inkStory}${bidStory}${anvilStory}`)}">` +
+    ` title="${esc(`#${e.tokenId}${hw}${earnStory}${pointStory}${inkStory}${bidStory}${anvilStory}`)}">` +
     `<span class="thumb">${img}${badge}${under}</span>` +
     (showPrice ? `<span class="price">${price}</span>` : "") +
     (showPrice && dollars ? `<span class="usd">${dollars}</span>` : "") +
+    earns +
     `<span class="tok">#${e.tokenId}</span>` +
   `</a>`;
 }
@@ -306,13 +328,16 @@ function gapLabel(e) {
   return gap < 1 ? "&lt;1%" : `+${gap}%`;
 }
 
-/** « Farms » d'abord : le desk vient du Body, il est scellé au mint, et la
- *  machine touche le double sur la part achetée pour ce desk. C'est la seule
- *  des quatre dimensions qui change ce que la machine rapporte. */
-export const TRAIT_TYPES = Object.freeze(["Farms", "Headwear", "Body", "Eyes"]);
-const FIELD = Object.freeze({ Farms: "ticker", Headwear: "headwear", Body: "body", Eyes: "eyes" });
+/** Le desk d'abord : c'est un secteur scellé au mint que la chaîne publie, et
+ *  la machine touche le double sur la part achetée pour lui. Seule des quatre
+ *  dimensions à changer ce que la machine rapporte — les trois autres sont
+ *  cosmétiques. Elle s'appelait « Farms » et se nommait d'après des tickers
+ *  déduits d'une couleur de corps ; les tickers sont ce que le bulletin
+ *  propose, pas ce que les machines portent. */
+export const TRAIT_TYPES = Object.freeze(["Desk", "Headwear", "Body", "Eyes"]);
+const FIELD = Object.freeze({ Desk: "desk", Headwear: "headwear", Body: "body", Eyes: "eyes" });
 
-export const EMPTY_FILTER = Object.freeze({ Farms: null, Headwear: null, Body: null, Eyes: null });
+export const EMPTY_FILTER = Object.freeze({ Desk: null, Headwear: null, Body: null, Eyes: null });
 
 export const filterIsActive = (filter) => TRAIT_TYPES.some((t) => filter?.[t]);
 
@@ -586,15 +611,14 @@ export function filterBarHtml(traitFilters, filter, vote = null) {
   // cosmétique : c'est le seul dont la valeur change avec un vote, et le menu
   // ne peut pas laisser croire que les seize se valent.
   const share = new Map();
-  for (const dk of vote?.desks ?? []) if (dk.ticker && dk.share !== null) share.set(dk.ticker, dk.share);
+  for (const dk of vote?.desks ?? []) if (dk.desk && dk.share !== null) share.set(dk.desk, dk.share);
 
   return TRAIT_TYPES.map((type) => {
     const values = traitFilters[type] ?? [];
     const options = values.map((v) => {
-      const ticker = v.ticker ? ` — ${esc(v.ticker)}` : "";
-      const pot = type === "Farms" && share.has(v.value) ? ` — ${fmtRatio(share.get(v.value))} of the pot` : "";
+      const pot = type === "Desk" && share.has(v.value) ? ` — ${fmtRatio(share.get(v.value))} of the pot` : "";
       const chosen = filter?.[type] === v.value ? " selected" : "";
-      return `<option value="${esc(v.value)}"${chosen}>${esc(v.value)}${ticker}${pot} (${fmtInt(v.listed)} on sale of ${fmtInt(v.total)})</option>`;
+      return `<option value="${esc(v.value)}"${chosen}>${esc(v.value)}${pot} (${fmtInt(v.listed)} on sale of ${fmtInt(v.total)})</option>`;
     }).join("");
     return `<label class="fl"><span class="label">${type}</span>` +
       `<select data-trait="${type}"><option value="">any</option>${options}</select></label>`;
@@ -722,7 +746,7 @@ if (typeof document !== "undefined") {
       const rows = new Map((traitFilters[select.dataset.trait] ?? []).map((v) => [v.value, v]));
       for (const option of select.options) {
         const v = rows.get(option.value);
-        if (v) option.textContent = `${v.value}${v.ticker ? ` — ${v.ticker}` : ""} (${v.listed} on sale of ${v.total})`;
+        if (v) option.textContent = `${v.value} (${v.listed} on sale of ${v.total})`;
       }
     }
   };

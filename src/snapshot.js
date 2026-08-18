@@ -1,12 +1,14 @@
 import { buildTraitIndex } from "./traitindex.js";
 import { TOTAL_MACHINES, OPERATING_CHARGE_PRINTER } from "./config.js";
 import { deskShares } from "./vote.js";
+import { deskName } from "./desks.js";
+import { epochUsd } from "./pot.js";
 
 /** Assemblage pur de tout ce dont la page a besoin. Une dérivation qui
  *  diviserait par une valeur non lue produit null plutôt qu'un zéro confiant. */
 export function composeSnapshot({
-  grid, printer, eth, protocol, stats, book, inkMeta, meta, legend, bodyTickers, ink, weights, anvil,
-  deskIndex, vote, now,
+  grid, printer, eth, protocol, stats, book, inkMeta, meta, legend, ink, weights, anvil,
+  deskIndex, vote, potUsd, now,
 }) {
   const activationPrinter = protocol?.activationInk
     ? Number(BigInt(protocol.activationInk) / 10n ** 15n) / 1000
@@ -32,12 +34,21 @@ export function composeSnapshot({
   const machineOf = (tokenId) => {
     const m = meta?.get(tokenId);
     if (!m) return null;
-    // Le ticker voyage avec la machine : la page filtre et étiquette sans
-    // avoir à refaire la correspondance corps -> desk pour chaque vignette.
-    return { ...m, ticker: bodyTickers?.get(m.body) ?? null };
+    // Le desk voyage avec la machine : la page filtre et étiquette sans avoir
+    // à retraverser l'index pour chaque vignette. C'est un secteur, lu sur la
+    // chaîne — plus une couleur de corps interprétée.
+    return { ...m, desk: deskName(deskIndex?.get(tokenId)) };
   };
 
   const PRINTER = 10n ** 18n;
+
+  // Ce qu'une machine toucherait si le pot était distribué maintenant. Le poids
+  // total est celui de la chaîne : une dormante pèse zéro, donc il ne compte
+  // déjà que les machines qui gagnent.
+  const fleetWeight = protocol?.totalWeight === null || protocol?.totalWeight === undefined
+    ? null
+    : Number(protocol.totalWeight);
+  const returnOf = (weight) => epochUsd({ weight, totalWeight: fleetWeight, potUsd });
 
   /**
    * Ce que l'anvil paierait, exprimé en ETH pour être comparable à un prix
@@ -74,6 +85,7 @@ export function composeSnapshot({
       // autre, et sa vignette doit pouvoir le dire.
       weight,
       inkMult: weight ? weight / classValue : null,
+      epochUsd: returnOf(weight),
       askUsd: printer?.usd ? e.askPrinter * printer.usd : null,
       askEth: printer?.usd && eth?.usd ? (e.askPrinter * printer.usd) / eth.usd : null,
     };
@@ -92,6 +104,7 @@ export function composeSnapshot({
         machine: machineOf(e.tokenId),
         weight,
         inkPrinter: i === undefined ? null : Number(i / PRINTER),
+        epochUsd: returnOf(weight),
         // Une machine dormante ne pèse rien : un rapport n'aurait aucun sens.
         inkMult: weight ? weight / classValue : null,
         anvilBidPrinter: anvil?.bids?.get(e.tokenId) ?? null,
@@ -145,11 +158,17 @@ export function composeSnapshot({
     at: now,
     rows,
     legend: legend ?? null,
-    traitFilters: meta ? buildTraitIndex({ meta, listed, bodyTickers }) : null,
+    traitFilters: meta ? buildTraitIndex({ meta, listed, deskOf: (id) => deskName(deskIndex?.get(id)) }) : null,
     excluded: grid.excluded,
     totals: grid.totals,
     printer,
     eth,
+    // Le pot en attente et le poids de la flotte : les deux nombres qui
+    // transforment un poids en dollars.
+    pot: {
+      usd: potUsd ?? null,
+      fleetWeight,
+    },
     ink: {
       activationPrinter,
       activationUsd,
@@ -163,7 +182,7 @@ export function composeSnapshot({
     // Le scrutin décide de la taille des parts du pot, donc du coefficient qui
     // s'applique par desk. Illisible, il vaut null : la page dira qu'elle ne
     // sait pas plutôt que d'annoncer seize parts égales, qu'elles ne sont pas.
-    vote: deskShares({ vote, deskIndex, tickerOf: (id) => bodyTickers?.get(meta?.get(id)?.body) ?? null }),
+    vote: deskShares({ vote }),
     book,
     collection,
     anvil: anvil

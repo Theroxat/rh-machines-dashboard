@@ -38,24 +38,15 @@ test("values are listed alphabetically, so a known one is easy to find", () => {
   assert.deepEqual(index.Headwear.map((v) => v.value), ["Alert", "Mohawk", "Zebra"]);
 });
 
-test("body values carry the ticker they farm, and the other traits do not", () => {
+test("the desk is its own dimension, and no trait carries a ticker any more", () => {
   const index = buildTraitIndex({
     meta: metaOf([[1, "Halo", "Sky", "UwU"]]),
     listed: new Set([1]),
-    bodyTickers: new Map([["Sky", "MSFT"]]),
+    deskOf: () => "health",
   });
-  assert.equal(index.Body[0].ticker, "MSFT");
+  assert.equal(index.Desk[0].value, "health");
   assert.equal("ticker" in index.Headwear[0], false);
-  assert.equal("ticker" in index.Eyes[0], false);
-});
-
-test("a body colour with no resolved desk gets a null ticker, never a guessed one", () => {
-  const index = buildTraitIndex({
-    meta: metaOf([[1, "Halo", "Sky", "UwU"]]),
-    listed: new Set(),
-    bodyTickers: new Map(),
-  });
-  assert.equal(index.Body[0].ticker, null);
+  assert.equal("ticker" in index.Body[0], false);
 });
 
 test("a machine missing a trait is skipped for that trait, not counted as blank", () => {
@@ -68,34 +59,35 @@ test("a machine missing a trait is skipped for that trait, not counted as blank"
   assert.equal(index.Headwear[0].total, 2);
 });
 
-// Le desk vient du Body et décide du stock sur lequel la machine touche double.
-// C'est la seule dimension mécanique des quatre : les trois autres sont
-// cosmétiques. Elle vient donc en premier.
-test("the stock a machine farms is indexed as its own dimension, first", () => {
-  assert.deepEqual(TRAIT_TYPES, ["Farms", "Headwear", "Body", "Eyes"]);
+// Le desk est un secteur scellé au mint, lu sur la chaîne. C'est la seule
+// dimension mécanique des quatre — les trois autres sont cosmétiques — donc
+// elle vient en premier. Elle se nommait d'après des tickers déduits d'une
+// couleur de corps ; c'était faux.
+test("the desk a machine sits on is indexed as its own dimension, first", () => {
+  assert.deepEqual(TRAIT_TYPES, ["Desk", "Headwear", "Body", "Eyes"]);
 });
 
-test("machines are grouped by the ticker their body puts them on", () => {
+test("machines are grouped by the sector the chain puts them on", () => {
   const index = buildTraitIndex({
     meta: new Map([
       [1, { image: "u", headwear: "Halo", body: "Sky", eyes: "UwU" }],
-      [2, { image: "u", headwear: "Fez", body: "Sky Stripe", eyes: "Rage" }],
+      [2, { image: "u", headwear: "Fez", body: "Amber", eyes: "Rage" }],
       [3, { image: "u", headwear: "Fez", body: "Concrete", eyes: "Rage" }],
     ]),
     listed: new Set([1, 3]),
-    bodyTickers: new Map([["Sky", "MSFT"], ["Sky Stripe", "MSFT"], ["Concrete", "COST"]]),
+    deskOf: (id) => (id === 3 ? "utilities" : "health"),
   });
-  const msft = index.Farms.find((v) => v.value === "MSFT");
-  assert.equal(msft.total, 2);      // deux couleurs de corps, un seul desk
-  assert.equal(msft.listed, 1);
-  assert.equal(index.Farms.find((v) => v.value === "COST").total, 1);
+  const health = index.Desk.find((v) => v.value === "health");
+  assert.equal(health.total, 2);      // deux couleurs de corps, un seul secteur
+  assert.equal(health.listed, 1);
+  assert.equal(index.Desk.find((v) => v.value === "utilities").total, 1);
 });
 
-test("a body whose desk could not be resolved joins no ticker", () => {
+test("a machine the chain places on no desk joins no sector", () => {
   const index = buildTraitIndex({
     meta: new Map([[1, { image: "u", headwear: "Halo", body: "Sky", eyes: "UwU" }]]),
     listed: new Set(),
-    bodyTickers: new Map(),
+    deskOf: () => null,
   });
-  assert.deepEqual(index.Farms, []);
+  assert.deepEqual(index.Desk, []);
 });

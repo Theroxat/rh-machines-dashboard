@@ -50,17 +50,39 @@ const withGrid = {
   legend: { byClass: [], headwearClass: new Map(), ambiguous: [], unpaired: 0 },
 };
 
-test("every machine on sale carries its picture, its traits and the ticker it farms", () => {
-  const s = composeSnapshot({ ...withGrid, bodyTickers: new Map([["Cobalt Stripe", "GOOGL"]]) });
+test("every machine on sale carries its picture, its traits and the desk it sits on", () => {
+  const s = composeSnapshot({ ...withGrid, deskIndex: new Map([[1253, 9]]) });
   assert.deepEqual(s.rows[0].inked.entries[0].machine, {
     image: "https://img/1253.webp", headwear: "Blueberries", body: "Cobalt Stripe",
-    eyes: "Rage", ticker: "GOOGL",
+    eyes: "Rage", desk: "utilities",
   });
 });
 
-test("a body colour with no resolved desk yields a null ticker, not a missing key", () => {
+// Le desk vient de la chaîne, plus d'une couleur interprétée. Une machine que
+// la chaîne ne place pas n'emprunte le secteur de personne.
+test("a machine the chain places nowhere yields a null desk, not a missing key", () => {
   const s = composeSnapshot(withGrid);
-  assert.equal(s.rows[0].inked.entries[0].machine.ticker, null);
+  assert.equal(s.rows[0].inked.entries[0].machine.desk, null);
+});
+
+// Le pot divisé par le poids : c'est le chiffre que le porteur vient chercher,
+// et il doit tomber sur celui que le terminal officiel lui montre ailleurs.
+test("every machine on sale says what it would earn if the pot dropped now", () => {
+  const s = composeSnapshot({
+    ...withGrid,
+    protocol: { ...withGrid.protocol, totalWeight: 1140002n },
+    potUsd: 160745,
+    weights: new Map([[1253, 600n]]),
+  });
+  assert.equal(s.rows[0].inked.entries[0].epochUsd.toFixed(2), "84.60");
+  assert.equal(s.pot.usd, 160745);
+  assert.equal(s.pot.fleetWeight, 1140002);
+});
+
+test("with no pot read no machine claims a return", () => {
+  const s = composeSnapshot({ ...withGrid, weights: new Map([[1253, 600n]]) });
+  assert.equal(s.rows[0].inked.entries[0].epochUsd, null);
+  assert.equal(s.pot.usd, null);
 });
 
 test("the trait index counts what is on sale against what exists", () => {

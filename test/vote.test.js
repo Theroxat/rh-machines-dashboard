@@ -11,27 +11,21 @@ const voteOf = (over = {}) => ({
 // poids brut — 100 par x1 tout juste activée — et se lit en points.
 const tallyOf = (pairs) => new Map(pairs.map(([d, w]) => [d, BigInt(w)]));
 
-const INDEX = new Map([[1, 5], [2, 5], [3, 0], [4, 14]]);
-const TICKERS = new Map([[1, "AAPL"], [2, "AAPL"], [3, "NVDA"], [4, "ETH"]]);
-const tickerOf = (id) => TICKERS.get(id) ?? null;
-
 test("a desk's share is what it drew out of every vote cast", () => {
   const { desks } = deskShares({
     vote: voteOf({ opened: true, tally: tallyOf([[5, 30000], [0, 10000]]), totalVotes: 40000n }),
-    deskIndex: INDEX, tickerOf,
   });
-  const aapl = desks.find((d) => d.ticker === "AAPL");
-  assert.equal(aapl.share, 0.75);
-  assert.equal(aapl.votedWeight, 300);
-  assert.equal(desks.find((d) => d.ticker === "NVDA").share, 0.25);
+  const health = desks.find((d) => d.desk === "health");
+  assert.equal(health.share, 0.75);
+  assert.equal(health.votedWeight, 300);
+  assert.equal(desks.find((d) => d.desk === "energy").share, 0.25);
 });
 
 test("the desk that drew most comes first, whatever its index", () => {
   const { desks } = deskShares({
-    vote: voteOf({ opened: true, tally: tallyOf([[0, 100], [5, 900], [14, 500]]), totalVotes: 1500n }),
-    deskIndex: INDEX, tickerOf,
+    vote: voteOf({ opened: true, tally: tallyOf([[0, 100], [5, 900], [10, 500]]), totalVotes: 1500n }),
   });
-  assert.deepEqual(desks.map((d) => d.ticker), ["AAPL", "ETH", "NVDA"]);
+  assert.deepEqual(desks.map((d) => d.desk), ["health", "real estate", "energy"]);
 });
 
 // Un desk sans voix ne reçoit rien du pot. C'est un fait, pas une absence de
@@ -39,11 +33,10 @@ test("the desk that drew most comes first, whatever its index", () => {
 test("a desk nobody voted for keeps its line, at nothing", () => {
   const { desks } = deskShares({
     vote: voteOf({ opened: true, tally: tallyOf([[5, 1000], [0, 0]]), totalVotes: 1000n }),
-    deskIndex: INDEX, tickerOf,
   });
-  const nvda = desks.find((d) => d.ticker === "NVDA");
-  assert.equal(nvda.votedWeight, 0);
-  assert.equal(nvda.share, 0);
+  const energy = desks.find((d) => d.desk === "energy");
+  assert.equal(energy.votedWeight, 0);
+  assert.equal(energy.share, 0);
 });
 
 // Zéro voix et zéro part ne sont pas la même chose : avant l'ouverture du
@@ -52,34 +45,24 @@ test("a desk nobody voted for keeps its line, at nothing", () => {
 test("before a single vote no share is announced, rather than a share of nothing", () => {
   const { desks, opened } = deskShares({
     vote: voteOf({ tally: tallyOf([[5, 0], [0, 0]]), totalVotes: 0n }),
-    deskIndex: INDEX, tickerOf,
   });
   assert.equal(opened, false);
   for (const d of desks) assert.equal(d.share, null);
 });
 
-test("an index that two tickers claim is reported, not arbitrated", () => {
-  const { desks, conflicts } = deskShares({
-    vote: voteOf({ opened: true, tally: tallyOf([[5, 100]]), totalVotes: 100n }),
-    deskIndex: new Map([[1, 5], [2, 5]]),
-    tickerOf: (id) => (id === 1 ? "AAPL" : "TSLA"),
+// Les desks se nommaient d'après des tickers déduits d'une couleur de corps.
+// C'était faux : ce sont des secteurs, et la chaîne les indexe.
+test("every desk is named for its sector, never for a stock", () => {
+  const { desks } = deskShares({
+    vote: voteOf({ opened: true, tally: tallyOf([[7, 100], [15, 50]]), totalVotes: 150n }),
   });
-  assert.deepEqual(conflicts, [5]);
-  assert.equal(desks.find((d) => d.index === 5).ticker, null);
-});
-
-test("a machine whose ticker is unknown names no desk and breaks none", () => {
-  const { desks, conflicts } = deskShares({
-    vote: voteOf({ opened: true, tally: tallyOf([[5, 100]]), totalVotes: 100n }),
-    deskIndex: new Map([[1, 5], [9, 5]]),
-    tickerOf: (id) => (id === 1 ? "AAPL" : null),
-  });
-  assert.deepEqual(conflicts, []);
-  assert.equal(desks.find((d) => d.index === 5).ticker, "AAPL");
+  assert.equal(desks.find((d) => d.index === 7).desk, "tech");
+  assert.equal(desks.find((d) => d.index === 15).desk, "semis");
+  for (const d of desks) assert.doesNotMatch(d.desk, /^[A-Z]{3,5}$/);
 });
 
 test("a ballot that could not be read at all yields nothing, never an empty tally", () => {
-  assert.equal(deskShares({ vote: null, deskIndex: INDEX, tickerOf }), null);
+  assert.equal(deskShares({ vote: null }), null);
 });
 
 test("the ballot carries sixteen desks", () => {

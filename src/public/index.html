@@ -27,6 +27,9 @@
     --ink:      #f0a41c;
     --dormant:  #6b8ba4;
     --alarm:    #d9564b;
+    /* Le re-encrage n'est pas une alarme et n'est pas un prix : il lui faut sa
+       propre couleur, la seule chaude qui ne serve à rien d'autre. */
+    --reink:    #ff4d3d;
     /* La seule couleur ajoutée depuis le début, et elle porte un sens précis :
        ce listing s'échange sous ce que le protocole lui-même en donnerait. */
     --under:    #6fbf73;
@@ -271,12 +274,22 @@
     position: absolute;
     top: 0; right: 0;
     padding: 0 3px;
-    background: var(--ink);
+    background: var(--reink);
     color: var(--paper);
-    font-size: 10px;
+    font-size: 10.5px;
     font-weight: 700;
     line-height: 1.5;
   }
+
+  /* Une x3 qui pèse comme une x6 se noyait au milieu des x3 au même prix. Elle
+     est cerclée : le badge dit combien, le cercle dit qu'il y a quelque chose à
+     lire. C'est la seule chose entourée de toute la page. */
+  .chip.is-reinked img, .chip.is-reinked .noimg {
+    border: 2px solid var(--reink);
+    outline: 1px solid var(--reink);
+    outline-offset: 1px;
+  }
+  .chip.is-reinked .tok { color: var(--reink); font-weight: 700; }
   .chip img, .chip .noimg {
     display: block;
     width: 60px; height: 60px;
@@ -287,6 +300,10 @@
   .chip .noimg { background: repeating-linear-gradient(45deg, var(--paper-2) 0 4px, var(--paper) 4px 8px); }
   .chip .price { display: block; font-size: 12px; font-weight: 600; margin-top: 3px; }
   .chip .usd   { display: block; font-size: 11.5px; color: var(--text); }
+  /* Ce que la machine rapporte, distinct de ce qu'elle coûte : le vert est déjà
+     la couleur de ce que le protocole verse, il ne peut pas se lire comme un
+     prix de plus. */
+  .chip .earns { display: block; font-size: 12px; font-weight: 700; color: var(--under); }
   .chip .tok   { display: block; font-size: 10.5px; color: var(--dim); }
 
   /* Le badge porte l'écart ; la phrase au-dessus de la bande dit ce qu'il veut
