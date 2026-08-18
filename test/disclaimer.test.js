@@ -229,3 +229,10 @@ test("the field is built like the filters, not like a banner", () => {
   // Un bouton bordé, comme « clear » — pas un aplat ambre.
   assert.doesNotMatch(page, /\.w-go[^{]*\{[^}]*background: var\(--ink\)/);
 });
+
+// Ailleurs sur la page l'intitulé est au-dessus de sa commande ; ici il est à
+// côté. Aligner sur le bas le faisait plonger sous la boîte de saisie.
+test("the wallet label faces its field rather than sinking under it", () => {
+  assert.match(page, /\.wallet-line \{[^}]*align-items: center/);
+  assert.doesNotMatch(page, /\.wallet-line \.label \{[^}]*padding-bottom/);
+});

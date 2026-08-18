@@ -202,8 +202,11 @@
      même intitulé, même champ, même bordure. C'est une commande de plus, pas
      un encart — en carte marquée dans le bandeau il se lisait comme une
      publicité au milieu des chiffres. */
-  .wallet-line { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; margin-top: 20px; }
-  .wallet-line .label { flex: none; padding-bottom: 5px; }
+  /* Aligné sur le milieu, pas sur le bas : ailleurs sur la page l'intitulé est
+     au-dessus de sa commande, donc `flex-end` les met à la même base. Ici il
+     est à côté, et la même règle le faisait plonger sous la boîte de saisie. */
+  .wallet-line { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 20px; }
+  .wallet-line .label { flex: none; }
   #wallet-input {
     font-family: inherit; font-size: 13px; color: var(--text);
     background: var(--paper-2); border: 1px solid var(--rule-2); border-radius: 0;
