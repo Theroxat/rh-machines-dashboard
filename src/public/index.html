@@ -244,6 +244,15 @@
   .cls-point .from { color: var(--dim); }
 
   .census { color: var(--dim); font-size: 11.5px; }
+
+  /* La bande de tête. Elle traverse les deux colonnes parce qu'elle ne parle ni
+     d'une classe ni d'un état : c'est le seul endroit du tableau où une x1 et
+     une x10 se comparent. Un filet plus marqué la sépare des sept lignes de
+     rareté, sans quoi elle se lirait comme une huitième classe. */
+  .best-row td { border-bottom: 2px solid var(--rule-2); }
+  .best-row .cls { color: var(--under); }
+  .best-row .cls-point { color: var(--under); }
+  td.half.best { border-left: 0; }
   .census.mismatch { color: var(--alarm); }
 
   td.half { width: 46%; }
@@ -309,6 +318,10 @@
      la couleur de ce que le protocole verse, il ne peut pas se lire comme un
      prix de plus. */
   .chip .earns { display: block; font-size: 13.5px; font-weight: 700; color: var(--under); margin-top: 3px; }
+  /* Ce qu'elle rapporterait, pas ce qu'elle rapporte : le même vert, en creux,
+     pour qu'on ne prenne pas une promesse pour un versement. */
+  .chip .earns.is-potential { color: var(--dormant); }
+  .chip .earns.is-potential + .per { color: var(--dormant); }
   /* Le chiffre vert ne se devine pas : sans ce mot, c'est un troisième nombre
      empilé sous deux prix, dont deux en dollars. Il se nomme lui-même, partout
      où on le regarde, plutôt que de compter sur une légende lue une fois. */

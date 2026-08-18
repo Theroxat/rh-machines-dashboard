@@ -4,7 +4,7 @@ import {
   fmtEth, fmtRatio, halfCell, cellKey,
   bannerMessage, rowsHtml, contextHtml, legendHtml,
   matchesFilter, filterBarHtml, filterSummary, freshness, fmtCompact, crateLine,
-  perPointUsd, viewBarHtml, ballotBlock, dropNote,
+  perPointUsd, viewBarHtml, ballotBlock, dropNote, bestRow, yieldOf,
 } from "../src/public/app.js";
 
 const entry = (tokenId, priceEth, image = `https://img/${tokenId}.webp`) => ({
@@ -1266,4 +1266,114 @@ test("with no pot read the note stays silent rather than explaining nothing", ()
 test("the return keeps its cents, so it can be checked against the terminal", () => {
   const html = halfCell(half({ entries: [{ ...entry(1, 0.1), weight: 600, epochUsd: 84.6023 }] }), "ink", { ethUsd: 1900 });
   assert.match(html, /class="earns">\$84\.60</);
+});
+
+// ---- la bande de tête ----------------------------------------------------
+//
+// Sept lignes de rareté ne se comparent pas entre elles : chacune tient son
+// propre carnet. La bande de tête est le seul endroit où une x1 et une x10
+// s'affrontent, sur la seule question qui les rapproche — combien de pot pour
+// combien de dollars.
+
+const BEST = {
+  eth: { usd: 2000 },
+  pot: { usd: 100000, fleetWeight: 1000000 },
+  ink: { activationTotalUsd: 50 },
+  rows: [
+    { classValue: 100, classLabel: "x1", docCount: 1, chainCount: 1,
+      // #1 : poids 100 → gagne $10, coûte $200 → 5%
+      inked: half({ entries: [{ ...entry(1, 0.10), weight: 100, epochUsd: 10 }] }),
+      dormant: half({ entries: [] }) },
+    { classValue: 1000, classLabel: "x10", docCount: 1, chainCount: 1,
+      // #2 : poids 1000 → gagne $100, coûte $400 → 25%
+      inked: half({ entries: [{ ...entry(2, 0.20), weight: 1000, epochUsd: 100 }] }),
+      dormant: half({ entries: [] }) },
+  ],
+};
+
+test("the top strip ranks by what a machine earns for what it costs", () => {
+  const html = bestRow(BEST, { ethUsd: 2000 });
+  assert.ok(html.indexOf("#2<") < html.indexOf("#1<"), "la x10 rapporte 25% de son prix, la x1 5%");
+  assert.match(html, /25\.0%/);
+});
+
+test("the strip spans both columns, being about neither", () => {
+  const html = bestRow(BEST, { ethUsd: 2000 });
+  assert.match(html, /colspan="2"/);
+  assert.equal((html.match(/<td/g) ?? []).length, 2);
+});
+
+// Une dormante pèse zéro et gagnerait donc zéro pour toujours. C'est ce qu'elle
+// pèsera une fois activée qui compte, contre ce qu'il faut sortir pour l'activer.
+test("a dormant machine is ranked on what it would earn, against what activating costs", () => {
+  // poids de classe 1000 → gagnerait $100 ; coûte $200 + $50 d'activation → 40%
+  const y = yieldOf({ weight: 0 }, {
+    side: "dormant", classValue: 1000, potUsd: 100000, fleetWeight: 1000000,
+    activationUsd: 50, priceUsd: 200,
+  });
+  assert.equal(y, 0.4);
+});
+
+test("an inked machine is ranked on its price alone, having nothing left to burn", () => {
+  const y = yieldOf({ weight: 1000 }, {
+    side: "ink", classValue: 1000, potUsd: 100000, fleetWeight: 1000000,
+    activationUsd: 50, priceUsd: 200,
+  });
+  assert.equal(y, 0.5);
+});
+
+test("without a pot there is no ranking to make, and no strip", () => {
+  assert.equal(bestRow({ ...BEST, pot: { usd: null, fleetWeight: null } }, { ethUsd: 2000 }), "");
+  assert.equal(yieldOf({ weight: 100 }, { side: "ink", potUsd: null, fleetWeight: 1e6, priceUsd: 200 }), null);
+});
+
+// Le rayon est un second marché, dans une autre monnaie : il garde sa bande
+// séparée, ici comme dans les lignes de rareté.
+test("the anvil keeps its own strip in the top band", () => {
+  const withShelf = {
+    ...BEST,
+    rows: [{ ...BEST.rows[0],
+      inked: half({ entries: [{ ...entry(1, 0.10), weight: 100, epochUsd: 10 }],
+                    anvilEntries: [{ tokenId: 900, askPrinter: 20000, askUsd: 150, askEth: 0.075,
+                                     machine: machineOf(), weight: 100 }] }) }],
+  };
+  const html = bestRow(withShelf, { ethUsd: 2000 });
+  assert.match(html, /class="shelf"/);
+  assert.match(html, /On the Anvil/);
+  assert.match(html, /#900</);
+});
+
+test("the top strip obeys the filter like everything else", () => {
+  const filtered = bestRow(BEST, { ethUsd: 2000, filter: { ...NO_FILTER, Desk: "nowhere" } });
+  assert.equal(filtered, "");
+});
+
+// Une dormante classée sur ce qu'elle rapporterait ne peut pas afficher $0.00 :
+// un zéro en troisième place d'un classement de rendement se lit comme un bug.
+test("a dormant machine in the top strip shows what it would earn, marked as such", () => {
+  const withDormant = {
+    ...BEST,
+    rows: [{ classValue: 1000, classLabel: "x10", docCount: 1, chainCount: 1,
+      inked: half({ entries: [] }),
+      dormant: half({ entries: [{ ...entry(7, 0.10), weight: 0, epochUsd: 0 }] }) }],
+  };
+  const html = bestRow(withDormant, { ethUsd: 2000 });
+  assert.match(html, /class="earns is-potential">\$100\.00<\/span><span class="per">once inked/);
+  assert.doesNotMatch(html, /\$0\.00/);
+});
+
+// Dans les lignes de rareté en revanche, zéro est la vérité : une dormante ne
+// gagne rien tant que rien n'a brûlé, et la vignette ne doit pas le maquiller.
+test("outside the top strip a dormant machine still earns nothing, and says so", () => {
+  const html = halfCell(half({ entries: [{ ...entry(7, 0.1), weight: 0, epochUsd: 0 }] }), "dormant", { ethUsd: 2000 });
+  assert.match(html, /class="earns">\$0\.00<\/span><span class="per">an epoch/);
+  assert.doesNotMatch(html, /once inked/);
+});
+
+// « earns $0.00 an epoch at weight 0x » est une façon absurde de dire qu'une
+// machine dort. L'infobulle annonce ce qui la réveillerait.
+test("a dormant machine's tooltip says what would wake it, not that it earns zero", () => {
+  const html = halfCell(half({ entries: [{ ...entry(7, 0.1), weight: 0, epochUsd: 0 }] }), "dormant", { ethUsd: 2000 });
+  assert.match(html, /earns nothing until it is inked/);
+  assert.doesNotMatch(html, /at weight 0x/);
 });

@@ -259,7 +259,7 @@ export function contextHtml(d, now = null) {
  * dérivé : le badge de re-encrage n'existait que du côté OpenSea, si bien
  * qu'une x10 re-inkée au plafond passait pour une x10 ordinaire sur le rayon.
  */
-function chip(e, { isFloor = false, ethUsd = null, anvil = false, showPrice = true, perPoint = null } = {}) {
+function chip(e, { isFloor = false, ethUsd = null, anvil = false, showPrice = true, perPoint = null, potential = null } = {}) {
   const hw = e.machine?.headwear ? ` · ${headwearLabel(e.machine.headwear)}` : "";
   const img = e.machine?.image
     ? `<img src="${esc(e.machine.image)}" alt="Machine #${e.tokenId}" loading="lazy" width="78" height="78">`
@@ -281,10 +281,16 @@ function chip(e, { isFloor = false, ethUsd = null, anvil = false, showPrice = tr
   // Ce que la machine toucherait si le pot tombait maintenant. C'est le chiffre
   // qu'on vient chercher : le prix est ce qu'on paie, celui-ci est ce qu'on
   // reçoit. Une dormante affiche zéro, ce qui est vrai et non pas manquant.
-  const earns = e.epochUsd === null || e.epochUsd === undefined
-    ? ""
-    : `<span class="earns">${fmtUsd(e.epochUsd)}</span>` +
-      `<span class="per">an epoch</span>`;
+  // Une dormante gagne zéro, et sa vignette le dit — sauf là où elle est classée
+  // sur ce qu'elle rapporterait une fois activée. Y afficher zéro mettrait un
+  // « $0.00 » en troisième place d'un classement de rendement.
+  const earns = potential !== null
+    ? `<span class="earns is-potential">${fmtUsd(potential)}</span>` +
+      `<span class="per">once inked</span>`
+    : e.epochUsd === null || e.epochUsd === undefined
+      ? ""
+      : `<span class="earns">${fmtUsd(e.epochUsd)}</span>` +
+        `<span class="per">an epoch</span>`;
   const inkStory = reinked
     ? ` · re-inked ×${e.inkMult.toFixed(2)} — ${fmtInt(e.inkPrinter)} $PRINTER burned · weight ${e.weight / 100}x`
     : "";
@@ -300,10 +306,18 @@ function chip(e, { isFloor = false, ethUsd = null, anvil = false, showPrice = tr
       (e.askEth ? ` · ≈${fmtEth(e.askEth)} ETH` : "")
     : "";
 
-  const earnStory = e.epochUsd === null || e.epochUsd === undefined
-    ? ""
-    : ` · earns ${fmtUsd(e.epochUsd)} an epoch at weight ${e.weight / 100}x` +
-      ` — up to ${fmtUsd(e.epochUsd * 2)} if the vote lands on its desk`;
+  // Une machine sans poids ne gagne rien, et « earns $0.00 at weight 0x » est
+  // une façon absurde de le dire. Elle annonce ce qui la réveillerait.
+  const known = e.epochUsd !== null && e.epochUsd !== undefined;
+  const earnStory = potential !== null
+    ? ` · earns nothing until it is inked — ${fmtUsd(potential)} an epoch once it is,` +
+      ` up to ${fmtUsd(potential * 2)} if the vote lands on its desk`
+    : !known
+      ? ""
+      : !e.weight
+        ? ` · earns nothing until it is inked`
+        : ` · earns ${fmtUsd(e.epochUsd)} an epoch at weight ${e.weight / 100}x` +
+          ` — up to ${fmtUsd(e.epochUsd * 2)} if the vote lands on its desk`;
 
   const pointStory = perPoint !== null
     ? ` · ${fmtUsd(perPoint, 0)} per weight point` +
@@ -557,6 +571,114 @@ function rankLine(best) {
     `<span class="from">${best.side === "dormant" ? "dormant" : "inked"}</span></span>`;
 }
 
+/**
+ * Ce qu'une machine rapporte pour ce qu'elle coûte.
+ *
+ * Le pot n'est pas un revenu périodique : il s'accumule depuis le lancement et
+ * n'a encore rien versé. Ce rapport dit donc « quelle part de son prix
+ * l'attend déjà », pas un rendement annuel — et il n'y a pas de règle de trois
+ * à faire dessus.
+ *
+ * Une dormante ne pèse rien : on compte ce qu'elle pèserait une fois activée,
+ * contre ce qu'il faut sortir pour l'activer. Sinon elle affiche zéro pour
+ * l'éternité et sort d'un classement où elle a sa place.
+ */
+export function yieldOf(e, { side, classValue, potUsd, fleetWeight, activationUsd, priceUsd }) {
+  if (!potUsd || !fleetWeight || !priceUsd) return null;
+  const dormant = side === "dormant";
+  if (dormant && !activationUsd) return null;
+
+  const weight = dormant ? classValue : e?.weight;
+  if (!weight) return null;
+
+  const earns = (potUsd * weight) / fleetWeight;
+  return earns / (priceUsd + (dormant ? activationUsd : 0));
+}
+
+/**
+ * La bande de tête : ce qui rapporte le plus pour le moins cher, toutes classes
+ * et les deux états confondus.
+ *
+ * Elle est bâtie comme une ligne de rareté — même intitulé à gauche, même bande
+ * de vignettes, même rayon de l'anvil en dessous — mais tient sur la largeur des
+ * deux colonnes, parce qu'elle ne parle ni d'un état ni d'une classe : elle les
+ * traverse. C'est la seule vue du tableau où une x1 et une x10 se comparent.
+ */
+export function bestRow(d, { limit = DEFAULT_LIMIT, step = REVEAL_STEP, shown = null, filter = EMPTY_FILTER, ethUsd = null } = {}) {
+  const potUsd = d?.pot?.usd ?? null;
+  const fleetWeight = d?.pot?.fleetWeight ?? null;
+  const activationUsd = d?.ink?.activationTotalUsd ?? null;
+  if (!potUsd || !fleetWeight) return "";
+
+  const active = filterIsActive(filter);
+  // Ce qu'une dormante rapporterait une fois activée. Null pour une inkée :
+  // elle n'a rien à devenir, sa vignette annonce ce qu'elle gagne déjà.
+  const potentialOf = (side, classValue) =>
+    side === "dormant" ? (potUsd * classValue) / fleetWeight : null;
+  const book = [];
+  const shelf = [];
+  for (const r of d.rows ?? []) {
+    for (const [side, cell] of [["ink", r.inked], ["dormant", r.dormant]]) {
+      const common = { side, classValue: r.classValue, potUsd, fleetWeight, activationUsd };
+      for (const e of cell?.entries ?? []) {
+        if (active && !matchesFilter(e.machine, filter)) continue;
+        const y = yieldOf(e, { ...common, priceUsd: usdOf(e.priceEth, ethUsd) });
+        if (y !== null) book.push({ e, y, classLabel: r.classLabel, potential: potentialOf(side, r.classValue) });
+      }
+      // Le rayon est un second marché, libellé en $PRINTER : il garde sa bande.
+      for (const e of cell?.anvilEntries ?? []) {
+        if (active && !matchesFilter(e.machine, filter)) continue;
+        const y = yieldOf(e, { ...common, priceUsd: e.askUsd });
+        if (y !== null) shelf.push({ e, y, classLabel: r.classLabel, potential: potentialOf(side, r.classValue) });
+      }
+    }
+  }
+  if (!book.length && !shelf.length) return "";
+
+  const byYield = (a, b) => b.y - a.y || a.e.tokenId - b.e.tokenId;
+  book.sort(byYield);
+  shelf.sort(byYield);
+
+  const visible = Math.max(limit, Math.min(shown ?? limit, book.length));
+  const head = book[0];
+  const hidden = book.length - visible;
+  const next = Math.min(step, hidden);
+  const more = hidden > 0
+    ? `<button class="more" type="button" data-key="best" data-next="${visible + next}">` +
+      `show ${fmtInt(next)} more · ${fmtInt(hidden)} left ▾</button>`
+    : (visible > limit
+        ? `<button class="more" type="button" data-key="best" data-next="${limit}">▴ show fewer</button>`
+        : "");
+
+  const strip = (list) => `<span class="strip">` +
+    list.map(({ e, potential }) => chip(e, { ethUsd, anvil: e.askPrinter !== undefined, potential })).join("") +
+    `</span>`;
+
+  const shelfPart = shelf.length
+    ? `<span class="shelf"><span class="market">On the Anvil</span>` +
+      `<span class="depth">${fmtInt(shelf.length)} on the shelf, best first</span>` +
+      strip(shelf.slice(0, limit)) + `</span>`
+    : "";
+
+  const label = active ? "best of your pick" : "best value";
+  return `<tr class="best-row">` +
+    `<td class="cls-cell"><span class="cls">Best</span>` +
+      `<span class="cls-point">${fmtRatio(head.y)}` +
+      `<span class="per">of its price</span><span class="from">already waiting</span></span>` +
+      `<span class="census">${fmtInt(book.length)} ranked</span></td>` +
+    `<td class="edge half best" colspan="2">` +
+      `<span class="market">On OpenSea</span>` +
+      `<span class="cell-floor"><span class="label">${label}</span>` +
+        `<span class="price">${fmtUsd(head.potential ?? head.e.epochUsd ?? 0)}</span> ` +
+        `<span class="unit">${head.potential !== null ? "once inked" : "an epoch"}</span>` +
+        `<span class="usd-big">for ${fmtUsdShort(usdOf(head.e.priceEth, ethUsd)) || "—"}</span></span>` +
+      `<span class="depth">every class and both states, most earned per dollar first` +
+        (active ? ` · ${fmtInt(book.length)} match your filter` : "") + `</span>` +
+      strip(book.slice(0, visible)) + more + shelfPart +
+    `</td>` +
+  `</tr>`;
+}
+
 export function rowsHtml(d, { expanded = new Map(), limit = DEFAULT_LIMIT, step = REVEAL_STEP, filter = EMPTY_FILTER, view = VIEW_FLOOR } = {}) {
   const ethUsd = d.eth?.usd ?? null;
   const activationUsd = d.ink?.activationTotalUsd ?? null;
@@ -584,7 +706,11 @@ export function rowsHtml(d, { expanded = new Map(), limit = DEFAULT_LIMIT, step 
     ? d.rows.map((r) => ({ r, best: bestPoint(r) })).sort((a, b) => (a.best.p - b.best.p) || 0)
     : d.rows.map((r) => ({ r, best: null }));
 
-  return rows.map(({ r, best }) => {
+  // La bande de tête est épinglée : elle ne suit pas le tri des lignes, parce
+  // qu'elle ne parle d'aucune classe en particulier.
+  const bestHtml = bestRow(d, { limit, step, shown: expanded.get("best") ?? limit, filter, ethUsd });
+
+  return bestHtml + rows.map(({ r, best }) => {
     const census = r.chainCount === r.docCount
       ? `<span class="census">${fmtInt(r.chainCount)} machines</span>`
       : `<span class="census mismatch" title="The chain returned ${r.chainCount}; the documentation says ${r.docCount}.">${fmtInt(r.chainCount)} ≠ ${fmtInt(r.docCount)}</span>`;
