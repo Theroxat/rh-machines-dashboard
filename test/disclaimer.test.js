@@ -189,3 +189,12 @@ test("the page carries the line that explains the green figure", () => {
 test("the band's heading holds on one line, like every rarity heading", () => {
   assert.match(page, /\.best-row \.cls \{[^}]*white-space: nowrap/);
 });
+
+// Le champ demande une adresse publique et ne fait lire que la chaîne. Il ne
+// doit jamais ressembler à un « connect wallet » : rien à signer, rien à approuver.
+test("the wallet field asks to read an address, never to connect one", () => {
+  assert.match(page, /id="wallet-form"/);
+  assert.match(page, /id="wallet-input"/);
+  assert.doesNotMatch(page, /connect wallet/i);
+  assert.doesNotMatch(page, /type="password"/);
+});

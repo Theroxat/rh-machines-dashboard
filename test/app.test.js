@@ -4,7 +4,7 @@ import {
   fmtEth, fmtRatio, halfCell, cellKey,
   bannerMessage, rowsHtml, contextHtml, legendHtml,
   matchesFilter, filterBarHtml, filterSummary, freshness, fmtCompact, crateLine,
-  perPointUsd, viewBarHtml, ballotBlock, dropNote, bestRow, yieldOf, BEST_LIMIT, DEFAULT_LIMIT, bestFit,
+  perPointUsd, viewBarHtml, ballotBlock, dropNote, bestRow, yieldOf, BEST_LIMIT, DEFAULT_LIMIT, bestFit, walletPanelHtml, fmtShare,
 } from "../src/public/app.js";
 
 const entry = (tokenId, priceEth, image = `https://img/${tokenId}.webp`) => ({
@@ -1465,4 +1465,82 @@ test("the band says what it ranks, not merely that something is best", () => {
 test("the band claims no risk measure it does not compute", () => {
   const html = bestRow(BEST, { ethUsd: 2000 });
   assert.doesNotMatch(html, /\bRR\b|risk/i);
+});
+
+// ---- le portefeuille du visiteur -----------------------------------------
+
+const WALLET = {
+  address: "0xe908ba570259e4bb1e1fdd2edd9b15e092b13211",
+  machines: [
+    { tokenId: 4347, weight: 200, deskIndex: 10, desk: "real estate", ticker: "SPCX", epochUsd: 27.72 },
+    { tokenId: 463, weight: 100, deskIndex: 9, desk: "utilities", ticker: "GME", epochUsd: 13.86 },
+  ],
+  awake: 2, dormant: 0, weight: 300, share: 0.000253, cutUsd: 39.12,
+  advice: { base: 39.09, best: { index: 10, desk: "real estate", ticker: "SPCX", held: true, heldWeight: 200, cutUsd: 39.12, gainUsd: 0.046 }, options: [] },
+};
+
+test("the panel leads with the ticker to vote, not with the wallet", () => {
+  const html = walletPanelHtml(WALLET);
+  assert.match(html, /class="w-ticker">SPCX</);
+  assert.match(html, /real estate — 2\.00x of your 3\.00x sit there/);
+});
+
+// Un bulletin isolé rapporte des centimes. Le taire rendrait le conseil plus
+// vendeur et ferait croire à un levier qui n'existe pas.
+test("the panel says what a single vote is really worth, without dressing it up", () => {
+  const html = walletPanelHtml(WALLET);
+  assert.match(html, /worth <b>\$0\.05<\/b>/);
+  assert.match(html, /barely moves a ballot/);
+});
+
+test("every machine is listed with its desk, its ticker and what it earns", () => {
+  const html = walletPanelHtml(WALLET);
+  assert.match(html, /#4347/);
+  assert.match(html, /real estate · SPCX/);
+  assert.match(html, /\$27\.72/);
+});
+
+test("a wallet holding nothing is told so, rather than shown an empty table", () => {
+  const html = walletPanelHtml({ ...WALLET, machines: [], advice: null });
+  assert.match(html, /holds no Machine/);
+  assert.doesNotMatch(html, /w-ticker/);
+});
+
+test("with no ballot open the panel advises nothing rather than guessing", () => {
+  const html = walletPanelHtml({ ...WALLET, advice: null });
+  assert.match(html, /No ballot is open/);
+  assert.doesNotMatch(html, /w-ticker/);
+});
+
+// L'adresse et le ticker viennent d'une requête réseau : ils entrent dans du
+// balisage et sont échappés, quoi qu'ils contiennent.
+test("nothing from the response reaches the page unescaped", () => {
+  const evil = '"><img src=x onerror=alert(1)>';
+  const html = walletPanelHtml({
+    ...WALLET, address: "0x" + "a".repeat(40),
+    machines: [{ tokenId: 1, weight: 100, deskIndex: 0, desk: evil, ticker: evil, epochUsd: 1 }],
+    advice: { base: 1, best: { index: 0, desk: evil, ticker: evil, held: false, heldWeight: 0, cutUsd: 1, gainUsd: 0 }, options: [] },
+  });
+  assert.doesNotMatch(html, /<img src=x/);
+  assert.match(html, /&lt;img src=x/);
+});
+
+test("an error is shown as a sentence, not as a broken panel", () => {
+  const html = walletPanelHtml({ error: "That is not a wallet address" });
+  assert.match(html, /not a wallet address/);
+  assert.doesNotMatch(html, /w-list/);
+});
+
+// 0,051% et 0,14% s'écrivaient tous deux « 0.1% » : un facteur trois effacé par
+// l'arrondi, sur le chiffre qui dit exactement combien on pèse.
+test("a tiny share keeps the digits that make it a fact", () => {
+  assert.equal(fmtShare(0.00051), "0.051%");
+  assert.equal(fmtShare(0.0014), "0.140%");
+  assert.equal(fmtShare(0.132), "13.2%");
+  assert.equal(fmtShare(null), "—");
+});
+
+test("the panel states the share precisely, not rounded into another number", () => {
+  const html = walletPanelHtml({ ...WALLET, share: 0.00051 });
+  assert.match(html, /0\.051%/);
 });

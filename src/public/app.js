@@ -4,6 +4,12 @@
 
 export const fmtEth   = (v) => v === null || v === undefined ? "—" : v.toFixed(4);
 export const fmtRatio = (v) => v === null || v === undefined ? "—" : (v * 100).toFixed(1) + "%";
+/** Une part minuscule arrondie à la décimale devient un mensonge : 0,051% et
+ *  0,14% s'écrivaient tous deux « 0.1% », soit un facteur trois effacé. */
+export const fmtShare = (v) =>
+  v === null || v === undefined ? "—"
+    : v >= 0.01 ? (v * 100).toFixed(1) + "%"
+    : (v * 100).toFixed(3) + "%";
 export const fmtUsd   = (v, d = 2) => v === null || v === undefined ? "—" : "$" + v.toFixed(d);
 export const fmtInt   = (v) => v === null || v === undefined ? "—" : v.toLocaleString("en-US");
 
@@ -800,6 +806,58 @@ export function dropNote(d) {
     when;
 }
 
+/**
+ * Le portefeuille d'un visiteur : ses machines, sa part, et pour quel ticker
+ * voter.
+ *
+ * Le conseil se donne en entier, gain compris. Un bulletin isolé rapporte des
+ * centimes — c'est un fait du protocole, pas un défaut du calcul — et le taire
+ * pour rendre le conseil plus vendeur ferait croire à un levier qui n'existe
+ * pas. Ce qui déplace vraiment une part, c'est l'issue du scrutin.
+ */
+export function walletPanelHtml(w) {
+  if (!w) return "";
+  if (w.error) return `<p class="w-empty">${esc(w.error)}</p>`;
+
+  const short = `${w.address.slice(0, 6)}…${w.address.slice(-4)}`;
+  if (!w.machines.length) {
+    return `<p class="w-empty"><b>${esc(short)}</b> holds no Machine — nothing to advise.</p>`;
+  }
+
+  const held = w.dormant
+    ? `${fmtInt(w.awake)} earning · ${fmtInt(w.dormant)} dormant`
+    : `${fmtInt(w.machines.length)} Machines`;
+
+  const head = `<p class="w-who"><b>${esc(short)}</b> — ${held} · ` +
+    `<b>${(w.weight / 100).toFixed(2)}x</b> of the fleet` +
+    (w.share === null ? "" : ` · ${fmtShare(w.share)}`) +
+    (w.cutUsd === null ? "" : ` · about <b class="w-cut">${fmtUsd(w.cutUsd)}</b> of the pot`) + `</p>`;
+
+  const best = w.advice?.best;
+  const call = !best
+    ? `<p class="w-empty">No ballot is open, so there is nothing to vote for yet.</p>`
+    : `<p class="w-call"><span class="w-verb">Vote</span> ` +
+      `<b class="w-ticker">${esc(best.ticker)}</b>` +
+      `<span class="w-why">${esc(best.desk)} — ` +
+      (best.heldWeight
+        ? `${(best.heldWeight / 100).toFixed(2)}x of your ${(w.weight / 100).toFixed(2)}x sit there`
+        : `you hold nothing there, but it is still your best slice`) +
+      `</span></p>` +
+      // Le gain d'un bulletin isolé, dit sans fard.
+      `<p class="w-small">Voting it is worth <b>${fmtUsd(best.gainUsd)}</b> to you against not voting — ` +
+      `a single wallet barely moves a ballot. What moves your share is where the vote lands.</p>`;
+
+  const list = w.machines.map((m) => {
+    const desk = m.desk ? `${esc(m.desk)}${m.ticker ? ` · ${esc(m.ticker)}` : ""}` : "no desk read";
+    return `<li><a href="${itemUrl(m.tokenId)}" target="_blank" rel="noopener">#${m.tokenId}</a>` +
+      `<span class="w-w">${(m.weight / 100).toFixed(2)}x</span>` +
+      `<span class="w-desk">${desk}</span>` +
+      `<span class="w-earn">${m.epochUsd === null ? "—" : fmtUsd(m.epochUsd)}</span></li>`;
+  }).join("");
+
+  return head + call + `<ul class="w-list">${list}</ul>`;
+}
+
 /** Ce que le filtre laisse passer, sur l'ensemble du carnet. Silencieux tant
  *  qu'aucun filtre n'est posé : un compteur permanent serait du bruit. */
 export function filterSummary(d, filter) {
@@ -966,6 +1024,30 @@ if (typeof document !== "undefined") {
     for (const select of filtersEl.querySelectorAll("select")) select.value = "";
     paint();
   });
+
+  // Le portefeuille du visiteur. L'adresse ne quitte jamais la page autrement
+  // que vers notre propre service, et elle est publique sur la chaîne de toute
+  // façon : c'est une lecture, pas une connexion.
+  const walletForm = $("wallet-form");
+  const walletOut = $("wallet-out");
+  if (walletForm) {
+    walletForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const value = $("wallet-input").value.trim();
+      if (!/^0x[0-9a-fA-F]{40}$/.test(value)) {
+        walletOut.innerHTML = walletPanelHtml({ error: "That is not a wallet address — paste the 0x… one." });
+        return;
+      }
+      walletOut.innerHTML = `<p class="w-empty">Reading the chain…</p>`;
+      try {
+        const res = await fetch(`/api/wallet?address=${encodeURIComponent(value)}`);
+        walletOut.innerHTML = walletPanelHtml(res.ok ? await res.json()
+          : { error: "The service could not read that address." });
+      } catch {
+        walletOut.innerHTML = walletPanelHtml({ error: "Could not reach the service." });
+      }
+    });
+  }
 
   // L'écran change de largeur : la bande doit se recompter, sinon elle garde le
   // découpage d'une fenêtre qui n'existe plus.

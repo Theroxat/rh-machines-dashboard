@@ -15,6 +15,10 @@ import { readProtocol } from "./protocol.js";
 import { readAnvil } from "./anvil.js";
 import { readVote, readDeskIndex } from "./vote.js";
 import { readPot } from "./pot.js";
+import { readBallotTickers } from "./ballot.js";
+import { readOwners, tokensOf } from "./owners.js";
+import { analyseWallet, isAddress } from "./wallet.js";
+import { SECTORS } from "./desks.js";
 import { deskName } from "./desks.js";
 import { buildGrid } from "./floors.js";
 import { composeSnapshot } from "./snapshot.js";
@@ -68,6 +72,21 @@ let meta = new Map();
 let legend = null;
 // Le desk est scellé au mint : lu une fois au démarrage, jamais réinterrogé.
 let deskIndex = new Map();
+// Les propriétaires bougent à chaque vente : relus sur la boucle de l'encre.
+let owners = { byToken: new Map(), byOwner: new Map(), failures: null };
+// Quel ticker occupe quel desk cette epoch, et le dépouillement en cours.
+let tickers = null;
+let tally = new Array(16).fill(0);
+
+async function sweepOwners() {
+  owners = await readOwners({
+    aggregate3: multicallOf(provider, ADDRESSES.MULTICALL3),
+    ids: Array.from({ length: TOTAL_MACHINES }, (_, i) => i + 1),
+    batchSize: cfg.multicallBatchSize,
+  });
+  console.log(`owners: ${owners.byOwner.size} wallets hold ${owners.byToken.size} machines` +
+    (owners.failures ? `, ${owners.failures} unreadable` : ""));
+}
 
 async function sweepInk() {
   const { ink: fresh, weights: freshWeights, failures } = await readInk({ provider, batchSize: cfg.multicallBatchSize });
@@ -96,6 +115,13 @@ async function sweepBook() {
   // Le pot en attente : le solde USDG de celui qui achètera. Aucun contrat ne
   // le nomme, et sans lui la page ne peut annoncer aucun retour.
   const potUsd = await readPot({ provider }).catch(() => null);
+
+  // Le ticker posé sur chaque desk change à chaque epoch : un porteur cherche
+  // « SPCX », pas « real estate ». Sans cette table la page nomme un secteur
+  // pendant que le terminal officiel propose une action.
+  tickers = await readBallotTickers({ provider, epoch: protocol?.epoch })
+    .catch(() => null) ?? tickers;
+  tally = vote ? Array.from({ length: 16 }, (_, d) => Number(vote.tally.get(d) ?? 0n)) : tally;
 
   // L'anvil est lu après le carnet parce qu'il faut savoir quelles machines sont
   // en vente pour lui demander ce qu'il en donnerait — et avant la grille, parce
@@ -158,6 +184,36 @@ const server = createServer((req, res) => {
     }
     res.writeHead(p.has ? 200 : 503, headers);
     res.end(p.body);
+    return;
+  }
+  // Le portefeuille d'un visiteur. Tout est déjà en mémoire : l'index des
+  // propriétaires, les poids, les desks, le dépouillement. La requête ne
+  // touche pas la chaîne, donc elle ne peut pas servir à la marteler.
+  if (req.url.startsWith("/api/wallet")) {
+    const address = new URL(req.url, "http://x").searchParams.get("address");
+    const headers = { "content-type": "application/json", ...cacheHeaders("api"), ...securityHeaders() };
+    // Ce qui entre ici interroge un index et ressort dans du balisage : une
+    // adresse, quarante hexadécimaux, rien d'autre.
+    if (!isAddress(address)) {
+      res.writeHead(400, headers);
+      res.end(JSON.stringify({ error: "not an address" }));
+      return;
+    }
+    const snap = store.get().data;
+    const sectorWeight = new Array(16).fill(0);
+    for (const [tokenId, index] of deskIndex) sectorWeight[index] += Number(weights.get(tokenId) ?? 0n);
+    const fleetWeight = snap?.pot?.fleetWeight ?? null;
+    const body = analyseWallet({
+      address: address.trim().toLowerCase(),
+      tokenIds: tokensOf(owners.byOwner, address),
+      weightOf: (id) => Number(weights.get(id) ?? 0n),
+      deskOf: (id) => deskIndex.get(id) ?? null,
+      epochUsdOf: (w) => (snap?.pot?.usd && fleetWeight ? (snap.pot.usd * w) / fleetWeight : null),
+      tally, potUsd: snap?.pot?.usd ?? null, fleetWeight, sectorWeight,
+      tickers: tickers ?? new Array(16).fill(null),
+    });
+    res.writeHead(200, headers);
+    res.end(JSON.stringify({ ...body, sectors: SECTORS, closesAt: snap?.vote?.closesAt ?? null }));
     return;
   }
   if (req.url === appPath) {
@@ -228,6 +284,7 @@ const started = async () => {
 
   loop("book", sweepBook, cfg.bookPollIntervalMs);
   loop("ink", sweepInk, cfg.inkPollIntervalMs, { runNow: false });
+  loop("owners", sweepOwners, cfg.inkPollIntervalMs);
 
   server.listen(cfg.port, () => console.log(`dashboard on :${cfg.port}, serving ${appPath}`));
 };

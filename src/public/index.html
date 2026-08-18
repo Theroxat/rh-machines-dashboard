@@ -195,6 +195,48 @@
   #drop-note { margin: 9px 0 0; font-size: 12.5px; color: var(--muted); max-width: 76ch; }
   #drop-note b { color: var(--under); font-weight: 600; }
   #drop-note:empty { display: none; }
+
+  /* ---- le portefeuille du visiteur ---- */
+
+  /* Une lecture, pas une connexion : on demande une adresse publique, on ne
+     demande jamais de signer quoi que ce soit. Le champ le dit par sa forme —
+     un champ de recherche, pas un bouton d'appairage de portefeuille. */
+  .wallet { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--rule-2); }
+  .wallet form { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; }
+  #wallet-input {
+    font-family: inherit; font-size: 13px; color: var(--text);
+    background: var(--paper-2); border: 1px solid var(--rule-2); border-radius: 0;
+    padding: 5px 9px; min-width: 420px; max-width: 100%;
+  }
+  #wallet-input:focus-visible { outline: 1px solid var(--ink); outline-offset: 1px; }
+  .w-go {
+    font-family: inherit; font-size: 12.5px; color: var(--paper); background: var(--ink);
+    border: 0; border-radius: 0; padding: 7px 13px; cursor: pointer; font-weight: 600;
+  }
+  .w-go:hover { filter: brightness(1.12); }
+
+  #wallet-out { margin-top: 14px; }
+  .w-empty { color: var(--muted); font-size: 13px; margin: 0; }
+  .w-who { color: var(--muted); font-size: 13px; margin: 0 0 10px; }
+  .w-who b { color: var(--text); font-weight: 600; }
+  .w-who .w-cut { color: var(--under); }
+
+  /* Le conseil, en gros : c'est ce que le visiteur est venu chercher. */
+  .w-call { margin: 0 0 6px; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .w-verb { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+  .w-ticker { font-size: 30px; font-weight: 700; color: var(--ink); letter-spacing: -0.02em; }
+  .w-why { font-size: 12.5px; color: var(--muted); }
+  .w-small { margin: 0 0 12px; font-size: 12px; color: var(--dim); max-width: 76ch; }
+  .w-small b { color: var(--muted); font-weight: 600; }
+
+  .w-list { list-style: none; margin: 0; padding: 0; font-size: 12.5px; }
+  .w-list li { display: flex; gap: 14px; padding: 3px 0; border-bottom: 1px solid var(--rule); }
+  .w-list a { color: var(--ink); text-decoration: none; min-width: 62px; }
+  .w-list a:hover { text-decoration: underline; }
+  .w-w { min-width: 52px; color: var(--text); font-weight: 600; }
+  .w-desk { flex: 1; color: var(--muted); }
+  .w-earn { color: var(--under); font-weight: 600; }
+
   #filter-summary:empty { display: none; }
   .clear {
     font-family: inherit;
@@ -444,6 +486,9 @@
 
     .fl { width: 100%; }
     .fl select { width: 100%; min-width: 0; max-width: none; }
+    #wallet-input { min-width: 0; width: 100%; }
+    .wallet form { gap: 10px; }
+    .w-ticker { font-size: 26px; }
     #filters { gap: 10px; }
     /* Empilés, le filet vertical ne sépare plus rien : il devient horizontal. */
     #view {
@@ -533,6 +578,17 @@
   </div>
   <p id="filter-summary"></p>
   <p id="drop-note"></p>
+</section>
+
+<section class="wallet">
+  <form id="wallet-form" autocomplete="off">
+    <label class="fl"><span class="label">Your wallet</span>
+      <input id="wallet-input" type="text" inputmode="latin" spellcheck="false"
+             placeholder="0x…" aria-label="Wallet address">
+    </label>
+    <button type="submit" class="w-go">what should I vote?</button>
+  </form>
+  <div id="wallet-out"></div>
 </section>
 
 <div class="scroll">
