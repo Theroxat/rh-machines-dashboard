@@ -1784,14 +1784,33 @@ test("a machine that never burned more claims no journey", () => {
 });
 
 // Le pot n'a jamais rien versé : aucun chiffre de la page ne peut se présenter
-// comme un rythme. Une seule étiquette oubliée suffit à faire mentir le reste.
-test("nowhere on the page does a figure claim to arrive every epoch", () => {
-  const app = readFileSync(new URL("../src/public/app.js", import.meta.url), "utf8");
-  // « an epoch » ne subsiste que pour dire le délai d'une machine tout juste
-  // inkée, qui est bien une histoire d'epoch et pas de montant.
-  const claims = [...app.matchAll(/`[^`]*an epoch[^`]*`/g)].map((m) => m[0]);
-  for (const c of claims) {
-    assert.match(c, /only starts earning at the next one/,
-      `« an epoch » se présente comme un rythme ici : ${c}`);
+// comme un rythme. Le contrôle porte sur ce qui est rendu, pas sur la source —
+// une expression régulière ne sait pas lire du JavaScript, et la première
+// version de ce test traversait un commentaire pour se croire en faute.
+test("nowhere on the page does an amount claim to arrive every epoch", () => {
+  const e = { ...entry(1, 0.1), weight: 100, epochUsd: 12.6, inkMult: 1, inkPrinter: 4250 };
+  const rendered = [
+    halfCell(half({ entries: [e] }), "ink", { ethUsd: 2000 }),
+    bestRow(BEST, { ethUsd: 2000 }),
+    walletCardHtml(WALLET),
+    walletDetailHtml(WALLET),
+    machineDetailHtml(DETAIL, 3145),
+    dropNote({ pot: { usd: 170000 }, vote: { opened: true }, printer: { volume24h: 250000 }, protocol: { sellFeeBps: 500 } }),
+  ].join("\n");
+
+  for (const line of rendered.split(/(?=<)/)) {
+    if (!/an epoch/.test(line)) continue;
+    // Seule exception : le délai « Lit », où l'epoch est bien le sujet et non
+    // le rythme d'un montant.
+    assert.match(line, /only starts earning at the next one/,
+      `un montant se présente comme récurrent ici : ${line.slice(0, 120)}`);
   }
+});
+
+test("the amounts say what they are — a share of the pot as it stands", () => {
+  assert.match(halfCell(half({ entries: [{ ...entry(1, 0.1), weight: 100, epochUsd: 12.6 }] }), "ink", { ethUsd: 2000 }),
+    /class="per">this drop</);
+  assert.match(bestRow(BEST, { ethUsd: 2000 }), /class="unit">of the pot</);
+  assert.match(walletCardHtml(WALLET), /of the pot waiting/);
+  assert.match(dropNote({ pot: { usd: 170000 }, vote: { opened: false } }), /never yet paid out/);
 });
