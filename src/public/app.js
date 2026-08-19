@@ -649,6 +649,13 @@ export function machineDetailHtml(d, tokenId) {
     : `<span class="noimg d-noimg" aria-hidden="true"></span>`;
 
   const reinked = e.inkMult > 1.0001 && e.weight;
+  // Le plafond est commun à toute la flotte et monte à mesure qu'elle brûle.
+  const ceiling = d.protocol?.ceiling ? Number(d.protocol.ceiling) / 100 : null;
+  const atCeiling = Boolean(ceiling && e.inkMult && e.inkMult >= ceiling - 0.001);
+  const gate = d.protocol?.nextGate;
+  const nextGate = gate?.needed && gate?.unlocks
+    ? { unlocks: Number(gate.unlocks) / 100, more: Number(BigInt(gate.needed) / 10n ** 18n) }
+    : null;
   const perPoint = perPointUsd(e, {
     classValue: r.classValue, side, ethUsd,
     activationUsd: d.ink?.activationTotalUsd ?? null,
@@ -661,9 +668,19 @@ export function machineDetailHtml(d, tokenId) {
       dormant ? "dormant — nothing burned, so it earns and votes nothing"
         : reinked ? `re-inked ×${e.inkMult.toFixed(2)} — it outweighs its own class`
         : "activated at the base burn") +
+    // La formule seule ment sur les machines qui touchent le plafond : le
+    // contrat tronque le multiplicateur au pourcent entier et refuse de le
+    // faire passer au-dessus du plafond commun. Une x4 à 17 150 d'encre pèse
+    // 800 et non 803,5, et le poids affiché plus haut est celui de la chaîne,
+    // jamais un produit de cette ligne.
     factRow("Ink burned",
       e.inkPrinter === null || e.inkPrinter === undefined ? null : `${fmtInt(e.inkPrinter)} $PRINTER`,
-      "weight = class × √(ink ÷ 4,250)") +
+      `class × √(ink ÷ 4,250), floored to whole percent` +
+      (ceiling ? ` and capped at the x${ceiling} ink ceiling` : "")) +
+    factRow("At the ceiling", atCeiling ? `x${ceiling}, the most ink can give today` : null,
+      nextGate
+        ? `x${nextGate.unlocks} opens when ${fmtCompact(nextGate.more)} more $PRINTER is burned across the fleet`
+        : "burning more would be refused, not quietly capped") +
     factRow("Desk", m.desk ? esc(m.desk) : null,
       m.ticker ? `wears ${esc(m.ticker)} this epoch — it counts 2× on that slice`
         : "no ticker on this epoch's ballot") +

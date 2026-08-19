@@ -1693,3 +1693,38 @@ test("a machine is found wherever it sits, in either state or market", () => {
   assert.equal(findMachine(DETAIL, 3145).market, "opensea");
   assert.equal(findMachine(DETAIL, 4242), null);
 });
+
+// La formule seule ment sur les machines au plafond : le contrat tronque le
+// multiplicateur au pourcent entier. Une x4 à 17 150 d'encre pèse 800, pas 803,5.
+const CEIL = {
+  ...DETAIL,
+  protocol: { ceiling: 200n, nextGate: { needed: 24000000n * 10n ** 18n, unlocks: 300n } },
+};
+
+test("the ink line names the flooring and the ceiling, not just the square root", () => {
+  const html = machineDetailHtml(CEIL, 3145);
+  assert.match(html, /floored to whole percent/);
+  assert.match(html, /capped at the x2 ink ceiling/);
+});
+
+test("a machine at the ceiling is told so, and told what would lift it", () => {
+  const html = machineDetailHtml(CEIL, 3145);
+  assert.match(html, /At the ceiling/);
+  assert.match(html, /x2, the most ink can give today/);
+  assert.match(html, /x3 opens when 24\.0M more/);
+});
+
+test("a machine below the ceiling makes no claim about being at it", () => {
+  const below = { ...CEIL, rows: [{ ...CEIL.rows[0],
+    inked: half({ entries: [{ ...DETAIL.rows[0].inked.entries[0], weight: 300, inkMult: 1, inkPrinter: 4250 }] }) }] };
+  const html = machineDetailHtml(below, 3145);
+  assert.doesNotMatch(html, /At the ceiling/);
+  assert.match(html, /floored to whole percent/);
+});
+
+// Sans plafond lu, on n'invente pas de limite.
+test("with no ceiling read the line claims none", () => {
+  const html = machineDetailHtml(DETAIL, 3145);
+  assert.doesNotMatch(html, /ink ceiling/);
+  assert.doesNotMatch(html, /At the ceiling/);
+});
