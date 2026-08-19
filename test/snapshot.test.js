@@ -54,7 +54,7 @@ test("every machine on sale carries its picture, its traits and the desk it sits
   const s = composeSnapshot({ ...withGrid, deskIndex: new Map([[1253, 9]]) });
   assert.deepEqual(s.rows[0].inked.entries[0].machine, {
     image: "https://img/1253.webp", headwear: "Blueberries", body: "Cobalt Stripe",
-    eyes: "Rage", desk: "utilities",
+    eyes: "Rage", desk: "utilities", ticker: null,
   });
 });
 
@@ -309,4 +309,27 @@ test("a shelf machine carries its weight like any other", () => {
   const a = s.rows[0].inked.anvilEntries[0];
   assert.equal(a.weight, 2000);
   assert.equal(a.inkMult, 2);      // 2000 / classe 1000
+});
+
+// Le ticker voyageait avec les machines d'un portefeuille mais pas avec celles
+// du carnet : le panneau annonçait « pas de ticker au bulletin » pour les dix
+// desks qui en avaient un.
+test("a listed machine carries the ticker its desk wears this epoch", () => {
+  const s = composeSnapshot({
+    ...withGrid,
+    deskIndex: new Map([[1253, 10]]),
+    tickers: Array.from({ length: 16 }, (_, i) => (i === 10 ? "SPCX" : null)),
+  });
+  const m = s.rows[0].inked.entries[0].machine;
+  assert.equal(m.desk, "real estate");
+  assert.equal(m.ticker, "SPCX");
+});
+
+test("a desk with no ticker this epoch says null, not the neighbour's", () => {
+  const s = composeSnapshot({
+    ...withGrid,
+    deskIndex: new Map([[1253, 7]]),
+    tickers: Array.from({ length: 16 }, (_, i) => (i === 10 ? "SPCX" : null)),
+  });
+  assert.equal(s.rows[0].inked.entries[0].machine.ticker, null);
 });

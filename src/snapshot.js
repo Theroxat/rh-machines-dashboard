@@ -8,7 +8,7 @@ import { epochUsd } from "./pot.js";
  *  diviserait par une valeur non lue produit null plutôt qu'un zéro confiant. */
 export function composeSnapshot({
   grid, printer, eth, protocol, stats, book, inkMeta, meta, legend, ink, weights, anvil,
-  deskIndex, vote, potUsd, sectorWeight, now,
+  deskIndex, vote, potUsd, sectorWeight, tickers, now,
 }) {
   const activationPrinter = protocol?.activationInk
     ? Number(BigInt(protocol.activationInk) / 10n ** 15n) / 1000
@@ -37,7 +37,16 @@ export function composeSnapshot({
     // Le desk voyage avec la machine : la page filtre et étiquette sans avoir
     // à retraverser l'index pour chaque vignette. C'est un secteur, lu sur la
     // chaîne — plus une couleur de corps interprétée.
-    return { ...m, desk: deskName(deskIndex?.get(tokenId)) };
+    const index = deskIndex?.get(tokenId);
+    return {
+      ...m,
+      desk: deskName(index),
+      // Le ticker que ce desk porte cette epoch. Il voyageait déjà avec les
+      // machines d'un portefeuille mais pas avec celles du carnet, si bien que
+      // le panneau de détail annonçait « pas de ticker au bulletin » pour les
+      // dix desks qui en avaient un.
+      ticker: index === null || index === undefined ? null : (tickers?.[index] ?? null),
+    };
   };
 
   const PRINTER = 10n ** 18n;
@@ -192,7 +201,7 @@ export function composeSnapshot({
     // Le scrutin décide de la taille des parts du pot, donc du coefficient qui
     // s'applique par desk. Illisible, il vaut null : la page dira qu'elle ne
     // sait pas plutôt que d'annoncer seize parts égales, qu'elles ne sont pas.
-    vote: deskShares({ vote }),
+    vote: deskShares({ vote, tickers }),
     book,
     collection,
     anvil: anvil

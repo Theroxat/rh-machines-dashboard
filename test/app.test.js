@@ -1831,3 +1831,14 @@ test("a snapshot that names no contract leaves the link alone", () => {
   setContract(undefined);
   assert.equal(itemUrl(7), before);
 });
+
+// Le desk est un secteur, mais celui qui vote cherche le ticker qu'il porte
+// ce tour-ci. Le menu doit donner les deux.
+test("the desk menu names the ticker the sector wears this epoch", () => {
+  const html = filterBarHtml(
+    { Desk: [{ value: "real estate", listed: 40, total: 623 }], Headwear: [], Body: [], Eyes: [] },
+    NO_FILTER,
+    { opened: true, closesAt: null, finalized: false,
+      desks: [{ index: 10, desk: "real estate", ticker: "SPCX", votedWeight: 40, share: 0.042 }] });
+  assert.match(html, /real estate · SPCX — 4\.2% of the pot \(40 on sale of 623\)/);
+});

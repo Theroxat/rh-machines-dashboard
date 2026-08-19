@@ -165,7 +165,7 @@ async function sweepBook() {
   const composed = composeSnapshot({
     grid, printer, eth, protocol, stats,
     book: { listed: book.listings.size, pages: book.pages, skipped: book.skipped },
-    inkMeta, meta, legend, ink, weights, anvil, deskIndex, vote, potUsd, sectorWeight, now: Date.now(),
+    inkMeta, meta, legend, ink, weights, anvil, deskIndex, vote, potUsd, sectorWeight, tickers, now: Date.now(),
   });
   store.succeed(composed);
 

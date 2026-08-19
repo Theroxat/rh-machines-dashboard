@@ -106,7 +106,7 @@ export async function readVote({ provider, epoch }) {
  * rien à recouper : la page nommait ces desks d'après des tickers déduits, et
  * la déduction était fausse.
  */
-export function deskShares({ vote }) {
+export function deskShares({ vote, tickers = [] }) {
   if (!vote) return null;
 
   const total = vote.totalVotes;
@@ -117,6 +117,9 @@ export function deskShares({ vote }) {
     desks.push({
       index,
       desk: deskName(index),
+      // Le desk est un secteur ; le ticker qu'il porte change à chaque epoch,
+      // et c'est celui-là que cherche quelqu'un qui vote.
+      ticker: tickers[index] ?? null,
       // Le poids voté, en points : une machine vote avec son poids, pas pour
       // une voix.
       votedWeight: Number(weight / 100n),

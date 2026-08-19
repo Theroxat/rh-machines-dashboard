@@ -68,3 +68,19 @@ test("a ballot that could not be read at all yields nothing, never an empty tall
 test("the ballot carries sixteen desks", () => {
   assert.equal(DESK_SLOTS, 16);
 });
+
+// Le desk est un secteur ; le ticker qu'il porte change à chaque epoch, et
+// c'est celui-là que cherche quelqu'un qui vote.
+test("each desk carries the ticker it wears this epoch", () => {
+  const { desks } = deskShares({
+    vote: voteOf({ opened: true, tally: tallyOf([[10, 100], [7, 50]]), totalVotes: 150n }),
+    tickers: Array.from({ length: 16 }, (_, i) => (i === 10 ? "SPCX" : null)),
+  });
+  assert.equal(desks.find((d) => d.index === 10).ticker, "SPCX");
+  assert.equal(desks.find((d) => d.index === 7).ticker, null);
+});
+
+test("with no ballot read, a desk claims no ticker", () => {
+  const { desks } = deskShares({ vote: voteOf({ opened: true, tally: tallyOf([[0, 1]]), totalVotes: 1n }) });
+  assert.equal(desks[0].ticker, null);
+});

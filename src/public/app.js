@@ -934,14 +934,20 @@ export function filterBarHtml(traitFilters, filter, vote = null) {
   // cosmétique : c'est le seul dont la valeur change avec un vote, et le menu
   // ne peut pas laisser croire que les seize se valent.
   const share = new Map();
-  for (const dk of vote?.desks ?? []) if (dk.desk && dk.share !== null) share.set(dk.desk, dk.share);
+  const wears = new Map();
+  for (const dk of vote?.desks ?? []) {
+    if (dk.desk && dk.share !== null) share.set(dk.desk, dk.share);
+    // Le desk est un secteur, mais on cherche le ticker qu'il porte ce tour-ci.
+    if (dk.desk && dk.ticker) wears.set(dk.desk, dk.ticker);
+  }
 
   return TRAIT_TYPES.map((type) => {
     const values = traitFilters[type] ?? [];
     const options = values.map((v) => {
+      const wearing = type === "Desk" && wears.has(v.value) ? ` · ${esc(wears.get(v.value))}` : "";
       const pot = type === "Desk" && share.has(v.value) ? ` — ${fmtRatio(share.get(v.value))} of the pot` : "";
       const chosen = filter?.[type] === v.value ? " selected" : "";
-      return `<option value="${esc(v.value)}"${chosen}>${esc(v.value)}${pot} (${fmtInt(v.listed)} on sale of ${fmtInt(v.total)})</option>`;
+      return `<option value="${esc(v.value)}"${chosen}>${esc(v.value)}${wearing}${pot} (${fmtInt(v.listed)} on sale of ${fmtInt(v.total)})</option>`;
     }).join("");
     return `<label class="fl"><span class="label">${type}</span>` +
       `<select data-trait="${type}"><option value="">any</option>${options}</select></label>`;
