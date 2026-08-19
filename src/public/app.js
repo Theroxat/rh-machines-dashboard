@@ -331,7 +331,7 @@ function chip(e, { isFloor = false, ethUsd = null, anvil = false, showPrice = tr
   const earns = e.epochUsd === null || e.epochUsd === undefined
     ? ""
     : `<span class="earns">${fmtUsd(e.epochUsd)}</span>` +
-      `<span class="per">an epoch</span>`;
+      `<span class="per">this drop</span>`;
   // « ×2.00 » se lisait « inkée deux fois ». Ce qui a été fait, c'est brûler
   // quatre fois l'encre de base ; le poids n'en gagne que le double, parce
   // qu'il suit une racine carrée.
@@ -357,12 +357,15 @@ function chip(e, { isFloor = false, ethUsd = null, anvil = false, showPrice = tr
   // une façon absurde de le dire. Inkée aujourd'hui elle serait « Lit », donc
   // elle ne toucherait rien avant l'epoch suivante : l'infobulle le dit.
   const known = e.epochUsd !== null && e.epochUsd !== undefined;
+  // « an epoch » promettait un rythme. Le pot qui attend s'est constitué depuis
+  // le lancement sans avoir jamais rien versé, sur la semaine où le token
+  // s'échangeait le plus. Ce chiffre est ce qui attend, pas ce qui revient.
   const earnStory = !known
     ? ""
     : !e.weight
       ? ` · earns nothing until it is inked, and nothing from this pot even then` +
         ` — a Machine inked during an epoch only starts earning at the next one`
-      : ` · earns ${fmtUsd(e.epochUsd)} an epoch at weight ${e.weight / 100}x` +
+      : ` · takes ${fmtUsd(e.epochUsd)} of the pot waiting now, at weight ${e.weight / 100}x` +
         ` — up to ${fmtUsd(e.epochUsd * 2)} if the vote lands on its desk`;
 
   const pointStory = perPoint !== null
@@ -713,7 +716,7 @@ export function machineDetailHtml(d, tokenId) {
     factRow("Desk", m.desk ? esc(m.desk) : null,
       m.ticker ? `wears ${esc(m.ticker)} this epoch — it counts 2× on that slice`
         : "no ticker on this epoch's ballot") +
-    factRow("Earns", e.epochUsd === null || e.epochUsd === undefined ? null : `${fmtUsd(e.epochUsd)} an epoch`,
+    factRow("Takes", e.epochUsd === null || e.epochUsd === undefined ? null : `${fmtUsd(e.epochUsd)} of the pot`,
       e.epochUsd ? `up to ${fmtUsd(e.epochUsd * 2)} if the vote lands on its desk`
         : "nothing from this pot, and nothing from the next until it is inked") +
     factRow(anvil ? "Asking" : "Price",
@@ -954,25 +957,28 @@ export function dropNote(d) {
   const pot = d?.pot?.usd;
   if (!pot) return "";
 
-  const waiting = fmtBig(pot);
   const when = d?.vote?.opened
     ? "A ballot is open — it pays out when that ballot closes."
     : "No ballot is open yet, so it keeps piling up until one closes.";
 
-  return `Sell fees pile up as USDG — <b>${waiting}</b> so far — and buy the stock the desks vote for. ` +
-    `Every Machine takes a share of it by weight: that is the green figure on each one. ` +
-    when;
+  // Le pot n'a jamais rien versé : il s'est constitué depuis le lancement, et
+  // sur la semaine où le token s'échangeait le plus. Appeler sa part « par
+  // epoch » promettait un rythme que rien ne garantit — le prochain pot vaudra
+  // ce que le volume de la semaine suivante lui donnera, et le volume vient de
+  // tomber. Le dire est plus utile que de laisser espérer.
+  const daily = d?.printer?.volume24h && d?.protocol?.sellFeeBps
+    ? (d.printer.volume24h * (d.protocol.sellFeeBps / 10000)) / 2
+    : null;
+  const rate = daily
+    ? ` At today's trading it takes about <b>${fmtBig(daily * 3.5)}</b> to refill over a 3.5-day epoch, ` +
+      `so the next one will not be this size unless volume holds.`
+    : "";
+
+  return `Sell fees pile up as USDG — <b>${fmtBig(pot)}</b> so far, never yet paid out — and buy the stock ` +
+    `the desks vote for. Every Machine takes a share of it by weight: that is the green figure on each one. ` +
+    when + rate;
 }
 
-/**
- * Le portefeuille d'un visiteur : ses machines, sa part, et pour quel ticker
- * voter.
- *
- * Le conseil se donne en entier, gain compris. Un bulletin isolé rapporte des
- * centimes — c'est un fait du protocole, pas un défaut du calcul — et le taire
- * pour rendre le conseil plus vendeur ferait croire à un levier qui n'existe
- * pas. Ce qui déplace vraiment une part, c'est l'issue du scrutin.
- */
 export function walletCardHtml(w) {
   const label = `<span class="label">Your wallet</span>`;
   const field = (note) =>
@@ -1002,7 +1008,7 @@ export function walletCardHtml(w) {
   return label + `<span class="w-said">` +
     `<span class="v">${best ? `Vote ${esc(best.ticker)}` : "No ballot open"}</span>` +
     (w.cutUsd === null ? ""
-      : `<span class="w-cut">${fmtUsd(w.cutUsd)}<small>an epoch, all ${fmtInt(w.machines.length)} machines</small></span>`) +
+      : `<span class="w-cut">${fmtUsd(w.cutUsd)}<small>of the pot waiting, all ${fmtInt(w.machines.length)} machines</small></span>`) +
     `<span class="x">${esc(short)} · <b>${(w.weight / 100).toFixed(2)}x</b> of the fleet</span>` +
     `<button class="w-again" type="button">another wallet</button></span>`;
 }

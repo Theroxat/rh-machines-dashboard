@@ -1230,13 +1230,13 @@ test("a ticker is escaped on its way into the page, wherever it came from", () =
 // devine pas. La vignette le nomme, et une ligne dit d'où il sort.
 test("the green figure names itself on every machine", () => {
   const html = halfCell(half({ entries: [{ ...entry(1, 0.1), weight: 100, epochUsd: 12.6 }] }), "ink", { ethUsd: 1900 });
-  assert.match(html, /class="earns">\$12\.60<\/span><span class="per">an epoch/);
+  assert.match(html, /class="earns">\$12\.60<\/span><span class="per">this drop/);
 });
 
 test("a machine with no readable return shows no green figure at all", () => {
   const html = halfCell(half({ entries: [{ ...entry(1, 0.1), weight: 100, epochUsd: null }] }), "ink", { ethUsd: 1900 });
   assert.doesNotMatch(html, /class="earns"/);
-  assert.doesNotMatch(html, /an epoch/);
+  assert.doesNotMatch(html, /this drop/);
 });
 
 test("the note says where the money comes from and that weight splits it", () => {
@@ -1380,7 +1380,7 @@ test("a band with nothing earning in it does not appear at all", () => {
 // gagne rien tant que rien n'a brûlé, et la vignette ne doit pas le maquiller.
 test("outside the top strip a dormant machine still earns nothing, and says so", () => {
   const html = halfCell(half({ entries: [{ ...entry(7, 0.1), weight: 0, epochUsd: 0 }] }), "dormant", { ethUsd: 2000 });
-  assert.match(html, /class="earns">\$0\.00<\/span><span class="per">an epoch/);
+  assert.match(html, /class="earns">\$0\.00<\/span><span class="per">this drop/);
   assert.doesNotMatch(html, /once inked/);
 });
 
@@ -1633,7 +1633,7 @@ test("the panel prices it, and says what it pays back", () => {
   const html = machineDetailHtml(DETAIL, 3145);
   assert.match(html, /0\.3000 ETH/);
   assert.match(html, /\$600\.00/);
-  assert.match(html, /\$60\.00 an epoch/);
+  assert.match(html, /\$60\.00 of the pot/);
   assert.match(html, /up to \$120\.00/);
   assert.match(html, /10\.0%/);            // 60 / 600
 });
@@ -1733,7 +1733,7 @@ test("with no ceiling read the line claims none", () => {
 // et un poids. C'est pourtant le chiffre qu'on vient chercher.
 test("what the wallet is owed is read as a figure, not as the end of a sentence", () => {
   const html = walletCardHtml(WALLET);
-  assert.match(html, /class="w-cut">\$39\.12<small>an epoch, all 2 machines<\/small>/);
+  assert.match(html, /class="w-cut">\$39\.12<small>of the pot waiting, all 2 machines<\/small>/);
 });
 
 // Vert pour ce que le protocole verse, ambre pour l'ordre à donner : les deux
