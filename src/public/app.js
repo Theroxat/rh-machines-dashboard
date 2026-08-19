@@ -290,7 +290,7 @@ export function contextHtml(d, now = null) {
  * dérivé : le badge de re-encrage n'existait que du côté OpenSea, si bien
  * qu'une x10 re-inkée au plafond passait pour une x10 ordinaire sur le rayon.
  */
-function chip(e, { isFloor = false, ethUsd = null, anvil = false, showPrice = true, perPoint = null } = {}) {
+function chip(e, { isFloor = false, ethUsd = null, anvil = false, showPrice = true, perPoint = null, classLabel = null } = {}) {
   const hw = e.machine?.headwear ? ` · ${headwearLabel(e.machine.headwear)}` : "";
   const img = e.machine?.image
     ? `<img src="${esc(e.machine.image)}" alt="Machine #${e.tokenId}" loading="lazy" width="78" height="78">`
@@ -308,6 +308,13 @@ function chip(e, { isFloor = false, ethUsd = null, anvil = false, showPrice = tr
   // pèse comme une x6 se noie sinon au milieu des x3 au même prix.
   const reinked = e.inkMult > 1.0001 && e.weight;
   const badge = reinked ? `<span class="reink">${e.weight / 100}x</span>` : "";
+
+  // La classe, en bas à gauche. Dans les lignes de rareté elle est déjà écrite
+  // en tête de ligne ; dans la bande de tête, où les sept classes se mélangent,
+  // rien ne disait plus si l'on regardait une x1 ou une x10. Avec le badge de
+  // re-encrage en face, la vignette dit alors les deux : ce qu'elle est de
+  // naissance, et ce qu'elle pèse aujourd'hui.
+  const cls = classLabel ? `<span class="cls-badge">${esc(classLabel)}</span>` : "";
 
   // Ce que la machine toucherait si le pot tombait maintenant. C'est le chiffre
   // qu'on vient chercher : le prix est ce qu'on paie, celui-ci est ce qu'on
@@ -356,7 +363,7 @@ function chip(e, { isFloor = false, ethUsd = null, anvil = false, showPrice = tr
   return `<a class="chip${isFloor ? " floor" : ""}${anvil ? " anvil" : ""}${!anvil && e.underBid ? " is-under" : ""}${reinked ? " is-reinked" : ""}"` +
     ` href="${anvil ? ANVIL_URL : itemUrl(e.tokenId)}" target="_blank" rel="noopener"` +
     ` title="${esc(`#${e.tokenId}${hw}${earnStory}${pointStory}${inkStory}${bidStory}${anvilStory}`)}">` +
-    `<span class="thumb">${img}${badge}${under}</span>` +
+    `<span class="thumb">${img}${badge}${cls}${under}</span>` +
     (showPrice ? `<span class="price">${price}</span>` : "") +
     (showPrice && dollars ? `<span class="usd">${dollars}</span>` : "") +
     earns +
@@ -679,7 +686,8 @@ export function bestRow(d, { limit = BEST_LIMIT, step = REVEAL_STEP, shown = nul
         : "");
 
   const strip = (list) => `<span class="strip">` +
-    list.map(({ e }) => chip(e, { ethUsd, anvil: e.askPrinter !== undefined })).join("") + `</span>`;
+    list.map(({ e, classLabel }) => chip(e, { ethUsd, anvil: e.askPrinter !== undefined, classLabel })).join("") +
+    `</span>`;
 
   const shelfPart = shelf.length
     ? `<span class="shelf"><span class="market">On the Anvil</span>` +

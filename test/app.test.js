@@ -1569,3 +1569,32 @@ test("the detail states the share precisely, not rounded into another number", (
   const html = walletDetailHtml({ ...WALLET, share: 0.00051 });
   assert.match(html, /0\.051%/);
 });
+
+// Dans la bande de tête les sept classes se mélangent : rien ne disait plus si
+// l'on regardait une x1 ou une x10. Le badge le dit, face à celui du re-encrage.
+test("every machine in the top band wears its class", () => {
+  const html = bestRow(BEST, { ethUsd: 2000 });
+  assert.match(html, /class="cls-badge">x10</);
+  assert.match(html, /class="cls-badge">x1</);
+});
+
+test("the class badge sits inside the picture, with the re-inking one", () => {
+  const html = bestRow({
+    ...BEST,
+    rows: [{ classValue: 300, classLabel: "x3", docCount: 1, chainCount: 1,
+      inked: half({ entries: [{ ...entry(1, 0.10), weight: 600, inkMult: 2, inkPrinter: 17000, epochUsd: 60 }] }),
+      dormant: half({ entries: [] }) }],
+  }, { ethUsd: 2000 });
+  const chip = html.match(/<a class="chip[\s\S]*?<\/a>/)[0];
+  const thumb = chip.match(/<span class="thumb">[\s\S]*?<\/span><span class="price"/)[0];
+  // Née x3, elle en pèse six : la vignette dit les deux, dans l'image.
+  assert.match(thumb, /class="reink">6x</);
+  assert.match(thumb, /class="cls-badge">x3</);
+});
+
+// Dans les lignes de rareté la classe est déjà en tête de ligne : la répéter
+// sur chaque vignette serait du bruit.
+test("a rarity row does not repeat its own class on every machine", () => {
+  const html = halfCell(half({ entries: [entry(1, 0.1)] }), "ink", { ethUsd: 2000 });
+  assert.doesNotMatch(html, /cls-badge/);
+});

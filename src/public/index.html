@@ -357,6 +357,20 @@
     outline-offset: 1px;
   }
   .chip.is-reinked .tok { color: var(--reink); font-weight: 700; }
+  /* La classe, en bas à gauche, face au badge de re-encrage. Neutre exprès :
+     le rouge dit « re-inkée » et l'ambre dit « un prix » — la rareté n'est ni
+     l'un ni l'autre, elle est un fait de naissance. */
+  .cls-badge {
+    position: absolute;
+    bottom: 0; left: 0;
+    padding: 0 3px;
+    background: var(--paper);
+    color: var(--text);
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1.5;
+  }
+
   .chip img, .chip .noimg {
     display: block;
     width: 78px; height: 78px;
