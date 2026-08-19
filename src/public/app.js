@@ -857,7 +857,7 @@ export function bestRow(d, { limit = BEST_LIMIT, step = REVEAL_STEP, shown = nul
     `<td class="edge half best" colspan="2">` +
       `<span class="market">On OpenSea</span>` +
       `<span class="cell-floor"><span class="label">${label}</span>` +
-        `<span class="price">${fmtUsd(head.e.epochUsd ?? 0)}</span> <span class="unit">an epoch</span>` +
+        `<span class="price">${fmtUsd(head.e.epochUsd ?? 0)}</span> <span class="unit">of the pot</span>` +
         `<span class="usd-big">for ${fmtUsdShort(usdOf(head.e.priceEth, ethUsd)) || "—"}</span></span>` +
       `<span class="depth">every class, machines already earning, most pot per dollar first` +
         (active ? ` · ${fmtInt(book.length)} match your filter` : "") + `</span>` +
@@ -947,7 +947,7 @@ export function filterBarHtml(traitFilters, filter, vote = null) {
 /**
  * D'où vient l'argent, dit une fois et en toutes lettres.
  *
- * Les vignettes portent le mot « an epoch » sous chaque montant vert, mais un
+ * Les vignettes portent « this drop » sous chaque montant vert, mais un
  * mot ne dit pas d'où sort la somme. Cette ligne le dit : le pot est fait des
  * frais de vente, il est partagé au prorata du poids, et il ne tombe pas au
  * rythme des epochs — il tombe quand un bulletin se clôt. Promettre une cadence

@@ -1782,3 +1782,16 @@ test("a machine that never burned more claims no journey", () => {
   assert.match(html, /activated at the base burn/);
   assert.doesNotMatch(html, /lifts it to/);
 });
+
+// Le pot n'a jamais rien versé : aucun chiffre de la page ne peut se présenter
+// comme un rythme. Une seule étiquette oubliée suffit à faire mentir le reste.
+test("nowhere on the page does a figure claim to arrive every epoch", () => {
+  const app = readFileSync(new URL("../src/public/app.js", import.meta.url), "utf8");
+  // « an epoch » ne subsiste que pour dire le délai d'une machine tout juste
+  // inkée, qui est bien une histoire d'epoch et pas de montant.
+  const claims = [...app.matchAll(/`[^`]*an epoch[^`]*`/g)].map((m) => m[0]);
+  for (const c of claims) {
+    assert.match(c, /only starts earning at the next one/,
+      `« an epoch » se présente comme un rythme ici : ${c}`);
+  }
+});
