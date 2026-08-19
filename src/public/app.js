@@ -307,14 +307,21 @@ function chip(e, { isFloor = false, ethUsd = null, anvil = false, showPrice = tr
   // Elle est cerclée : c'est la seule anomalie utile du tableau, une x3 qui
   // pèse comme une x6 se noie sinon au milieu des x3 au même prix.
   const reinked = e.inkMult > 1.0001 && e.weight;
-  const badge = reinked ? `<span class="reink">${e.weight / 100}x</span>` : "";
 
-  // La classe, en bas à gauche. Dans les lignes de rareté elle est déjà écrite
-  // en tête de ligne ; dans la bande de tête, où les sept classes se mélangent,
-  // rien ne disait plus si l'on regardait une x1 ou une x10. Avec le badge de
-  // re-encrage en face, la vignette dit alors les deux : ce qu'elle est de
-  // naissance, et ce qu'elle pèse aujourd'hui.
-  const cls = classLabel ? `<span class="cls-badge">${esc(classLabel)}</span>` : "";
+  // Un seul badge, et il raconte l'histoire entière.
+  //
+  // Il y en avait deux : « x2 » en bas à gauche pour la classe, « 4x » en haut à
+  // droite pour le poids. Deux notations qui ne différaient que par la place du
+  // x, aucune ne disant ce qu'elle était, et l'on comprenait « x2 inkée deux
+  // fois » — alors que c'est une x2 qui a brûlé quatre fois l'encre de base pour
+  // peser le double. « x2→4x » se lit sans notice : née là, arrivée ici.
+  const now = e.weight ? `${e.weight / 100}x` : null;
+  const badge = reinked && classLabel && now
+    ? `<span class="reink">${esc(classLabel)}&#8594;${now}</span>`
+    : reinked && now ? `<span class="reink">${now}</span>`
+    : classLabel ? `<span class="cls-badge">${esc(classLabel)}</span>`
+    : "";
+  const cls = "";
 
   // Ce que la machine toucherait si le pot tombait maintenant. C'est le chiffre
   // qu'on vient chercher : le prix est ce qu'on paie, celui-ci est ce qu'on
@@ -325,8 +332,12 @@ function chip(e, { isFloor = false, ethUsd = null, anvil = false, showPrice = tr
     ? ""
     : `<span class="earns">${fmtUsd(e.epochUsd)}</span>` +
       `<span class="per">an epoch</span>`;
+  // « ×2.00 » se lisait « inkée deux fois ». Ce qui a été fait, c'est brûler
+  // quatre fois l'encre de base ; le poids n'en gagne que le double, parce
+  // qu'il suit une racine carrée.
   const inkStory = reinked
-    ? ` · re-inked ×${e.inkMult.toFixed(2)} — ${fmtInt(e.inkPrinter)} $PRINTER burned · weight ${e.weight / 100}x`
+    ? ` · burning ${e.inkPrinter ? (e.inkPrinter / 4250).toFixed(0) : "more"}× the base ink` +
+      ` — ${fmtInt(e.inkPrinter)} $PRINTER burned · weight ${e.weight / 100}x`
     : "";
 
   // L'anvil ne peut pas vendre sous sa propre offre : la marque n'a de sens que
@@ -678,7 +689,13 @@ export function machineDetailHtml(d, tokenId) {
     factRow("Class", esc(r.classLabel), `${fmtInt(r.chainCount)} machines are born in it`) +
     factRow("Weight", e.weight ? `${e.weight / 100}x` : "0x",
       dormant ? "dormant — nothing burned, so it earns and votes nothing"
-        : reinked ? `re-inked ×${e.inkMult.toFixed(2)} — it outweighs its own class`
+        // « ×2.00 » seul se lisait comme « inkée deux fois ». Ce qui a été fait,
+        // c'est brûler quatre fois l'encre de base ; le poids n'en gagne que le
+        // double parce qu'il suit une racine carrée.
+        : reinked && e.inkPrinter
+          ? `born ${esc(r.classLabel)} — burning ${(e.inkPrinter / 4250).toFixed(0)}× the base ink ` +
+            `lifts it to ${e.weight / 100}x, since weight follows the square root`
+        : reinked ? `it outweighs its own class`
         : "activated at the base burn") +
     // La formule seule ment sur les machines qui touchent le plafond : le
     // contrat tronque le multiplicateur au pourcent entier et refuse de le

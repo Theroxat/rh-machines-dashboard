@@ -482,7 +482,7 @@ test("a re-inked machine is badged with the weight it actually carries", () => {
 
 test("the badge spells the whole story on hover", () => {
   const html = halfCell(half({ entries: [inked({ weight: 1200, inkMult: 2, inkPrinter: 17000 })] }), "ink");
-  assert.match(html, /re-inked ×2\.00/);
+  assert.match(html, /burning 4× the base ink/);
   assert.match(html, /17,000 \$PRINTER burned/);
   assert.match(html, /weight 12x/);
 });
@@ -1578,7 +1578,7 @@ test("every machine in the top band wears its class", () => {
   assert.match(html, /class="cls-badge">x1</);
 });
 
-test("the class badge sits inside the picture, with the re-inking one", () => {
+test("a re-inked machine wears one badge that tells the whole story", () => {
   const html = bestRow({
     ...BEST,
     rows: [{ classValue: 300, classLabel: "x3", docCount: 1, chainCount: 1,
@@ -1586,10 +1586,10 @@ test("the class badge sits inside the picture, with the re-inking one", () => {
       dormant: half({ entries: [] }) }],
   }, { ethUsd: 2000 });
   const chip = html.match(/<a class="chip[\s\S]*?<\/a>/)[0];
-  const thumb = chip.match(/<span class="thumb">[\s\S]*?<\/span><span class="price"/)[0];
-  // Née x3, elle en pèse six : la vignette dit les deux, dans l'image.
-  assert.match(thumb, /class="reink">6x</);
-  assert.match(thumb, /class="cls-badge">x3</);
+  // Née x3, elle en pèse six. Deux badges se lisaient « x3 inkée six fois » ;
+  // un seul, fléché, se lit « née là, arrivée ici ».
+  assert.match(chip, /class="reink">x3&#8594;6x</);
+  assert.doesNotMatch(chip, /cls-badge/);
 });
 
 // Dans les lignes de rareté la classe est déjà en tête de ligne : la répéter
@@ -1625,7 +1625,7 @@ test("the panel tells what the machine is, and what it became", () => {
   assert.match(html, /Machine #3145/);
   assert.match(html, /Class<\/span><span class="d-v">x3</);
   assert.match(html, /Weight<\/span><span class="d-v">6x</);
-  assert.match(html, /re-inked ×2\.00/);
+  assert.match(html, /burning 4× the base ink/);
   assert.match(html, /17,000 \$PRINTER/);
 });
 
@@ -1761,4 +1761,24 @@ test("an empty cell says it too, having nothing else to explain itself with", ()
 test("the anvil strip carries the same state as the half it sits in", () => {
   const html = halfCell(half({ entries: [entry(1, 0.1)], anvilEntries: [shelfEntry()] }), "dormant", { ethUsd: 2000 });
   assert.match(html, /On the Anvil <span class="st">dormant</);
+});
+
+// « x2 » et « 4x » côte à côte ne différaient que par la place du x, et l'on
+// comprenait « inkée deux fois ». Elle a brûlé quatre fois l'encre de base ;
+// le poids n'en gagne que le double, parce qu'il suit une racine carrée.
+test("the detail says how much ink was burned, not just what it multiplied", () => {
+  const html = machineDetailHtml(DETAIL, 3145);
+  assert.match(html, /born x3/);
+  assert.match(html, /burning 4× the base ink/);
+  assert.match(html, /lifts it to 6x/);
+  assert.match(html, /square root/);
+  assert.doesNotMatch(html, /re-inked ×2\.00/);
+});
+
+test("a machine that never burned more claims no journey", () => {
+  const plain = { ...DETAIL, rows: [{ ...DETAIL.rows[0],
+    inked: half({ entries: [{ ...DETAIL.rows[0].inked.entries[0], weight: 300, inkMult: 1, inkPrinter: 4250 }] }) }] };
+  const html = machineDetailHtml(plain, 3145);
+  assert.match(html, /activated at the base burn/);
+  assert.doesNotMatch(html, /lifts it to/);
 });
