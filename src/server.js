@@ -84,8 +84,11 @@ let deskIndex = new Map();
 let history = null;
 let historyFailures = 0;
 try {
-  history = openHistory(join(here, "..", "data", "history.db"));
-  console.log("history: recording to data/history.db");
+  // Un fichier par contrat. La collection migre, et deux collections dont les
+  // identifiants se ressemblent ne doivent pas se retrouver dans la même table :
+  // au basculement, un fichier neuf commence et l'ancien reste lisible.
+  history = openHistory(join(here, "..", "data", `history-${ADDRESSES.MACHINES.slice(2, 10).toLowerCase()}.db`));
+  console.log(`history: recording to data/history-${ADDRESSES.MACHINES.slice(2, 10).toLowerCase()}.db`);
 } catch (e) {
   console.error(`history: not recording — ${e.message}`);
 }

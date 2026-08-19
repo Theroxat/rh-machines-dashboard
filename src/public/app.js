@@ -66,7 +66,11 @@ export function viewBarHtml(view) {
     `<select data-view>${options}</select></label>`;
 }
 
-const MACHINES = "0xb509e195bcb3e4461e235ff152c68d66915f67b5";
+/** Le contrat servi par le snapshot, pas une adresse recopiée ici. La
+ *  collection migre vers un nouveau contrat ; les liens doivent suivre sans
+ *  qu'on retouche la page. La valeur d'origine ne sert que de repli. */
+let MACHINES = "0xb509e195bcb3e4461e235ff152c68d66915f67b5";
+export const setContract = (addr) => { if (addr) MACHINES = String(addr).toLowerCase(); };
 export const itemUrl = (id) => `https://opensea.io/assets/robinhood/${MACHINES}/${id}`;
 /** Une machine du rayon s'achète sur l'anvil, et nulle part ailleurs : le lien
  *  mène donc là où la transaction se fait, pas sur une fiche descriptive. */
@@ -1351,6 +1355,7 @@ if (typeof document !== "undefined") {
     showBanner(bannerMessage(v));
     if (!v.data) return;
 
+    setContract(v.data.collection?.contract);
     lastData = v.data;
     contextEl.innerHTML = contextHtml(v.data, serverNow);
     paintFilters(v.data.traitFilters, v.data.vote);

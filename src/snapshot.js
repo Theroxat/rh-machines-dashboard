@@ -1,5 +1,5 @@
 import { buildTraitIndex } from "./traitindex.js";
-import { TOTAL_MACHINES, OPERATING_CHARGE_PRINTER } from "./config.js";
+import { TOTAL_MACHINES, OPERATING_CHARGE_PRINTER, ADDRESSES, OPENSEA } from "./config.js";
 import { deskShares } from "./vote.js";
 import { deskName } from "./desks.js";
 import { epochUsd } from "./pot.js";
@@ -158,6 +158,10 @@ export function composeSnapshot({
     publishedFloor: stats?.floor ?? null,
     publishedFloorSymbol: stats?.symbol ?? null,
     publishedFloorUsedInComputation: false,
+    // La page bâtit ses liens avec ça au lieu de recopier l'adresse : au
+    // basculement vers le nouveau contrat, elle suit sans être retouchée.
+    contract: ADDRESSES.MACHINES,
+    slug: OPENSEA.slug,
   };
 
   return {

@@ -5,7 +5,7 @@ import {
   fmtEth, fmtRatio, halfCell, cellKey,
   bannerMessage, rowsHtml, contextHtml, legendHtml,
   matchesFilter, filterBarHtml, filterSummary, freshness, fmtCompact, crateLine,
-  perPointUsd, viewBarHtml, ballotBlock, dropNote, bestRow, yieldOf, BEST_LIMIT, DEFAULT_LIMIT, bestFit, walletCardHtml, walletDetailHtml, fmtShare, machineDetailHtml, findMachine,
+  perPointUsd, viewBarHtml, ballotBlock, dropNote, bestRow, yieldOf, BEST_LIMIT, DEFAULT_LIMIT, bestFit, walletCardHtml, walletDetailHtml, fmtShare, machineDetailHtml, findMachine, itemUrl, setContract,
 } from "../src/public/app.js";
 
 const entry = (tokenId, priceEth, image = `https://img/${tokenId}.webp`) => ({
@@ -1813,4 +1813,21 @@ test("the amounts say what they are — a share of the pot as it stands", () => 
   assert.match(bestRow(BEST, { ethUsd: 2000 }), /class="unit">of the pot</);
   assert.match(walletCardHtml(WALLET), /of the pot waiting/);
   assert.match(dropNote({ pot: { usd: 170000 }, vote: { opened: false } }), /never yet paid out/);
+});
+
+// La collection migre vers un nouveau contrat. Les liens doivent suivre le
+// snapshot, pas une adresse recopiée dans la page.
+test("item links follow the contract the service serves", () => {
+  const before = itemUrl(42);
+  assert.match(before, /0xb509e195bcb3e4461e235ff152c68d66915f67b5\/42$/);
+  setContract("0xABCdef0123456789012345678901234567890123");
+  assert.match(itemUrl(42), /0xabcdef0123456789012345678901234567890123\/42$/);
+  setContract(before.match(/robinhood\/(0x[a-f0-9]+)\//)[1]);   // on remet, les tests partagent le module
+});
+
+test("a snapshot that names no contract leaves the link alone", () => {
+  const before = itemUrl(7);
+  setContract(null);
+  setContract(undefined);
+  assert.equal(itemUrl(7), before);
 });

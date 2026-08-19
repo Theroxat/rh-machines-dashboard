@@ -1,8 +1,18 @@
 export const CHAIN_ID = 4663;
 export const RPC_URL = "https://rpc.mainnet.chain.robinhood.com";
 
+/**
+ * La collection est en cours de migration vers un nouveau contrat — l'original
+ * n'imposait pas de frais de vente, et l'équipe en redéploie un qui les
+ * applique. L'adresse et le slug se surchargent donc par l'environnement : le
+ * jour du basculement, c'est un `.env` et un redémarrage, pas une modification
+ * de code, une reconstruction et une suite de tests pendant que le marché tourne.
+ */
+export const MACHINES_ADDRESS =
+  (process.env.MACHINES_ADDRESS ?? "").trim() || "0xB509e195bcB3E4461e235Ff152c68D66915f67b5";
+
 export const ADDRESSES = Object.freeze({
-  MACHINES:   "0xB509e195bcB3E4461e235Ff152c68D66915f67b5",
+  MACHINES:   MACHINES_ADDRESS,
   MINE:       "0x3C4E763E87Ac5775A23aE2eb2e69F90232f413E1",
   TRAITS:     "0x8a0833f41cE9e869d6ebd8aC16EfDC9Ee7a38a22",
   // The Anvil : le teneur de marché du protocole. Ni l'adresse ni l'ABI ne sont
@@ -42,7 +52,7 @@ export const OPERATING_CHARGE_PRINTER = 750;
 
 export const OPENSEA = Object.freeze({
   base: "https://api.opensea.io/api/v2",
-  slug: "rh-machines",
+  slug: (process.env.OPENSEA_SLUG ?? "").trim() || "rh-machines",
   chain: "robinhood",
   itemUrl: (tokenId) =>
     `https://opensea.io/assets/robinhood/${ADDRESSES.MACHINES.toLowerCase()}/${tokenId}`,
