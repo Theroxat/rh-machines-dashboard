@@ -5,7 +5,7 @@ import { OPENSEA, ADDRESSES, TOTAL_MACHINES } from "./config.js";
 /** Le cache est versionné : une version antérieure ne portait pas Eyes, et la
  *  relire telle quelle donnerait un filtre qui ne trouve jamais rien, sans la
  *  moindre erreur. Un changement de forme force la relecture. */
-const CACHE_VERSION = 2;
+const CACHE_VERSION = 3;
 
 /** Background vaut « Acid Lime » sur les 10 000 machines : il ne distingue rien
  *  et n'est donc pas stocké. Les trois autres traits varient. */
@@ -18,6 +18,11 @@ function traitsOf(nft, image) {
     headwear: t.Headwear ?? null,
     body: t.Body ?? null,
     eyes: t.Eyes ?? null,
+    // Le desk n'a jamais été dans les métadonnées : la page le lit sur la
+    // chaîne, où il fait autorité. L'équipe est en train de l'y ajouter, et
+    // quand il arrivera ce champ servira à recouper — pas à décider. Deux
+    // sources qui se contredisent valent mieux qu'une seule qu'on croit.
+    desk: t.Desk ?? t.desk ?? null,
   };
 }
 
@@ -115,6 +120,7 @@ export function readCache(path) {
       headwear: v.headwear ?? null,
       body: v.body ?? null,
       eyes: v.eyes ?? null,
+      desk: v.desk ?? null,
     });
   }
   return map;
@@ -129,12 +135,35 @@ export function writeCache(path, meta) {
   renameSync(tmp, path);
 }
 
+/** Une seule requête, sur une seule machine : les métadonnées publient-elles
+ *  un desk que notre cache ne connaît pas encore ? Une panne réseau rend faux —
+ *  on garde alors le cache, ce qui est le comportement d'avant. */
+async function deskAppeared({ apiKey, cached, fetchImpl, contract = ADDRESSES.MACHINES, chain = OPENSEA.chain }) {
+  const [tokenId, entry] = cached.entries().next().value ?? [];
+  if (!tokenId || entry?.desk) return false;
+  try {
+    const res = await fetchImpl(`${OPENSEA.base}/chain/${chain}/contract/${contract}/nfts/${tokenId}`, {
+      headers: { "x-api-key": apiKey, accept: "application/json" },
+    });
+    if (!res.ok) return false;
+    const traits = (await res.json())?.nft?.traits ?? [];
+    return traits.some((t) => String(t.trait_type).toLowerCase() === "desk");
+  } catch {
+    return false;
+  }
+}
+
 export async function loadMetadata({
   apiKey, cachePath, maxPages, wanted = [], backfillLimit = 100,
   total = TOTAL_MACHINES, fetchImpl = fetch,
 }) {
   const cached = readCache(cachePath);
-  const fromCache = cached && cached.size >= total * 0.99;
+  // Les métadonnées sont scellées au mint, donc lues une fois puis gardées à
+  // vie. L'équipe y ajoute pourtant le desk, et un cache gardé à vie ne le
+  // verrait jamais arriver. Une seule machine suffit à le demander : si elle
+  // porte désormais un desk que le cache ignore, le cache est périmé.
+  const stale = cached?.size ? await deskAppeared({ apiKey, cached, fetchImpl }) : false;
+  const fromCache = cached && !stale && cached.size >= total * 0.99;
   const meta = fromCache ? cached : (await fetchMetadata({ apiKey, maxPages, fetchImpl })).meta;
 
   // Le rattrapage tourne aussi sur un cache accepté : sans ça, un cache écrit

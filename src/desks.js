@@ -36,6 +36,43 @@ export const SECTORS = Object.freeze([
   "semis",            // 15
 ]);
 
+/**
+ * Recoupe les deux sources : le desk que la chaîne assigne, et celui que les
+ * métadonnées annonceront.
+ *
+ * La chaîne décide — elle est l'autorité et elle ne bouge pas. Les métadonnées,
+ * elles, arrivent après coup et sont écrites par une main humaine. Ce contrôle
+ * ne sert donc pas à corriger la page : il sert à savoir, le jour où les deux
+ * divergent, laquelle des seize étiquettes est fausse. Aujourd'hui les noms de
+ * secteurs viennent des bundles du terminal ; s'ils se retrouvent démentis par
+ * les métadonnées officielles, il faudra le voir plutôt que de le supposer.
+ */
+export function crossCheckDesks({ deskIndex, meta }) {
+  const agree = new Map();
+  const disagree = new Map();
+  let unnamed = 0;
+
+  for (const [tokenId, index] of deskIndex ?? []) {
+    const published = meta?.get(tokenId)?.desk;
+    if (!published) { unnamed++; continue; }
+    const ours = deskName(index);
+    const bag = String(published).toLowerCase() === String(ours).toLowerCase() ? agree : disagree;
+    const key = `${index}:${ours}:${published}`;
+    bag.set(key, (bag.get(key) ?? 0) + 1);
+  }
+
+  return {
+    // Aucune métadonnée ne porte encore de desk : il n'y a rien à recouper,
+    // ce qui n'est pas la même chose qu'un accord.
+    checked: (deskIndex?.size ?? 0) - unnamed,
+    agree: [...agree.values()].reduce((a, b) => a + b, 0),
+    disagreements: [...disagree.keys()].map((k) => {
+      const [index, ours, published] = k.split(":");
+      return { index: Number(index), ours, published, count: disagree.get(k) };
+    }),
+  };
+}
+
 /** Le nom d'un desk, ou null. Un index hors table ne prend pas le nom du
  *  voisin : une machine sans desk lisible n'appartient à aucun secteur. */
 export function deskName(index) {

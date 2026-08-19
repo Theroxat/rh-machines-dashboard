@@ -20,7 +20,7 @@ import { readOwners, tokensOf } from "./owners.js";
 import { openHistory } from "./history.js";
 import { analyseWallet, isAddress } from "./wallet.js";
 import { SECTORS } from "./desks.js";
-import { deskName } from "./desks.js";
+import { deskName, crossCheckDesks } from "./desks.js";
 import { buildGrid } from "./floors.js";
 import { composeSnapshot } from "./snapshot.js";
 import { createStore } from "./store.js";
@@ -317,6 +317,18 @@ const started = async () => {
     }).catch((e) => { console.error(`desks: deskOf unreadable — ${e.message}`); return new Map(); });
     const named = new Set([...deskIndex.values()].map(deskName).filter(Boolean));
     console.log(`desks: ${deskIndex.size} machines placed across ${named.size} sectors`);
+
+    // L'équipe ajoute le desk aux métadonnées. La chaîne reste l'autorité, mais
+    // le jour où les deux se contrediront il faut le voir, pas le supposer.
+    const cross = crossCheckDesks({ deskIndex, meta });
+    if (!cross.checked) {
+      console.log("desks: metadata carries no desk yet — nothing to cross-check");
+    } else if (!cross.disagreements.length) {
+      console.log(`desks: metadata agrees with the chain on all ${cross.agree} machines it names`);
+    } else {
+      console.error(`desks: metadata disagrees with the chain on ${cross.disagreements.length} sector(s) — ` +
+        cross.disagreements.map((x) => `${x.index} ours=${x.ours} theirs=${x.published} (${x.count})`).join(", "));
+    }
   } catch (e) {
     console.error(`metadata: ${e.message} — the dashboard runs without pictures`);
   }

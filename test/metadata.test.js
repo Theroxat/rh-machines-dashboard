@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fetchMetadata, readCache, writeCache, backfillMetadata } from "../src/metadata.js";
+import { fetchMetadata, readCache, writeCache, backfillMetadata, loadMetadata } from "../src/metadata.js";
 
 const tmp = () => join(mkdtempSync(join(tmpdir(), "rh-meta-")), "metadata.json");
 
@@ -37,7 +37,7 @@ test("each machine keeps its image and every trait that varies", async () => {
     image: "https://img/1253.webp",
     headwear: "Blueberries",
     body: "Sky",
-    eyes: "Rage",
+    eyes: "Rage", desk: null,
   });
 });
 
@@ -109,7 +109,7 @@ test("an entry with no usable image is skipped and counted, never half-stored", 
 // le 2026-08-16 : présent sur l'endpoint individuel, absent des 50 pages.
 // Un trou qu'on sait combler ne reste pas un trou.
 test("machines the bulk pages dropped are fetched one by one", async () => {
-  const meta = new Map([[1, { image: "u", headwear: "Fez", body: "Sky", eyes: "UwU" }]]);
+  const meta = new Map([[1, { image: "u", headwear: "Fez", body: "Sky", eyes: "UwU", desk: null }]]);
   const asked = [];
   const filled = await backfillMetadata({
     apiKey: "k", meta, wanted: [1, 765], limit: 50,
@@ -123,7 +123,7 @@ test("machines the bulk pages dropped are fetched one by one", async () => {
   });
   assert.deepEqual(asked, ["765"]);          // le 1 déjà connu n'est pas redemandé
   assert.equal(filled, 1);
-  assert.deepEqual(meta.get(765), { image: "https://img/765.webp", headwear: "Fez", body: "Cobalt", eyes: null });
+  assert.deepEqual(meta.get(765), { image: "https://img/765.webp", headwear: "Fez", body: "Cobalt", eyes: null, desk: null });
 });
 
 test("a backfill that fails leaves the map alone rather than poisoning it", async () => {
@@ -150,8 +150,8 @@ test("a backfill refuses to hammer the API when the gap is not a gap but a failu
 
 test("a written cache reads back as the same map", () => {
   const path = tmp();
-  writeCache(path, new Map([[1, { image: "u", headwear: "Halo", body: "Sky", eyes: "UwU" }]]));
-  assert.deepEqual(readCache(path).get(1), { image: "u", headwear: "Halo", body: "Sky", eyes: "UwU" });
+  writeCache(path, new Map([[1, { image: "u", headwear: "Halo", body: "Sky", eyes: "UwU", desk: null }]]));
+  assert.deepEqual(readCache(path).get(1), { image: "u", headwear: "Halo", body: "Sky", eyes: "UwU", desk: null });
 });
 
 test("a corrupt or missing cache is treated as absent, never half-trusted", () => {
@@ -159,4 +159,46 @@ test("a corrupt or missing cache is treated as absent, never half-trusted", () =
   writeFileSync(path, "{ not json");
   assert.equal(readCache(path), null);
   assert.equal(readCache(join(tmpdir(), "absent-rh-metadata.json")), null);
+});
+
+// Les métadonnées sont scellées au mint et gardées à vie. L'équipe y ajoute
+// pourtant le desk, et un cache gardé à vie ne le verrait jamais arriver.
+test("a cache that predates the desk trait is dropped once the trait appears", async () => {
+  const path = tmp();
+  writeCache(path, new Map(Array.from({ length: 10 }, (_, i) =>
+    [i + 1, { image: "u", headwear: "Halo", body: "Sky", eyes: "UwU", desk: null }])));
+
+  let asked = 0;
+  const fetchImpl = async (url) => {
+    if (url.includes("/nfts/1")) {
+      asked++;
+      return { ok: true, json: async () => ({ nft: { traits: [{ trait_type: "Desk", value: "utilities" }] } }) };
+    }
+    return { ok: true, json: async () => ({ nfts: [{ identifier: "1", image_url: "u", traits: [{ trait_type: "Desk", value: "utilities" }] }], next: null }) };
+  };
+
+  const { meta } = await loadMetadata({ apiKey: "k", cachePath: path, maxPages: 1, total: 1, fetchImpl });
+  assert.equal(asked, 1, "une seule machine interrogée pour le savoir");
+  assert.equal(meta.get(1).desk, "utilities");
+});
+
+test("a cache that already carries desks is not thrown away for nothing", async () => {
+  const path = tmp();
+  writeCache(path, new Map(Array.from({ length: 10 }, (_, i) =>
+    [i + 1, { image: "u", headwear: "Halo", body: "Sky", eyes: "UwU", desk: "utilities" }])));
+  let called = 0;
+  const fetchImpl = async () => { called++; return { ok: true, json: async () => ({ nfts: [], next: null }) }; };
+  const { meta } = await loadMetadata({ apiKey: "k", cachePath: path, maxPages: 1, total: 10, fetchImpl });
+  assert.equal(called, 0, "rien à demander");
+  assert.equal(meta.size, 10);
+});
+
+// Une panne réseau ne doit pas jeter un cache valable.
+test("a probe that fails keeps the cache, rather than refetching ten thousand", async () => {
+  const path = tmp();
+  writeCache(path, new Map(Array.from({ length: 10 }, (_, i) =>
+    [i + 1, { image: "u", headwear: "Halo", body: "Sky", eyes: "UwU", desk: null }])));
+  const fetchImpl = async () => { throw new Error("network down"); };
+  const { meta } = await loadMetadata({ apiKey: "k", cachePath: path, maxPages: 1, total: 10, fetchImpl });
+  assert.equal(meta.size, 10);
 });
