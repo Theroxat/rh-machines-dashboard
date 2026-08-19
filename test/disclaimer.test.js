@@ -265,3 +265,26 @@ test("the state written in a cell wears its column's colour", () => {
   assert.match(page, /td\.g-ink\s+\.market \.st \{[^}]*var\(--ink\)/);
   assert.match(page, /td\.g-dormant \.market \.st \{[^}]*var\(--dormant\)/);
 });
+
+// Trois couleurs et deux badges portent tout le tableau, et rien ne les
+// présentait : « x2 » à côté de « 4x » se lisait « inkée deux fois ».
+test("a legend introduces the badges and the colours, between wallet and table", () => {
+  const key = page.indexOf('class="key"');
+  assert.ok(key > 0, "la légende doit exister");
+  assert.ok(page.indexOf('id="wallet-card"') < key);
+  assert.ok(key < page.indexOf('class="scroll"'));
+});
+
+test("the legend explains the journey badge, not just its shape", () => {
+  assert.match(page, /x3&#8594;6x/);
+  assert.match(page, /burned 4× the base ink to weigh double/);
+  assert.match(page, /square root/);
+});
+
+// Chaque pastille porte la couleur qu'elle explique, sinon la légende ment.
+test("each swatch wears the colour it names", () => {
+  assert.match(page, /\.key-swatch\.amber \{ background: var\(--ink\)/);
+  assert.match(page, /\.key-swatch\.green \{ background: var\(--under\)/);
+  assert.match(page, /\.key-swatch\.blue  \{ background: var\(--dormant\)/);
+  assert.match(page, /\.key-badge\.re  \{ background: var\(--reink\)/);
+});

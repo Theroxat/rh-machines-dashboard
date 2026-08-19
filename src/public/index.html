@@ -317,6 +317,34 @@
   }
   .clear:hover, .clear:focus-visible { color: var(--text); border-color: var(--muted); }
 
+  /* ---- la légende ---- */
+
+  /* Trois couleurs et deux badges portent tout le tableau, et rien ne les
+     présentait. « x2 » à côté de « 4x » se lisait « inkée deux fois » alors
+     qu'il s'agit d'une x2 arrivée à 4x. */
+  .key {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px;
+    margin-top: 20px; padding: 10px 0;
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    font-size: 11.5px; color: var(--muted);
+  }
+  .key-label {
+    font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--dim); flex: none;
+  }
+  .key-item { display: inline-flex; align-items: center; gap: 7px; }
+  .key-badge {
+    padding: 0 4px; font-size: 10.5px; font-weight: 700; line-height: 1.6;
+    color: var(--paper); flex: none;
+  }
+  .key-badge.cls { background: var(--text); }
+  .key-badge.re  { background: var(--reink); }
+  .key-swatch { width: 11px; height: 11px; flex: none; }
+  .key-swatch.amber { background: var(--ink); }
+  .key-swatch.green { background: var(--under); }
+  .key-swatch.blue  { background: var(--dormant); }
+
   /* ---- la grille : classe, inkées, dormantes ---- */
 
   .scroll { overflow-x: auto; margin-top: 18px; }
@@ -684,6 +712,17 @@
 
 <div class="wallet-line" id="wallet-card"></div>
 <div id="wallet-out"></div>
+
+<!-- La légende. Statique : elle ne dépend d'aucune donnée, donc elle ne peut
+     ni se tromper ni disparaître si un balayage échoue. -->
+<div class="key">
+  <span class="key-label">Reading a machine</span>
+  <span class="key-item"><span class="key-badge cls">x3</span>born a x3 — its sealed class</span>
+  <span class="key-item"><span class="key-badge re">x3&#8594;6x</span>re-inked: it burned 4× the base ink to weigh double, since weight follows a square root</span>
+  <span class="key-item"><span class="key-swatch amber"></span>what it costs</span>
+  <span class="key-item"><span class="key-swatch green"></span>what it earns an epoch</span>
+  <span class="key-item"><span class="key-swatch blue"></span>dormant — never inked, so it earns and votes nothing</span>
+</div>
 
 <div class="scroll">
   <table>
