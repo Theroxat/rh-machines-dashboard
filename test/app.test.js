@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   fmtEth, fmtRatio, halfCell, cellKey,
   bannerMessage, rowsHtml, contextHtml, legendHtml,
@@ -1482,8 +1483,7 @@ const WALLET = {
 test("the line carries the verdict, on one line, with the field's own words", () => {
   const html = walletCardHtml(WALLET);
   assert.match(html, /class="v">Vote SPCX</);
-  assert.match(html, /3\.00x/);
-  assert.match(html, /\$39\.12<\/b> of the pot/);
+  assert.match(html, /3\.00x<\/b> of the fleet/);
   assert.match(html, /another wallet/);
 });
 
@@ -1727,4 +1727,19 @@ test("with no ceiling read the line claims none", () => {
   const html = machineDetailHtml(DETAIL, 3145);
   assert.doesNotMatch(html, /ink ceiling/);
   assert.doesNotMatch(html, /At the ceiling/);
+});
+
+// Le montant tenait en petit au bout d'une phrase, entre une adresse tronquée
+// et un poids. C'est pourtant le chiffre qu'on vient chercher.
+test("what the wallet is owed is read as a figure, not as the end of a sentence", () => {
+  const html = walletCardHtml(WALLET);
+  assert.match(html, /class="w-cut">\$39\.12<small>an epoch, all 2 machines<\/small>/);
+});
+
+// Vert pour ce que le protocole verse, ambre pour l'ordre à donner : les deux
+// grands nombres de la ligne ne disent pas la même chose.
+test("the amount and the instruction do not wear the same colour", () => {
+  const css = readFileSync(new URL("../src/public/index.html", import.meta.url), "utf8");
+  assert.match(css, /\.w-said \.v \{[^}]*var\(--ink\)/);
+  assert.match(css, /\.w-cut \{[^}]*var\(--under\)/);
 });

@@ -966,11 +966,15 @@ export function walletCardHtml(w) {
       `<button class="w-again" type="button">try another</button></span>`;
   }
 
+  // Deux réponses, pas une : pour quoi voter, et combien le portefeuille pèse.
+  // La seconde était en petit au bout d'une phrase — c'est pourtant le chiffre
+  // qu'on vient chercher, et il se lit maintenant comme sur les vignettes.
   const best = w.advice?.best;
   return label + `<span class="w-said">` +
     `<span class="v">${best ? `Vote ${esc(best.ticker)}` : "No ballot open"}</span>` +
-    `<span class="x">${esc(short)} · <b>${(w.weight / 100).toFixed(2)}x</b>` +
-    (w.cutUsd === null ? "" : ` · <b>${fmtUsd(w.cutUsd)}</b> of the pot`) + `</span>` +
+    (w.cutUsd === null ? ""
+      : `<span class="w-cut">${fmtUsd(w.cutUsd)}<small>an epoch, all ${fmtInt(w.machines.length)} machines</small></span>`) +
+    `<span class="x">${esc(short)} · <b>${(w.weight / 100).toFixed(2)}x</b> of the fleet</span>` +
     `<button class="w-again" type="button">another wallet</button></span>`;
 }
 
