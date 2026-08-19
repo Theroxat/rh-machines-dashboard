@@ -404,12 +404,24 @@ export function matchesFilter(machine, filter) {
 }
 
 /**
+ * L'état de la moitié, écrit dans chaque case.
+ *
+ * Il n'était qu'en tête de tableau. Passé la première ligne on ne voyait plus
+ * quelle colonne imprime et laquelle dort, et deux cases côte à côte affichant
+ * l'une $14.81 et l'autre $0.00 devenaient inexplicables. Chaque case le dit
+ * désormais elle-même, à côté du marché dont elle parle.
+ */
+function stateTag(state) {
+  return state ? ` <span class="st">${state === "Inked" ? "inked" : "dormant"}</span>` : "";
+}
+
+/**
  * Le rayon de l'anvil dans cette case : un second marché, libellé en $PRINTER.
  * Il a sa propre bande et son propre en-tête plutôt que d'être fondu dans le
  * carnet OpenSea — les fondre laisserait croire qu'une machine de l'anvil
  * s'achète comme un listing, avec la même monnaie et la même transaction.
  */
-function shelfStrip(anvilEntries, floorEth) {
+function shelfStrip(anvilEntries, floorEth, state = null) {
   if (!anvilEntries?.length) return "";
 
   const first = anvilEntries[0];
@@ -437,7 +449,7 @@ function shelfStrip(anvilEntries, floorEth) {
     : "";
 
   return `<span class="shelf">` +
-    `<span class="market">On the Anvil</span>` +
+    `<span class="market">On the Anvil${stateTag(state)}</span>` +
     priceLine + under +
     `<span class="strip">${chips}</span>` +
   `</span>`;
@@ -500,8 +512,8 @@ export function halfCell(half, side, { shown = null, step = REVEAL_STEP, limit =
       ? "Nothing on sale in this class and state carries the traits you picked."
       : "Nothing is on sale in this class in this state.";
     return `<td class="${g} edge half" data-state="${state}" title="${esc(tip)}">` +
-      `<span class="market">On OpenSea</span>` +
-      `<span class="depth">${why}</span>` + shelfStrip(keptShelf, half.floorEth) + `</td>`;
+      `<span class="market">On OpenSea${stateTag(state)}</span>` +
+      `<span class="depth">${why}</span>` + shelfStrip(keptShelf, half.floorEth, state) + `</td>`;
   }
 
   const half_ = { ...half, entries: ranked, anvilEntries: keptShelf };
@@ -571,13 +583,13 @@ function renderHalf(half, g, { shown: count, step, limit, key, depth, state, eth
       (floorUsd ? ` <span class="usd-big">${floorUsd}</span>` : "") + `</span>`;
 
   return `<td class="${g} edge half" data-state="${state}" title="${esc(tip)}">` +
-    `<span class="market">On OpenSea</span>` +
+    `<span class="market">On OpenSea${stateTag(state)}</span>` +
     head +
     `<span class="depth">${depth}</span>` +
     underNote +
     `<span class="strip">${shown.map((e, i) => chip(e, { isFloor: i === 0, ethUsd, perPoint: valued ? e.perPoint : null })).join("")}</span>` +
     more +
-    shelfStrip(half.anvilEntries, half.floorEth) +
+    shelfStrip(half.anvilEntries, half.floorEth, state) +
   `</td>`;
 }
 

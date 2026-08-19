@@ -258,3 +258,10 @@ test("the page carries the panel the detail is painted into", () => {
   assert.match(page, /aria-modal="true"/);
   assert.match(page, /id="detail"[^>]*hidden/);
 });
+
+// L'ambre est l'encre, le bleu froid le papier non imprimé : l'état écrit dans
+// la case prend la couleur de sa colonne, comme tout le reste du tableau.
+test("the state written in a cell wears its column's colour", () => {
+  assert.match(page, /td\.g-ink\s+\.market \.st \{[^}]*var\(--ink\)/);
+  assert.match(page, /td\.g-dormant \.market \.st \{[^}]*var\(--dormant\)/);
+});

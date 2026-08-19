@@ -502,6 +502,12 @@
     padding-bottom: 5px;
     margin-bottom: 9px;
   }
+  /* L'état, à côté du marché. Il prend la couleur de sa colonne : l'ambre est
+     l'encre, le bleu froid le papier non imprimé — la même règle que partout. */
+  .market .st { font-weight: 700; }
+  td.g-ink     .market .st { color: var(--ink); }
+  td.g-dormant .market .st { color: var(--dormant); }
+
   td.g-ink     .market { border-bottom-color: var(--ink); }
   td.g-dormant .market { border-bottom-color: var(--dormant); }
   /* Le prix du rayon est libellé en $PRINTER : il s'annonce comme un prix, au

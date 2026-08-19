@@ -760,21 +760,21 @@ test("both halves label their price, each with the right word", () => {
 // se lisait pas comme une section — juste comme le contenu de la case.
 test("both markets in a cell carry their name", () => {
   const html = halfCell(half({ entries: [entry(1, 0.11)], anvilEntries: [shelfEntry()] }), "ink", { ethUsd: 1896 });
-  assert.match(html, /class="market">On OpenSea</);
-  assert.match(html, /class="market">On the Anvil</);
+  assert.match(html, /class="market">On OpenSea /);
+  assert.match(html, /class="market">On the Anvil /);
   assert.ok(html.indexOf("On OpenSea") < html.indexOf("On the Anvil"));
 });
 
 test("a cell with nothing on OpenSea still says which market is empty", () => {
   const html = halfCell(half({ entries: [], listed: 0, anvilEntries: [shelfEntry()] }), "ink", { ethUsd: 1896 });
-  assert.match(html, /class="market">On OpenSea</);
+  assert.match(html, /class="market">On OpenSea /);
   assert.match(html, /no listing/);
-  assert.match(html, /class="market">On the Anvil</);
+  assert.match(html, /class="market">On the Anvil /);
 });
 
 test("a cell the anvil holds nothing in names only the market that has something", () => {
   const html = halfCell(half({ entries: [entry(1, 0.11)], anvilEntries: [] }), "ink", { ethUsd: 1896 });
-  assert.match(html, /class="market">On OpenSea</);
+  assert.match(html, /class="market">On OpenSea /);
   assert.doesNotMatch(html, /On the Anvil/);
 });
 
@@ -1742,4 +1742,23 @@ test("the amount and the instruction do not wear the same colour", () => {
   const css = readFileSync(new URL("../src/public/index.html", import.meta.url), "utf8");
   assert.match(css, /\.w-said \.v \{[^}]*var\(--ink\)/);
   assert.match(css, /\.w-cut \{[^}]*var\(--under\)/);
+});
+
+// L'état n'était qu'en tête de tableau. Passé la première ligne, deux cases
+// côte à côte affichant l'une $14.81 et l'autre $0.00 devenaient inexplicables.
+test("every cell says which side it speaks for, beside the market it names", () => {
+  const ink = halfCell(half({ entries: [entry(1, 0.1)] }), "ink", { ethUsd: 2000 });
+  const dor = halfCell(half({ entries: [entry(2, 0.1)] }), "dormant", { ethUsd: 2000 });
+  assert.match(ink, /On OpenSea <span class="st">inked</);
+  assert.match(dor, /On OpenSea <span class="st">dormant</);
+});
+
+test("an empty cell says it too, having nothing else to explain itself with", () => {
+  const html = halfCell(half({ entries: [] }), "dormant", { ethUsd: 2000 });
+  assert.match(html, /On OpenSea <span class="st">dormant</);
+});
+
+test("the anvil strip carries the same state as the half it sits in", () => {
+  const html = halfCell(half({ entries: [entry(1, 0.1)], anvilEntries: [shelfEntry()] }), "dormant", { ethUsd: 2000 });
+  assert.match(html, /On the Anvil <span class="st">dormant</);
 });
