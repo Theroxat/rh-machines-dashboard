@@ -1,0 +1,127 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { openHistory } from "../src/history.js";
+
+const snap = (over = {}) => ({
+  at: 1000,
+  pot: { usd: 160000, fleetWeight: 1140000 },
+  eth: { usd: 2000 },
+  printer: { usd: 0.008, marketCap: 1.4e6, volume24h: 3e5, liquidityUsd: 3.5e5 },
+  protocol: { epoch: 2n, activeMachines: 6900n, totalInkBurned: 36000000n * 10n ** 18n, ceiling: 200n, sellFeeBps: 500 },
+  collection: { floorEth: 0.05, volumeEth: 645, sales: 20421 },
+  anvil: { spotPrinter: 14000, shelf: 0, cratePrinter: 20000, paused: false },
+  book: { listed: 2 },
+  totals: { inked: 6900, dormant: 3100 },
+  vote: { desks: [{ index: 0, ticker: "NVDA", votedWeight: 100 }, { index: 10, ticker: "SPCX", votedWeight: 40 }] },
+  rows: [{
+    classValue: 300, classLabel: "x3",
+    inked: { floorEth: 0.3, listed: 1, pelotonEth: 0.31, entries: [{ tokenId: 1, priceEth: 0.3 }], anvilEntries: [] },
+    dormant: { floorEth: 0.1, listed: 1, pelotonEth: 0.11, entries: [{ tokenId: 2, priceEth: 0.1 }], anvilEntries: [] },
+  }],
+  ...over,
+});
+
+test("a sweep writes one tick, and the whole of what it saw", () => {
+  const h = openHistory(":memory:");
+  const c = h.record(snap());
+  assert.equal(c.tick, 1);
+  assert.equal(c.floor, 2);
+  assert.equal(c.tally, 2);
+  assert.equal(c.ballot, 2);
+  assert.equal(c.listing, 2);
+  const row = h.db.prepare("SELECT * FROM tick").get();
+  assert.equal(row.pot, 160000);
+  assert.equal(row.sellFeeBps, 500);
+  assert.equal(row.inkBurned, 36000000);
+  h.close();
+});
+
+// La règle qui fait tenir l'année dans quelques dizaines de mégaoctets : ce qui
+// n'a pas bougé ne s'écrit pas. Le carnet est presque immobile.
+test("a second identical sweep writes a tick and nothing else", () => {
+  const h = openHistory(":memory:");
+  h.record(snap());
+  const c = h.record(snap({ at: 2000 }));
+  assert.equal(c.tick, 1);
+  assert.equal(c.floor, 0);
+  assert.equal(c.listing, 0);
+  assert.equal(c.tally, 0);
+  h.close();
+});
+
+test("a price that moves is written, and only that one", () => {
+  const h = openHistory(":memory:");
+  h.record(snap());
+  const moved = snap({ at: 2000 });
+  moved.rows[0].inked.entries[0].priceEth = 0.25;
+  const c = h.record(moved);
+  assert.equal(c.listing, 1);
+  const rows = h.db.prepare("SELECT * FROM listing WHERE tokenId = 1 ORDER BY t").all();
+  assert.deepEqual(rows.map((r) => [r.priceEth, r.kind]), [[0.3, "new"], [0.25, "price"]]);
+  h.close();
+});
+
+// Une annonce qui disparaît est un fait, et c'est même le plus intéressant :
+// c'est une vente ou un retrait.
+test("a listing that leaves the book is recorded as gone, once", () => {
+  const h = openHistory(":memory:");
+  h.record(snap());
+  const empty = snap({ at: 2000 });
+  empty.rows[0].inked.entries = [];
+  assert.equal(h.record(empty).listing, 1);
+  assert.equal(h.record(snap({ at: 3000, rows: empty.rows })).listing, 0);
+  const gone = h.db.prepare("SELECT * FROM listing WHERE kind = 'gone'").all();
+  assert.equal(gone.length, 1);
+  assert.equal(gone[0].tokenId, 1);
+  h.close();
+});
+
+test("a machine that burns more ink is written; one that does not is not", () => {
+  const h = openHistory(":memory:");
+  const weights = new Map([[1, 300n]]);
+  const ink = new Map([[1, 4250n * 10n ** 18n]]);
+  assert.equal(h.record(snap(), { weights, ink }).machine, 1);
+  assert.equal(h.record(snap({ at: 2000 }), { weights, ink }).machine, 0);
+  const burned = h.record(snap({ at: 3000 }), { weights: new Map([[1, 600n]]), ink: new Map([[1, 17000n * 10n ** 18n]]) });
+  assert.equal(burned.machine, 1);
+  const rows = h.db.prepare("SELECT weight, ink FROM machine WHERE tokenId = 1 ORDER BY t").all();
+  assert.deepEqual(rows.map((r) => ({ ...r })), [{ weight: 300, ink: 4250 }, { weight: 600, ink: 17000 }]);
+  h.close();
+});
+
+// Le bulletin est réattribué en cours de scrutin quand une action n'a pas de
+// pool. Ces remaniements sont exactement ce qu'un historique doit retenir.
+test("a desk remapped mid-ballot leaves both its names behind it", () => {
+  const h = openHistory(":memory:");
+  h.record(snap());
+  const remapped = snap({ at: 2000, vote: { desks: [
+    { index: 0, ticker: "NVDA", votedWeight: 100 },
+    { index: 10, ticker: "SPY", votedWeight: 40 },
+  ] } });
+  assert.equal(h.record(remapped).ballot, 1);
+  const rows = h.db.prepare("SELECT ticker FROM ballot WHERE desk = 10 ORDER BY t").all();
+  assert.deepEqual(rows.map((r) => r.ticker), ["SPCX", "SPY"]);
+  h.close();
+});
+
+test("a floor that moves is written against its own cell, not the row's", () => {
+  const h = openHistory(":memory:");
+  h.record(snap());
+  const moved = snap({ at: 2000 });
+  moved.rows[0].dormant.floorEth = 0.09;
+  assert.equal(h.record(moved).floor, 1);
+  const rows = h.db.prepare("SELECT side, floorEth FROM floor ORDER BY t, side").all();
+  assert.deepEqual(rows.map((r) => ({ ...r })), [{ side: "dormant", floorEth: 0.1 }, { side: "inked", floorEth: 0.3 }, { side: "dormant", floorEth: 0.09 }]);
+  h.close();
+});
+
+// Rien à moitié écrit : un balayage entre en une transaction ou pas du tout.
+test("a sweep that throws leaves nothing behind", () => {
+  const h = openHistory(":memory:");
+  h.record(snap());
+  const before = h.db.prepare("SELECT COUNT(*) n FROM listing").get().n;
+  assert.throws(() => h.record(snap({ at: 2000, rows: [{ classValue: 300, inked: null, dormant: null }] })));
+  assert.equal(h.db.prepare("SELECT COUNT(*) n FROM listing").get().n, before);
+  assert.equal(h.db.prepare("SELECT COUNT(*) n FROM tick").get().n, 1);
+  h.close();
+});

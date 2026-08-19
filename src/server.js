@@ -17,6 +17,7 @@ import { readVote, readDeskIndex } from "./vote.js";
 import { readPot, epochUsd } from "./pot.js";
 import { readBallotTickers } from "./ballot.js";
 import { readOwners, tokensOf } from "./owners.js";
+import { openHistory } from "./history.js";
 import { analyseWallet, isAddress } from "./wallet.js";
 import { SECTORS } from "./desks.js";
 import { deskName } from "./desks.js";
@@ -72,6 +73,22 @@ let meta = new Map();
 let legend = null;
 // Le desk est scellé au mint : lu une fois au démarrage, jamais réinterrogé.
 let deskIndex = new Map();
+
+/**
+ * L'historique. Le service voyait tout et n'en gardait rien.
+ *
+ * Il s'ouvre au démarrage et n'est jamais une condition : si le fichier ne peut
+ * pas s'ouvrir — disque plein, dossier en lecture seule, base d'une version
+ * qu'on ne sait plus lire — la page continue de servir sans lui, et le dit.
+ */
+let history = null;
+let historyFailures = 0;
+try {
+  history = openHistory(join(here, "..", "data", "history.db"));
+  console.log("history: recording to data/history.db");
+} catch (e) {
+  console.error(`history: not recording — ${e.message}`);
+}
 // Les propriétaires bougent à chaque vente : relus sur la boucle de l'encre.
 let owners = { byToken: new Map(), byOwner: new Map(), failures: null };
 // Quel ticker occupe quel desk cette epoch, et le dépouillement en cours.
@@ -148,6 +165,21 @@ async function sweepBook() {
     inkMeta, meta, legend, ink, weights, anvil, deskIndex, vote, potUsd, sectorWeight, now: Date.now(),
   });
   store.succeed(composed);
+
+  // Après avoir servi, jamais avant. Une écriture qui échoue est comptée et
+  // annoncée ; elle ne peut pas emporter le balayage avec elle.
+  if (history) {
+    try {
+      const n = history.record(composed, { ink, weights });
+      if (n.listing || n.floor || n.machine || n.tally || n.ballot) {
+        console.log(`history: ${n.listing} listing, ${n.floor} floor, ${n.tally} tally, ` +
+          `${n.ballot} ballot, ${n.shelf} shelf, ${n.machine} machine`);
+      }
+    } catch (e) {
+      historyFailures++;
+      console.error(`history: write failed (${historyFailures} so far) — ${e.message}`);
+    }
+  }
 
   const under = composed.rows
     .flatMap((r) => [...r.inked.entries, ...r.dormant.entries])
