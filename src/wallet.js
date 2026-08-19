@@ -97,7 +97,7 @@ export function analyseWallet({
       deskIndex: index ?? null,
       desk: deskName(index),
       ticker: index === null || index === undefined ? null : (tickers[index] ?? null),
-      epochUsd: epochUsdOf ? epochUsdOf(weight) : null,
+      epochUsd: epochUsdOf ? epochUsdOf(weight, tokenId) : null,
     };
   }).sort((a, b) => b.weight - a.weight || a.tokenId - b.tokenId);
 

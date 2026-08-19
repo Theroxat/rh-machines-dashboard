@@ -33,17 +33,37 @@ export async function readPot({ provider }) {
 /**
  * Ce qu'une machine toucherait si le pot était distribué maintenant.
  *
- * C'est la formule du terminal, volontairement : `poids ÷ poids total × pot`.
- * Elle ignore que le doublement de chaque secteur dilue les autres, donc elle
- * n'est exacte qu'à vote réparti — mais elle a le mérite d'être celle que le
- * porteur voit ailleurs, et l'écart réel tient dans la fourchette annoncée à
- * côté plutôt que dans un second chiffre qui contredirait le premier.
+ * Le pot n'est pas partagé au prorata du seul poids. Il est découpé en tranches
+ * par desk, proportionnellement aux voix, et sur chaque tranche une machine qui
+ * porte ce desk compte double. En sommant les tranches, pour une machine de
+ * poids `w` sur le desk `k` :
  *
- * Une dormante pèse zéro : elle ne touche rien, et c'est un fait, pas une
- * donnée manquante.
+ *     part = w × pot × [ Σ_s  voix_s/voix × 1/(W + W_s)  +  voix_k/voix × 1/(W + W_k) ]
+ *
+ * Le crochet ne dépend que du desk, jamais du poids : deux machines du même
+ * desk touchent exactement en proportion de leur poids, et deux machines de
+ * même poids sur des desks différents ne touchent pas pareil. C'est cette
+ * seconde moitié que le partage naïf `poids ÷ flotte × pot` efface — celui du
+ * terminal officiel, qui l'annonce d'ailleurs comme approximatif.
+ *
+ * Tant qu'aucune voix n'est tombée il n'y a pas de tranches, et le partage à
+ * plat est alors la seule hypothèse honnête.
  */
-export function epochUsd({ weight, totalWeight, potUsd }) {
+export function epochUsd({ weight, deskIndex = null, totalWeight, potUsd, tally = null, sectorWeight = null }) {
   if (!potUsd || !totalWeight) return null;
   if (weight === null || weight === undefined) return null;
-  return (potUsd * weight) / totalWeight;
+
+  const votes = tally?.reduce((a, b) => a + b, 0) ?? 0;
+  if (!votes || !sectorWeight) return (potUsd * weight) / totalWeight;
+
+  let per = 0;
+  for (let s = 0; s < tally.length; s++) {
+    const w = totalWeight + (sectorWeight[s] ?? 0);
+    if (!w) continue;
+    const share = tally[s] / votes;
+    per += share / w;
+    // Le double sur sa propre tranche, et sur elle seule.
+    if (s === deskIndex) per += share / w;
+  }
+  return potUsd * weight * per;
 }

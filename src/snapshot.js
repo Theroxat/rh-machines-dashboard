@@ -8,7 +8,7 @@ import { epochUsd } from "./pot.js";
  *  diviserait par une valeur non lue produit null plutôt qu'un zéro confiant. */
 export function composeSnapshot({
   grid, printer, eth, protocol, stats, book, inkMeta, meta, legend, ink, weights, anvil,
-  deskIndex, vote, potUsd, now,
+  deskIndex, vote, potUsd, sectorWeight, now,
 }) {
   const activationPrinter = protocol?.activationInk
     ? Number(BigInt(protocol.activationInk) / 10n ** 15n) / 1000
@@ -48,7 +48,13 @@ export function composeSnapshot({
   const fleetWeight = protocol?.totalWeight === null || protocol?.totalWeight === undefined
     ? null
     : Number(protocol.totalWeight);
-  const returnOf = (weight) => epochUsd({ weight, totalWeight: fleetWeight, potUsd });
+  // Le dépouillement en cours, dans l'ordre des desks : sans lui on ne peut pas
+  // découper le pot en tranches, et le partage à plat est le seul honnête.
+  const tally = vote ? Array.from({ length: 16 }, (_, d) => Number(vote.tally.get(d) ?? 0n)) : null;
+  const returnOf = (tokenId, weight) => epochUsd({
+    weight, deskIndex: deskIndex?.get(tokenId) ?? null,
+    totalWeight: fleetWeight, potUsd, tally, sectorWeight,
+  });
 
   /**
    * Ce que l'anvil paierait, exprimé en ETH pour être comparable à un prix
@@ -85,7 +91,7 @@ export function composeSnapshot({
       // autre, et sa vignette doit pouvoir le dire.
       weight,
       inkMult: weight ? weight / classValue : null,
-      epochUsd: returnOf(weight),
+      epochUsd: returnOf(e.tokenId, weight),
       askUsd: printer?.usd ? e.askPrinter * printer.usd : null,
       askEth: printer?.usd && eth?.usd ? (e.askPrinter * printer.usd) / eth.usd : null,
     };
@@ -104,7 +110,7 @@ export function composeSnapshot({
         machine: machineOf(e.tokenId),
         weight,
         inkPrinter: i === undefined ? null : Number(i / PRINTER),
-        epochUsd: returnOf(weight),
+        epochUsd: returnOf(e.tokenId, weight),
         // Une machine dormante ne pèse rien : un rapport n'aurait aucun sens.
         inkMult: weight ? weight / classValue : null,
         anvilBidPrinter: anvil?.bids?.get(e.tokenId) ?? null,

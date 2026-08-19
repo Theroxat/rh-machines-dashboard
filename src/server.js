@@ -14,7 +14,7 @@ import { fetchPrinter, fetchEthUsd } from "./prices.js";
 import { readProtocol } from "./protocol.js";
 import { readAnvil } from "./anvil.js";
 import { readVote, readDeskIndex } from "./vote.js";
-import { readPot } from "./pot.js";
+import { readPot, epochUsd } from "./pot.js";
 import { readBallotTickers } from "./ballot.js";
 import { readOwners, tokensOf } from "./owners.js";
 import { analyseWallet, isAddress } from "./wallet.js";
@@ -138,10 +138,14 @@ async function sweepBook() {
     shelf: anvil?.shelfListings,
   });
 
+  // Le poids de chaque desk : il décide de la dilution sur sa propre tranche.
+  const sectorWeight = new Array(16).fill(0);
+  for (const [tokenId, index] of deskIndex) sectorWeight[index] += Number(weights.get(tokenId) ?? 0n);
+
   const composed = composeSnapshot({
     grid, printer, eth, protocol, stats,
     book: { listed: book.listings.size, pages: book.pages, skipped: book.skipped },
-    inkMeta, meta, legend, ink, weights, anvil, deskIndex, vote, potUsd, now: Date.now(),
+    inkMeta, meta, legend, ink, weights, anvil, deskIndex, vote, potUsd, sectorWeight, now: Date.now(),
   });
   store.succeed(composed);
 
@@ -208,7 +212,12 @@ const server = createServer((req, res) => {
       tokenIds: tokensOf(owners.byOwner, address),
       weightOf: (id) => Number(weights.get(id) ?? 0n),
       deskOf: (id) => deskIndex.get(id) ?? null,
-      epochUsdOf: (w) => (snap?.pot?.usd && fleetWeight ? (snap.pot.usd * w) / fleetWeight : null),
+      // La même fonction que le tableau : sans quoi la somme des machines d'un
+      // portefeuille ne retomberait pas sur le total annoncé au-dessus d'elles.
+      epochUsdOf: (w, id) => epochUsd({
+        weight: w, deskIndex: deskIndex.get(id) ?? null,
+        totalWeight: fleetWeight, potUsd: snap?.pot?.usd ?? null, tally, sectorWeight,
+      }),
       tally, potUsd: snap?.pot?.usd ?? null, fleetWeight, sectorWeight,
       tickers: tickers ?? new Array(16).fill(null),
     });
