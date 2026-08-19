@@ -6,22 +6,23 @@ import { SECTORS } from "./desks.js";
  * Le bulletin d'une epoch : quel ticker occupe quel desk.
  *
  * Le desk est scellé au mint — une machine reste sur `real estate` pour
- * toujours — mais **le ticker posé dessus change à chaque epoch**. Un porteur
- * cherche « SPCX », pas « real estate » : sans cette table, la page nomme un
- * secteur pendant que le terminal officiel propose une action, et personne ne
- * fait le lien.
+ * toujours — mais **le ticker posé dessus change à chaque epoch**, et peut même
+ * changer en cours de scrutin : un desk dont l'action n'a pas de pool sur cette
+ * chaîne reste un trou jusqu'à ce que l'équipe le réattribue. Un porteur
+ * cherche « SPCX », pas « real estate ».
  *
- * Aucune vue ne publie la liste. Elle est dans l'évènement `BallotOpened`,
- * émis à l'ouverture, et les symboles se lisent sur chaque jeton.
+ * Ceci se lisait d'abord dans l'évènement `BallotOpened`, et c'était une
+ * erreur. Un journal n'est interrogeable que sur une fenêtre de blocs, la
+ * chaîne en produit des centaines de milliers par jour, et l'ouverture d'une
+ * epoch sort de portée bien avant sa clôture — sans bruit, en rendant zéro
+ * résultat plutôt qu'une erreur. Le contrat publie l'état, lui, et le publie
+ * toujours : `choicesFor` répond aussi bien le premier jour que le dernier, et
+ * suit les réattributions au lieu de figer l'ouverture.
  */
-const BALLOT_EVENT = new ethers.Interface([
-  "event BallotOpened(uint256 indexed epoch, address[] tickers, uint256 closesAt)",
+const VOTE = new ethers.Interface([
+  "function choicesFor(uint256) view returns (address[])",
 ]);
 const ERC20 = new ethers.Interface(["function symbol() view returns (string)"]);
-
-/** De combien de blocs on remonte pour retrouver l'ouverture. Une epoch dure
- *  3,5 jours ; large, mais borné — un `getLogs` sans borne se fait refuser. */
-const LOOKBACK_BLOCKS = 400000;
 
 /** Les symboles ne changent pas pour une adresse donnée : lus une fois, gardés. */
 const symbolCache = new Map();
@@ -48,21 +49,16 @@ async function symbolOf(provider, address) {
 export async function readBallotTickers({ provider, epoch }) {
   if (epoch === null || epoch === undefined) return null;
   try {
-    const head = await provider.getBlockNumber();
-    const logs = await provider.getLogs({
-      address: ADDRESSES.VOTE,
-      topics: [
-        BALLOT_EVENT.getEvent("BallotOpened").topicHash,
-        ethers.zeroPadValue(ethers.toBeHex(BigInt(epoch)), 32),
-      ],
-      fromBlock: Math.max(0, head - LOOKBACK_BLOCKS),
-      toBlock: head,
+    const raw = await provider.call({
+      to: ADDRESSES.VOTE,
+      data: VOTE.encodeFunctionData("choicesFor", [BigInt(epoch)]),
     });
-    if (!logs.length) return null;
+    if (raw === "0x") return null;
+    const choices = VOTE.decodeFunctionResult("choicesFor", raw)[0];
+    if (!choices?.length) return null;
 
-    const { tickers } = BALLOT_EVENT.decodeEventLog("BallotOpened", logs[0].data, logs[0].topics);
     const out = new Array(SECTORS.length).fill(null);
-    await Promise.all([...tickers].slice(0, SECTORS.length).map(async (addr, i) => {
+    await Promise.all([...choices].slice(0, SECTORS.length).map(async (addr, i) => {
       if (addr === ethers.ZeroAddress) return;
       out[i] = await symbolOf(provider, addr);
     }));
