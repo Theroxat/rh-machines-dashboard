@@ -196,6 +196,55 @@
   #drop-note b { color: var(--under); font-weight: 600; }
   #drop-note:empty { display: none; }
 
+  /* ---- le détail d'une machine ---- */
+
+  /* Une vignette fait 78 pixels et porte cinq nombres ; la machine en a vingt.
+     Le panneau les montre tous, et l'image à une taille où l'on voit ce qu'on
+     achète. À plat comme le reste : des filets, aucun arrondi, aucune ombre. */
+  .d-veil {
+    position: fixed; inset: 0; z-index: 50;
+    display: flex; align-items: flex-start; justify-content: center;
+    padding: 40px 20px;
+    background: rgba(0, 0, 0, 0.78);
+    overflow-y: auto;
+  }
+  .d-veil[hidden] { display: none; }
+  .d-panel {
+    width: 100%; max-width: 760px;
+    background: var(--paper);
+    border: 1px solid var(--rule-2);
+  }
+  .d-head {
+    display: flex; align-items: baseline; gap: 14px;
+    padding: 12px 16px; border-bottom: 1px solid var(--rule-2);
+  }
+  .d-id { font-size: 19px; font-weight: 700; }
+  .d-where { flex: 1; font-size: 11px; letter-spacing: 0.13em; text-transform: uppercase; color: var(--muted); }
+  .d-close {
+    font-family: inherit; font-size: 20px; line-height: 1; color: var(--muted);
+    background: none; border: 0; padding: 0 2px; cursor: pointer;
+  }
+  .d-close:hover, .d-close:focus-visible { color: var(--text); }
+
+  .d-body { display: flex; gap: 18px; padding: 16px; flex-wrap: wrap; }
+  .d-pic { flex: none; width: 300px; max-width: 100%; }
+  .d-pic img, .d-noimg {
+    display: block; width: 100%; height: auto; aspect-ratio: 1;
+    border: 1px solid var(--rule-2); background: var(--paper-2);
+  }
+  .d-go {
+    display: block; margin-top: 10px; padding: 6px 0; text-align: center;
+    color: var(--ink); text-decoration: none; border: 1px solid var(--rule-2); font-size: 12.5px;
+  }
+  .d-go:hover, .d-go:focus-visible { border-color: var(--ink); }
+
+  .d-facts { flex: 1 1 300px; min-width: 0; }
+  .d-row { padding: 5px 0; border-bottom: 1px solid var(--rule); }
+  .d-row:last-child { border-bottom: 0; }
+  .d-row .label { display: block; }
+  .d-v { display: block; font-size: 15px; font-weight: 700; color: var(--ink); }
+  .d-x { display: block; font-size: 12px; color: var(--muted); }
+
   /* ---- le portefeuille du visiteur ---- */
 
   /* Posé juste au-dessus de l'en-tête du tableau, et bâti comme les filtres :
@@ -509,11 +558,15 @@
 
     .fl { width: 100%; }
     .fl select { width: 100%; min-width: 0; max-width: none; }
+    .d-veil { padding: 14px 10px; }
+    .d-pic { width: 100%; }
     #wallet-input { min-width: 0; width: 100%; }
     .wallet form { gap: 10px; }
     .w-ticker { font-size: 26px; }
     #filters { gap: 10px; }
     /* Empilés, le filet vertical ne sépare plus rien : il devient horizontal. */
+    .d-veil { padding: 14px 10px; }
+    .d-pic { width: 100%; }
     #wallet-input { min-width: 0; width: 100%; }
     .wallet-line form { width: 100%; }
     #view {
@@ -604,6 +657,11 @@
   <p id="filter-summary"></p>
   <p id="drop-note"></p>
 </section>
+
+<!-- Le panneau de détail. Vide et masqué tant qu'on n'a cliqué sur rien. -->
+<div class="d-veil" id="detail" hidden>
+  <div class="d-panel" role="dialog" aria-modal="true" aria-label="Machine detail" id="detail-panel"></div>
+</div>
 
 <div class="wallet-line" id="wallet-card"></div>
 <div id="wallet-out"></div>

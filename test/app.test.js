@@ -4,7 +4,7 @@ import {
   fmtEth, fmtRatio, halfCell, cellKey,
   bannerMessage, rowsHtml, contextHtml, legendHtml,
   matchesFilter, filterBarHtml, filterSummary, freshness, fmtCompact, crateLine,
-  perPointUsd, viewBarHtml, ballotBlock, dropNote, bestRow, yieldOf, BEST_LIMIT, DEFAULT_LIMIT, bestFit, walletCardHtml, walletDetailHtml, fmtShare,
+  perPointUsd, viewBarHtml, ballotBlock, dropNote, bestRow, yieldOf, BEST_LIMIT, DEFAULT_LIMIT, bestFit, walletCardHtml, walletDetailHtml, fmtShare, machineDetailHtml, findMachine,
 } from "../src/public/app.js";
 
 const entry = (tokenId, priceEth, image = `https://img/${tokenId}.webp`) => ({
@@ -1597,4 +1597,99 @@ test("the class badge sits inside the picture, with the re-inking one", () => {
 test("a rarity row does not repeat its own class on every machine", () => {
   const html = halfCell(half({ entries: [entry(1, 0.1)] }), "ink", { ethUsd: 2000 });
   assert.doesNotMatch(html, /cls-badge/);
+});
+
+// ---- le détail d'une machine ---------------------------------------------
+
+const DETAIL = {
+  eth: { usd: 2000 },
+  pot: { usd: 100000, fleetWeight: 1000000 },
+  ink: { activationTotalUsd: 50 },
+  rows: [{
+    classValue: 300, classLabel: "x3", docCount: 559, chainCount: 559,
+    inked: half({ entries: [{
+      tokenId: 3145, priceEth: 0.3,
+      machine: { image: "https://img/3145.webp", headwear: "Ordinals", body: "Sky", eyes: "Rage", desk: "materials", ticker: "AMD" },
+      weight: 600, inkMult: 2, inkPrinter: 17000, epochUsd: 60,
+      anvilBidPrinter: 20000, anvilBidEth: 0.1, underBid: false,
+    }] }),
+    dormant: half({ entries: [{
+      tokenId: 77, priceEth: 0.1, machine: { image: "u", headwear: "Ordinals", body: "Sky", eyes: "Rage", desk: "materials", ticker: "AMD" },
+      weight: 0, inkMult: null, inkPrinter: 0, epochUsd: 0,
+    }] }),
+  }],
+};
+
+test("the panel tells what the machine is, and what it became", () => {
+  const html = machineDetailHtml(DETAIL, 3145);
+  assert.match(html, /Machine #3145/);
+  assert.match(html, /Class<\/span><span class="d-v">x3</);
+  assert.match(html, /Weight<\/span><span class="d-v">6x</);
+  assert.match(html, /re-inked ×2\.00/);
+  assert.match(html, /17,000 \$PRINTER/);
+});
+
+test("the panel prices it, and says what it pays back", () => {
+  const html = machineDetailHtml(DETAIL, 3145);
+  assert.match(html, /0\.3000 ETH/);
+  assert.match(html, /\$600\.00/);
+  assert.match(html, /\$60\.00 an epoch/);
+  assert.match(html, /up to \$120\.00/);
+  assert.match(html, /10\.0%/);            // 60 / 600
+});
+
+test("the panel names the desk and the ticker it wears this epoch", () => {
+  const html = machineDetailHtml(DETAIL, 3145);
+  assert.match(html, /materials/);
+  assert.match(html, /wears AMD this epoch/);
+  assert.match(html, /counts 2× on that slice/);
+});
+
+// Une dormante ne gagne rien, et le panneau doit le dire en entier : ni ce
+// pot-ci ni le suivant tant que rien n'a brûlé.
+test("a dormant machine is told plainly what it is missing", () => {
+  const html = machineDetailHtml(DETAIL, 77);
+  assert.match(html, /dormant/);
+  assert.match(html, /nothing burned/);
+  assert.match(html, /until it is inked/);
+});
+
+test("the panel points at the market the machine is actually on", () => {
+  assert.match(machineDetailHtml(DETAIL, 3145), /View on OpenSea/);
+  const shelf = {
+    ...DETAIL,
+    rows: [{ ...DETAIL.rows[0],
+      inked: half({ entries: [], anvilEntries: [{ tokenId: 900, askPrinter: 20000, askUsd: 150, askEth: 0.075,
+        machine: machineOf({ desk: "materials", ticker: "AMD" }), weight: 300, inkMult: 1, epochUsd: 30 }] }) }],
+  };
+  const html = machineDetailHtml(shelf, 900);
+  assert.match(html, /Buy on the Anvil/);
+  assert.match(html, /20,000 \$PRINTER/);
+  assert.doesNotMatch(html, /View on OpenSea/);
+});
+
+// Une machine peut se vendre entre le moment où la page est peinte et le clic.
+test("a machine that has left the book says so instead of breaking", () => {
+  const html = machineDetailHtml(DETAIL, 999999);
+  assert.match(html, /Not in the book right now/);
+  assert.match(html, /d-close/);
+});
+
+test("nothing about a machine reaches the panel unescaped", () => {
+  const evil = '"><img src=x onerror=alert(1)>';
+  const html = machineDetailHtml({
+    ...DETAIL,
+    rows: [{ ...DETAIL.rows[0], classLabel: evil,
+      inked: half({ entries: [{ tokenId: 1, priceEth: 0.1, weight: 100, epochUsd: 1,
+        machine: { image: evil, headwear: evil, body: evil, eyes: evil, desk: evil, ticker: evil } }] }) }],
+  }, 1);
+  assert.doesNotMatch(html, /<img src=x/);
+  assert.match(html, /&lt;img src=x/);
+});
+
+test("a machine is found wherever it sits, in either state or market", () => {
+  assert.equal(findMachine(DETAIL, 3145).side, "ink");
+  assert.equal(findMachine(DETAIL, 77).side, "dormant");
+  assert.equal(findMachine(DETAIL, 3145).market, "opensea");
+  assert.equal(findMachine(DETAIL, 4242), null);
 });

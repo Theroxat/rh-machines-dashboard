@@ -244,3 +244,17 @@ test("the class badge borrows neither the re-inking red nor the price amber", ()
   assert.doesNotMatch(rule, /var\(--reink\)|var\(--ink\)/);
   assert.match(rule, /bottom: 0; left: 0/);
 });
+
+// La vignette reste un lien vers le marché : un clic modifié ou du milieu doit
+// continuer d'y mener. Seul le clic simple ouvre le panneau.
+test("a modified click still goes to the marketplace", () => {
+  const app = readFileSync(new URL("../src/public/app.js", import.meta.url), "utf8");
+  assert.match(app, /closest\("a\.chip"\)[\s\S]{0,220}metaKey[\s\S]{0,80}ctrlKey/);
+  assert.match(app, /Escape[\s\S]{0,60}closeDetail/);
+});
+
+test("the page carries the panel the detail is painted into", () => {
+  assert.match(page, /id="detail-panel"/);
+  assert.match(page, /aria-modal="true"/);
+  assert.match(page, /id="detail"[^>]*hidden/);
+});

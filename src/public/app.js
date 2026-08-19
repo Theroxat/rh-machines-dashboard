@@ -594,6 +594,110 @@ function boostTraits(legend, classValue) {
 }
 
 /**
+ * Retrouve une machine dans le carnet, où qu'elle soit : les deux états, les
+ * sept classes, et les deux marchés. Le tableau ne la connaît que par sa
+ * vignette ; le panneau de détail, lui, a besoin de sa ligne pour savoir de
+ * quelle classe elle est et sur quel marché elle se vend.
+ */
+export function findMachine(d, tokenId) {
+  const id = Number(tokenId);
+  for (const r of d?.rows ?? []) {
+    for (const [side, cell] of [["ink", r.inked], ["dormant", r.dormant]]) {
+      for (const e of cell?.entries ?? []) {
+        if (e.tokenId === id) return { e, row: r, side, market: "opensea" };
+      }
+      for (const e of cell?.anvilEntries ?? []) {
+        if (e.tokenId === id) return { e, row: r, side, market: "anvil" };
+      }
+    }
+  }
+  return null;
+}
+
+const factRow = (label, value, extra = "") =>
+  value === null || value === undefined || value === ""
+    ? ""
+    : `<div class="d-row"><span class="label">${label}</span>` +
+      `<span class="d-v">${value}</span>` +
+      (extra ? `<span class="d-x">${extra}</span>` : "") + `</div>`;
+
+/**
+ * Tout ce que l'on sait d'une machine, sur une seule page.
+ *
+ * La vignette porte cinq nombres parce qu'elle fait 78 pixels de large ; la
+ * machine en a vingt. Ce qu'elle est de naissance, ce qu'elle est devenue à
+ * force d'encre, ce qu'elle coûte, ce qu'elle rapporte et où l'acheter — rien
+ * n'est déduit ici, tout est déjà lu sur la chaîne.
+ */
+export function machineDetailHtml(d, tokenId) {
+  const found = findMachine(d, tokenId);
+  if (!found) {
+    return `<div class="d-head"><span class="d-id">Machine #${esc(String(tokenId))}</span>` +
+      `<button class="d-close" type="button" aria-label="Close">×</button></div>` +
+      `<div class="d-body"><p class="w-small">Not in the book right now — it may have just sold.</p></div>`;
+  }
+
+  const { e, row: r, side, market } = found;
+  const ethUsd = d.eth?.usd ?? null;
+  const m = e.machine ?? {};
+  const anvil = market === "anvil";
+  const priceUsd = anvil ? e.askUsd : usdOf(e.priceEth, ethUsd);
+  const dormant = side === "dormant";
+
+  const img = m.image
+    ? `<img src="${esc(m.image)}" alt="Machine #${e.tokenId}" width="300" height="300">`
+    : `<span class="noimg d-noimg" aria-hidden="true"></span>`;
+
+  const reinked = e.inkMult > 1.0001 && e.weight;
+  const perPoint = perPointUsd(e, {
+    classValue: r.classValue, side, ethUsd,
+    activationUsd: d.ink?.activationTotalUsd ?? null,
+  });
+  const yieldPct = e.epochUsd && priceUsd ? e.epochUsd / priceUsd : null;
+
+  const facts =
+    factRow("Class", esc(r.classLabel), `${fmtInt(r.chainCount)} machines are born in it`) +
+    factRow("Weight", e.weight ? `${e.weight / 100}x` : "0x",
+      dormant ? "dormant — nothing burned, so it earns and votes nothing"
+        : reinked ? `re-inked ×${e.inkMult.toFixed(2)} — it outweighs its own class`
+        : "activated at the base burn") +
+    factRow("Ink burned",
+      e.inkPrinter === null || e.inkPrinter === undefined ? null : `${fmtInt(e.inkPrinter)} $PRINTER`,
+      "weight = class × √(ink ÷ 4,250)") +
+    factRow("Desk", m.desk ? esc(m.desk) : null,
+      m.ticker ? `wears ${esc(m.ticker)} this epoch — it counts 2× on that slice`
+        : "no ticker on this epoch's ballot") +
+    factRow("Earns", e.epochUsd === null || e.epochUsd === undefined ? null : `${fmtUsd(e.epochUsd)} an epoch`,
+      e.epochUsd ? `up to ${fmtUsd(e.epochUsd * 2)} if the vote lands on its desk`
+        : "nothing from this pot, and nothing from the next until it is inked") +
+    factRow(anvil ? "Asking" : "Price",
+      anvil ? `${fmtInt(Math.round(e.askPrinter))} $PRINTER` : `${fmtEth(e.priceEth)} ETH`,
+      priceUsd ? fmtUsd(priceUsd) : "") +
+    factRow("Return", yieldPct === null ? null : fmtRatio(yieldPct),
+      "of its price is already waiting in the pot") +
+    factRow("Per point", perPoint === null ? null : fmtUsd(perPoint),
+      `what one x1 point of weight costs here${dormant ? ", activation included" : ""}`) +
+    factRow("Anvil bid", !anvil && e.anvilBidEth ? `${fmtEth(e.anvilBidEth)} ETH` : null,
+      e.anvilBidPrinter
+        ? `${fmtInt(e.anvilBidPrinter)} $PRINTER, net of the sell fee` +
+          (e.underBid ? " — more than it is listed for" : "")
+        : "") +
+    factRow("Headwear", m.headwear ? esc(headwearLabel(m.headwear)) : null, "the trait that seals the class") +
+    factRow("Body", m.body ? esc(m.body) : null, "cosmetic — the desk is read from the chain") +
+    factRow("Eyes", m.eyes ? esc(m.eyes) : null, "cosmetic");
+
+  const where = anvil
+    ? `<a class="d-go" href="${ANVIL_URL}" target="_blank" rel="noopener">Buy on the Anvil &#8599;</a>`
+    : `<a class="d-go" href="${itemUrl(e.tokenId)}" target="_blank" rel="noopener">View on OpenSea &#8599;</a>`;
+
+  return `<div class="d-head"><span class="d-id">Machine #${e.tokenId}</span>` +
+    `<span class="d-where">${anvil ? "on the Anvil" : "on OpenSea"} · ${dormant ? "dormant" : "inked"}` +
+    ` · ${esc(r.classLabel)}</span>` +
+    `<button class="d-close" type="button" aria-label="Close">×</button></div>` +
+    `<div class="d-body"><div class="d-pic">${img}${where}</div>` +
+    `<div class="d-facts">${facts}</div></div>`;
+}
+/**
  * Le chiffre qui range la ligne, écrit à côté de la classe. Sans lui l'ordre
  * paraît arbitraire : les deux colonnes sont deux marchés indépendants, aucun
  * tri ne peut les rendre toutes deux croissantes, et le nombre qui décide du
@@ -1113,7 +1217,51 @@ if (typeof document !== "undefined") {
     resizeTimer = setTimeout(() => { if (measureBest()) { painted = ""; paint(); } }, 150);
   });
 
+  // Le détail d'une machine.
+  //
+  // La vignette reste un lien vers le marché : un clic modifié, un clic du
+  // milieu ou un « ouvrir dans un nouvel onglet » doivent continuer d'y mener.
+  // Seul le clic simple est détourné vers le panneau.
+  const veil = $("detail");
+  const panel = $("detail-panel");
+  let lastFocus = null;
+
+  const closeDetail = () => {
+    veil.hidden = true;
+    panel.innerHTML = "";
+    lastFocus?.focus?.();
+    lastFocus = null;
+  };
+
+  const openDetail = (tokenId, from) => {
+    if (!lastData) return;
+    lastFocus = from ?? null;
+    panel.innerHTML = machineDetailHtml(lastData, tokenId);
+    veil.hidden = false;
+    panel.querySelector(".d-close")?.focus();
+  };
+
+  if (veil) {
+    veil.addEventListener("click", (e) => {
+      // Le voile ferme ; le panneau ne ferme que par sa croix.
+      if (e.target === veil || e.target.closest(".d-close")) closeDetail();
+    });
+    addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !veil.hidden) closeDetail();
+    });
+  }
+
   rowsEl.addEventListener("click", (e) => {
+    const chip = e.target.closest("a.chip");
+    if (chip && veil && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey && e.button === 0) {
+      const id = chip.querySelector(".tok")?.textContent?.replace("#", "");
+      if (id) {
+        e.preventDefault();
+        openDetail(Number(id), chip);
+        return;
+      }
+    }
+
     const btn = e.target.closest(".more");
     if (!btn) return;
     const next = Number(btn.dataset.next);
