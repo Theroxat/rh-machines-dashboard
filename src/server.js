@@ -20,7 +20,7 @@ import { readOwners, tokensOf } from "./owners.js";
 import { openHistory } from "./history.js";
 import { analyseWallet, isAddress } from "./wallet.js";
 import { SECTORS } from "./desks.js";
-import { deskName, crossCheckDesks } from "./desks.js";
+import { deskName, crossCheckDesks, crossCheckWeights } from "./desks.js";
 import { buildGrid } from "./floors.js";
 import { composeSnapshot } from "./snapshot.js";
 import { createStore } from "./store.js";
@@ -336,11 +336,31 @@ const started = async () => {
       console.log(`desks: metadata names ${naming} desks by ticker, on ${cross.checked} machines — ` +
         `the page follows those names, with the sector alongside`);
     }
+
   } catch (e) {
     console.error(`metadata: ${e.message} — the dashboard runs without pictures`);
   }
 
   await sweepInk().catch((e) => console.error(`ink: ${e.message}`));
+
+  // Le poids et le multiplicateur publiés sont établis sans passer par notre
+  // dérivation couvre-chef → classe : les recouper la met à l'épreuve sur
+  // les dix mille machines, à chaque démarrage.
+  const wc = crossCheckWeights({
+    weights, meta,
+    classOf: (id) => traits.get(id)?.weightClass ?? null,
+  });
+  if (!wc.checked) {
+    console.log("weights: metadata publishes none — nothing to cross-check");
+  } else {
+    // Un écart ne veut pas dire une erreur : les métadonnées sont figées dans
+    // notre cache, la chaîne avance à chaque brûlure. C'est ce qui compte qui
+    // est dit — combien de multiplicateurs notre table de raretés reproduit.
+    const drift = wc.checked - wc.agree;
+    console.log(`weights: ${wc.multAgree}/${wc.multChecked} multipliers reproduce our rarity table` +
+      (drift ? `, ${drift} machines burned since the metadata was cached` : ", nothing has burned since"));
+  }
+
 
   loop("book", sweepBook, cfg.bookPollIntervalMs);
   loop("ink", sweepInk, cfg.inkPollIntervalMs, { runNow: false });

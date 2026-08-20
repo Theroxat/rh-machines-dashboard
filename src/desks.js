@@ -73,6 +73,44 @@ export function crossCheckDesks({ deskIndex, meta }) {
   };
 }
 
+/**
+ * Recoupe le poids que la chaîne donne et celui que les métadonnées publient.
+ *
+ * Les deux devraient toujours coïncider, et c'est justement pour ça que le
+ * contrôle vaut : le multiplicateur publié est établi sans passer par notre
+ * dérivation couvre-chef → classe. S'ils divergent, soit la chaîne a bougé
+ * depuis la dernière génération des métadonnées — cas normal, une brûlure
+ * récente — soit notre modèle de rareté s'est trompé quelque part, et il vaut
+ * mieux l'apprendre d'un journal que d'un chiffre faux servi pendant des jours.
+ */
+export function crossCheckWeights({ weights, meta, classOf }) {
+  let checked = 0, agree = 0;
+  const off = [];
+
+  for (const [tokenId, m] of meta ?? []) {
+    if (m?.weight === null || m?.weight === undefined) continue;
+    const chain = weights?.get(tokenId);
+    if (chain === undefined) continue;
+    checked++;
+    if (Number(chain) === m.weight) agree++;
+    else if (off.length < 5) off.push({ tokenId, chain: Number(chain), published: m.weight });
+  }
+
+  // Le multiplicateur se déduit chez nous de la classe : le recouper met notre
+  // table des raretés à l'épreuve, machine par machine.
+  let multChecked = 0, multAgree = 0;
+  for (const [tokenId, m] of meta ?? []) {
+    const cls = classOf?.(tokenId);
+    if (!cls || m?.multiplier === null || m?.multiplier === undefined) continue;
+    const chain = weights?.get(tokenId);
+    if (chain === undefined || !Number(chain)) continue;
+    multChecked++;
+    if (Math.abs(Number(chain) / cls - m.multiplier) < 0.005) multAgree++;
+  }
+
+  return { checked, agree, off, multChecked, multAgree };
+}
+
 /** Le nom d'un desk, ou null. Un index hors table ne prend pas le nom du
  *  voisin : une machine sans desk lisible n'appartient à aucun secteur. */
 export function deskName(index) {

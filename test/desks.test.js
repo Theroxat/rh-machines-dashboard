@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { SECTORS, deskName, crossCheckDesks } from "../src/desks.js";
+import { SECTORS, deskName, crossCheckDesks, crossCheckWeights } from "../src/desks.js";
 
 test("the sixteen desks are sectors, in the order the chain indexes them", () => {
   assert.equal(SECTORS.length, 16);
@@ -52,4 +52,44 @@ test("a sector the two sources name differently is reported, with both names", (
   });
   assert.equal(r.agree, 1);
   assert.deepEqual(r.disagreements, [{ index: 9, ours: "utilities", published: "energy", count: 2 }]);
+});
+
+// Le multiplicateur publié est établi sans passer par notre dérivation
+// couvre-chef → classe. Le recouper met notre table des raretés à l'épreuve.
+test("chain weights and published weights are compared, and disagreements named", () => {
+  const r = crossCheckWeights({
+    weights: new Map([[1, 396n], [2, 800n], [3, 100n]]),
+    meta: new Map([[1, { weight: 396, multiplier: 1.98 }], [2, { weight: 800, multiplier: 2 }], [3, { weight: 250, multiplier: 1 }]]),
+    classOf: (id) => ({ 1: 200, 2: 400, 3: 100 })[id],
+  });
+  assert.equal(r.checked, 3);
+  assert.equal(r.agree, 2);
+  assert.deepEqual(r.off, [{ tokenId: 3, chain: 100, published: 250 }]);
+});
+
+test("a multiplier that our class table cannot reproduce is counted apart", () => {
+  const r = crossCheckWeights({
+    weights: new Map([[1, 396n]]),
+    meta: new Map([[1, { weight: 396, multiplier: 1.98 }]]),
+    classOf: () => 200,
+  });
+  assert.equal(r.multChecked, 1);
+  assert.equal(r.multAgree, 1);
+
+  const wrong = crossCheckWeights({
+    weights: new Map([[1, 396n]]),
+    meta: new Map([[1, { weight: 396, multiplier: 1.98 }]]),
+    classOf: () => 300,        // mauvaise classe : 396/300 = 1.32, pas 1.98
+  });
+  assert.equal(wrong.multAgree, 0);
+});
+
+test("a machine the metadata does not weigh is not counted as agreeing", () => {
+  const r = crossCheckWeights({
+    weights: new Map([[1, 100n]]),
+    meta: new Map([[1, { weight: null, multiplier: null }]]),
+    classOf: () => 100,
+  });
+  assert.equal(r.checked, 0);
+  assert.equal(r.multChecked, 0);
 });

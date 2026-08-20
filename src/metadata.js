@@ -5,7 +5,7 @@ import { OPENSEA, ADDRESSES, TOTAL_MACHINES } from "./config.js";
 /** Le cache est versionné : une version antérieure ne portait pas Eyes, et la
  *  relire telle quelle donnerait un filtre qui ne trouve jamais rien, sans la
  *  moindre erreur. Un changement de forme force la relecture. */
-const CACHE_VERSION = 3;
+const CACHE_VERSION = 4;
 
 /** Background vaut « Acid Lime » sur les 10 000 machines : il ne distingue rien
  *  et n'est donc pas stocké. Les trois autres traits varient. */
@@ -23,6 +23,12 @@ function traitsOf(nft, image) {
     // quand il arrivera ce champ servira à recouper — pas à décider. Deux
     // sources qui se contredisent valent mieux qu'une seule qu'on croit.
     desk: t.Desk ?? t.desk ?? null,
+    // Le poids et le multiplicateur publiés. La page ne s'en sert pas — elle
+    // lit la chaîne, qui est plus fraîche — mais ils sont établis sans passer
+    // par notre dérivation des classes, donc les recouper la met à l'épreuve
+    // sur les dix mille machines à chaque démarrage.
+    weight: t.Weight === undefined ? null : Number(t.Weight),
+    multiplier: t.Multiplier === undefined ? null : Number(t.Multiplier),
   };
 }
 
@@ -121,6 +127,8 @@ export function readCache(path) {
       body: v.body ?? null,
       eyes: v.eyes ?? null,
       desk: v.desk ?? null,
+      weight: v.weight ?? null,
+      multiplier: v.multiplier ?? null,
     });
   }
   return map;
