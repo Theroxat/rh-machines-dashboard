@@ -5,7 +5,7 @@ import {
   fmtEth, fmtRatio, halfCell, cellKey,
   bannerMessage, rowsHtml, contextHtml, legendHtml,
   matchesFilter, filterBarHtml, filterSummary, freshness, fmtCompact, crateLine,
-  perPointUsd, viewBarHtml, ballotBlock, dropNote, bestRow, yieldOf, BEST_LIMIT, DEFAULT_LIMIT, bestFit, walletCardHtml, walletDetailHtml, fmtShare, machineDetailHtml, findMachine, itemUrl, setContract,
+  perPointUsd, viewBarHtml, ballotBlock, dropNote, bestRow, yieldOf, BEST_LIMIT, DEFAULT_LIMIT, bestFit, walletCardHtml, walletDetailHtml, fmtShare, machineDetailHtml, findMachine, itemUrl, setContract, migrationNote,
 } from "../src/public/app.js";
 
 const entry = (tokenId, priceEth, image = `https://img/${tokenId}.webp`) => ({
@@ -1853,4 +1853,27 @@ test("the desk menu leads with the ticker and places it by sector", () => {
     { opened: true, closesAt: null, finalized: false,
       desks: [{ index: 10, desk: "SPCX", sector: "real estate", ticker: "SPCX", votedWeight: 40, share: 0.042 }] });
   assert.match(html, /SPCX · real estate — 4\.2% of the pot \(40 on sale of 623\)/);
+});
+
+// La collection a migré : quelqu'un qui arrive doit pouvoir vérifier en deux
+// secondes qu'il ne regarde pas les prix de la collection abandonnée.
+test("the page says which collection it is actually tracking", () => {
+  const html = migrationNote({ collection: { contract: "0x8C71D170fBd94BCba93bB08FC2CFD0e8620cD9cE", slug: "rhmachines" } });
+  assert.match(html, /New contract/);
+  assert.match(html, /0x8C71…D9cE/);
+  assert.match(html, /opensea\.io\/collection\/rhmachines/);
+  assert.match(html, /no longer followed/);
+});
+
+// L'adresse vient du snapshot, pas d'une constante recopiée : la mention ne
+// peut pas annoncer un contrat que le service n'interroge pas.
+test("the notice names the contract the service actually reads", () => {
+  const html = migrationNote({ collection: { contract: "0x" + "a".repeat(40), slug: "other" } });
+  assert.match(html, /0xaaaa…aaaa/);
+  assert.doesNotMatch(html, /8C71/);
+});
+
+test("with no collection read the notice stays silent rather than reassuring wrongly", () => {
+  assert.equal(migrationNote({ collection: {} }), "");
+  assert.equal(migrationNote(null), "");
 });

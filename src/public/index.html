@@ -92,6 +92,35 @@
     vertical-align: 1px;
   }
 
+  /* La collection a migré : quelqu'un qui arrive doit voir en deux secondes
+     qu'il ne regarde pas les prix de la collection abandonnée. En rouge parce
+     que c'est le seul endroit de la page où l'on demande à quelqu'un de
+     vérifier quelque chose avant de faire confiance au reste. */
+  .migrated {
+    margin: 10px 0 0;
+    padding: 6px 10px;
+    border-left: 3px solid var(--alarm);
+    background: var(--paper-2);
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .migrated:empty { display: none; }
+  .migrated .tag {
+    display: inline-block;
+    margin-right: 8px;
+    padding: 1px 6px;
+    background: var(--alarm);
+    color: var(--paper);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-weight: 700;
+    vertical-align: 1px;
+  }
+  .migrated b { color: var(--text); font-weight: 600; }
+  .migrated a { color: var(--alarm); text-decoration: none; border-bottom: 1px solid currentColor; }
+  .migrated a:hover { color: var(--text); }
+
   /* Sept blocs qui se replient sur deux rangs : le filet du bas ferme chaque
      rang, celui du conteneur ferme le dernier. */
   .context { display: flex; flex-wrap: wrap; margin-top: 14px; border: 1px solid var(--rule); border-right: 0; border-bottom: 0; }
@@ -691,6 +720,7 @@
     </a>
   </div>
   <p class="disclaimer"><span class="tag">Unofficial</span>An independent tool, not built by, affiliated with, or endorsed by the RH MACHINES team.</p>
+  <p class="migrated" id="migrated"></p>
   <div class="context" id="context"></div>
   <div class="banner" id="banner" role="status"></div>
 </header>

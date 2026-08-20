@@ -234,6 +234,26 @@ export function ballotBlock(vote, epoch, now) {
     [when, `${voted.length} of 16 desks drew votes`].filter(Boolean).join(" · "));
 }
 
+/**
+ * La collection a migré vers un nouveau contrat, et le dashboard le suit.
+ *
+ * Quelqu'un qui arrive ici doit pouvoir vérifier en deux secondes qu'il ne
+ * regarde pas les prix de la collection abandonnée. L'adresse est celle que le
+ * service interroge réellement — elle vient du snapshot, pas d'une constante
+ * recopiée dans la page, donc cette mention ne peut pas mentir sur ce qu'elle
+ * annonce.
+ */
+export function migrationNote(d) {
+  const c = d?.collection?.contract;
+  const slug = d?.collection?.slug;
+  if (!c || !slug) return "";
+  const short = `${c.slice(0, 6)}…${c.slice(-4)}`;
+  return `<span class="tag">New contract</span>` +
+    `Tracking the migrated collection — ` +
+    `<a href="https://opensea.io/collection/${esc(slug)}" target="_blank" rel="noopener">${esc(slug)}</a>` +
+    ` at <b>${esc(short)}</b>. The old one is no longer followed.`;
+}
+
 export function contextHtml(d, now = null) {
   const p = d.printer ?? {};
   const e = d.eth ?? {};
@@ -1364,6 +1384,7 @@ if (typeof document !== "undefined") {
 
     setContract(v.data.collection?.contract);
     lastData = v.data;
+    $("migrated").innerHTML = migrationNote(v.data);
     contextEl.innerHTML = contextHtml(v.data, serverNow);
     paintFilters(v.data.traitFilters, v.data.vote);
     $("queue").innerHTML = crateLine(v.data.anvil);
