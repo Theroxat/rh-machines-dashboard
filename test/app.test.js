@@ -1638,11 +1638,23 @@ test("the panel prices it, and says what it pays back", () => {
   assert.match(html, /10\.0%/);            // 60 / 600
 });
 
-test("the panel names the desk and the ticker it wears this epoch", () => {
-  const html = machineDetailHtml(DETAIL, 3145);
-  assert.match(html, /materials/);
-  assert.match(html, /wears AMD this epoch/);
+// Le ticker nomme le desk, le secteur le situe : on ne demande pas « les
+// machines du secteur materials », on demande AMD.
+test("the panel names the desk by its ticker, and places it by its sector", () => {
+  const withSector = { ...DETAIL, rows: [{ ...DETAIL.rows[0],
+    inked: half({ entries: [{ ...DETAIL.rows[0].inked.entries[0],
+      machine: { ...DETAIL.rows[0].inked.entries[0].machine, desk: "AMD", sector: "materials" } }] }) }] };
+  const html = machineDetailHtml(withSector, 3145);
+  assert.match(html, /Desk<\/span><span class="d-v">AMD</);
+  assert.match(html, /the materials desk/);
   assert.match(html, /counts 2× on that slice/);
+});
+
+test("a desk left off this epoch's ballot says so, rather than nothing", () => {
+  const off = { ...DETAIL, rows: [{ ...DETAIL.rows[0],
+    inked: half({ entries: [{ ...DETAIL.rows[0].inked.entries[0],
+      machine: { ...DETAIL.rows[0].inked.entries[0].machine, desk: "CRCL", sector: "tech", ticker: null } }] }) }] };
+  assert.match(machineDetailHtml(off, 3145), /not on this epoch's ballot/);
 });
 
 // Une dormante ne gagne rien, et le panneau doit le dire en entier : ni ce
@@ -1834,11 +1846,11 @@ test("a snapshot that names no contract leaves the link alone", () => {
 
 // Le desk est un secteur, mais celui qui vote cherche le ticker qu'il porte
 // ce tour-ci. Le menu doit donner les deux.
-test("the desk menu names the ticker the sector wears this epoch", () => {
+test("the desk menu leads with the ticker and places it by sector", () => {
   const html = filterBarHtml(
-    { Desk: [{ value: "real estate", listed: 40, total: 623 }], Headwear: [], Body: [], Eyes: [] },
+    { Desk: [{ value: "SPCX", listed: 40, total: 623 }], Headwear: [], Body: [], Eyes: [] },
     NO_FILTER,
     { opened: true, closesAt: null, finalized: false,
-      desks: [{ index: 10, desk: "real estate", ticker: "SPCX", votedWeight: 40, share: 0.042 }] });
-  assert.match(html, /real estate · SPCX — 4\.2% of the pot \(40 on sale of 623\)/);
+      desks: [{ index: 10, desk: "SPCX", sector: "real estate", ticker: "SPCX", votedWeight: 40, share: 0.042 }] });
+  assert.match(html, /SPCX · real estate — 4\.2% of the pot \(40 on sale of 623\)/);
 });

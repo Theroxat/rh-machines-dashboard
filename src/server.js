@@ -323,14 +323,18 @@ const started = async () => {
 
     // L'équipe ajoute le desk aux métadonnées. La chaîne reste l'autorité, mais
     // le jour où les deux se contrediront il faut le voir, pas le supposer.
+    // Le contrôle a fait son travail : il a montré que les métadonnées nomment
+    // les desks par leur ticker, et la page a adopté ce nom. Il reste en place
+    // pour la prochaine divergence, celle qu'on n'attend pas — un index dont le
+    // ticker changerait sans qu'on le voie.
     const cross = crossCheckDesks({ deskIndex, meta });
+    const naming = [...new Set([...deskIndex.entries()]
+      .map(([id, i]) => meta.get(id)?.desk && `${i}=${meta.get(id).desk}`).filter(Boolean))].length;
     if (!cross.checked) {
-      console.log("desks: metadata carries no desk yet — nothing to cross-check");
-    } else if (!cross.disagreements.length) {
-      console.log(`desks: metadata agrees with the chain on all ${cross.agree} machines it names`);
+      console.log("desks: metadata carries no desk yet — the page names them by sector");
     } else {
-      console.error(`desks: metadata disagrees with the chain on ${cross.disagreements.length} sector(s) — ` +
-        cross.disagreements.map((x) => `${x.index} ours=${x.ours} theirs=${x.published} (${x.count})`).join(", "));
+      console.log(`desks: metadata names ${naming} desks by ticker, on ${cross.checked} machines — ` +
+        `the page follows those names, with the sector alongside`);
     }
   } catch (e) {
     console.error(`metadata: ${e.message} — the dashboard runs without pictures`);

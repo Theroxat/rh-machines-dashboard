@@ -54,7 +54,7 @@ test("every machine on sale carries its picture, its traits and the desk it sits
   const s = composeSnapshot({ ...withGrid, deskIndex: new Map([[1253, 9]]) });
   assert.deepEqual(s.rows[0].inked.entries[0].machine, {
     image: "https://img/1253.webp", headwear: "Blueberries", body: "Cobalt Stripe",
-    eyes: "Rage", desk: "utilities", ticker: null,
+    eyes: "Rage", desk: "utilities", sector: "utilities", ticker: null,
   });
 });
 

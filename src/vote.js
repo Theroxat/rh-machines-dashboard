@@ -116,9 +116,11 @@ export function deskShares({ vote, tickers = [] }) {
     if (weight === undefined) continue;
     desks.push({
       index,
-      desk: deskName(index),
-      // Le desk est un secteur ; le ticker qu'il porte change à chaque epoch,
-      // et c'est celui-là que cherche quelqu'un qui vote.
+      // Même règle que partout : le ticker nomme, le secteur situe.
+      desk: tickers[index] ?? deskName(index),
+      sector: deskName(index),
+      // Sur le bulletin de cette epoch, ou non : un desk dont l'action n'a pas
+      // de pool n'est pas votable ce tour-ci, même s'il porte un nom.
       ticker: tickers[index] ?? null,
       // Le poids voté, en points : une machine vote avec son poids, pas pour
       // une voix.

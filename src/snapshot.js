@@ -40,7 +40,13 @@ export function composeSnapshot({
     const index = deskIndex?.get(tokenId);
     return {
       ...m,
-      desk: deskName(index),
+      // Le nom officiel d'un desk est son ticker : c'est ce que publient les
+      // métadonnées de la collection, et c'est ce que cherche un porteur — on
+      // ne demande pas « les machines du secteur utilities », on demande GME.
+      // Le secteur reste en second, pour ceux qui raisonnent par thème. Sans
+      // métadonnée lue, on retombe sur le secteur plutôt que sur rien.
+      desk: m.desk ?? deskName(index),
+      sector: deskName(index),
       // Le ticker que ce desk porte cette epoch. Il voyageait déjà avec les
       // machines d'un portefeuille mais pas avec celles du carnet, si bien que
       // le panneau de détail annonçait « pas de ticker au bulletin » pour les
@@ -177,7 +183,8 @@ export function composeSnapshot({
     at: now,
     rows,
     legend: legend ?? null,
-    traitFilters: meta ? buildTraitIndex({ meta, listed, deskOf: (id) => deskName(deskIndex?.get(id)) }) : null,
+    traitFilters: meta ? buildTraitIndex({ meta, listed,
+      deskOf: (id) => meta.get(id)?.desk ?? deskName(deskIndex?.get(id)) }) : null,
     excluded: grid.excluded,
     totals: grid.totals,
     printer,

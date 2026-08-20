@@ -718,8 +718,9 @@ export function machineDetailHtml(d, tokenId) {
         ? `x${nextGate.unlocks} opens when ${fmtCompact(nextGate.more)} more $PRINTER is burned across the fleet`
         : "burning more would be refused, not quietly capped") +
     factRow("Desk", m.desk ? esc(m.desk) : null,
-      m.ticker ? `wears ${esc(m.ticker)} this epoch — it counts 2× on that slice`
-        : "no ticker on this epoch's ballot") +
+      (m.sector ? `the ${esc(m.sector)} desk — ` : "") +
+      (m.ticker ? `on this epoch's ballot, and it counts 2× on that slice`
+        : `not on this epoch's ballot, so no slice is bought for it this time`)) +
     factRow("Takes", e.epochUsd === null || e.epochUsd === undefined ? null : `${fmtUsd(e.epochUsd)} of the pot`,
       e.epochUsd ? `up to ${fmtUsd(e.epochUsd * 2)} if the vote lands on its desk`
         : "nothing from this pot, and nothing from the next until it is inked") +
@@ -934,17 +935,17 @@ export function filterBarHtml(traitFilters, filter, vote = null) {
   // cosmétique : c'est le seul dont la valeur change avec un vote, et le menu
   // ne peut pas laisser croire que les seize se valent.
   const share = new Map();
-  const wears = new Map();
+  const sector = new Map();
   for (const dk of vote?.desks ?? []) {
     if (dk.desk && dk.share !== null) share.set(dk.desk, dk.share);
     // Le desk est un secteur, mais on cherche le ticker qu'il porte ce tour-ci.
-    if (dk.desk && dk.ticker) wears.set(dk.desk, dk.ticker);
+    if (dk.desk && dk.sector) sector.set(dk.desk, dk.sector);
   }
 
   return TRAIT_TYPES.map((type) => {
     const values = traitFilters[type] ?? [];
     const options = values.map((v) => {
-      const wearing = type === "Desk" && wears.has(v.value) ? ` · ${esc(wears.get(v.value))}` : "";
+      const wearing = type === "Desk" && sector.has(v.value) ? ` · ${esc(sector.get(v.value))}` : "";
       const pot = type === "Desk" && share.has(v.value) ? ` — ${fmtRatio(share.get(v.value))} of the pot` : "";
       const chosen = filter?.[type] === v.value ? " selected" : "";
       return `<option value="${esc(v.value)}"${chosen}>${esc(v.value)}${wearing}${pot} (${fmtInt(v.listed)} on sale of ${fmtInt(v.total)})</option>`;
