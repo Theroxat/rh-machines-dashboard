@@ -18,6 +18,28 @@ export const fmtInt   = (v) => v === null || v === undefined ? "—" : v.toLocal
  *  pas de conversion — on laisse l'ETH seul plutôt que d'afficher un faux. */
 export const usdOf = (eth, ethUsd) =>
   eth === null || eth === undefined || !ethUsd ? null : eth * ethUsd;
+/**
+ * Un poids, écrit court.
+ *
+ * Sur l'ancien contrat tout le monde plafonnait au même endroit et les poids
+ * tombaient ronds. Ils ne le sont plus : une machine qui a brûlé 16 750 au lieu
+ * de 17 000 pèse 3,96x, et « x2→3.96x » dans un badge de soixante-dix-huit
+ * pixels se lit « 96x ». On tronque à la décimale — jamais on n'arrondit vers
+ * le haut, une machine ne doit pas s'annoncer au poids d'une classe qu'elle
+ * n'a pas atteinte. Le chiffre exact reste dans l'infobulle et le panneau.
+ */
+/** Deux décimales, mais seulement si elles disent quelque chose : « 4× » pour
+ *  une machine au plafond, « 3.94× » pour celle qui s'en approche. */
+export const fmtExact = (n) => String(Number(Number(n).toFixed(2)));
+
+export const fmtWeightX = (weight) => {
+  if (!weight) return "0x";
+  const x = weight / 100;
+  if (Number.isInteger(x)) return `${x}x`;
+  const cut = Math.floor(x * 10) / 10;
+  return `${Number.isInteger(cut) ? cut.toFixed(1) : cut}x`;
+};
+
 export const fmtUsdShort = (v) =>
   v === null || v === undefined ? "" : v >= 10000 ? `$${Math.round(v / 1000)}k` : `$${Math.round(v)}`;
 
@@ -339,7 +361,7 @@ function chip(e, { isFloor = false, ethUsd = null, anvil = false, showPrice = tr
   // x, aucune ne disant ce qu'elle était, et l'on comprenait « x2 inkée deux
   // fois » — alors que c'est une x2 qui a brûlé quatre fois l'encre de base pour
   // peser le double. « x2→4x » se lit sans notice : née là, arrivée ici.
-  const now = e.weight ? `${e.weight / 100}x` : null;
+  const now = e.weight ? fmtWeightX(e.weight) : null;
   const badge = reinked && classLabel && now
     ? `<span class="reink">${esc(classLabel)}&#8594;${now}</span>`
     : reinked && now ? `<span class="reink">${now}</span>`
@@ -360,8 +382,8 @@ function chip(e, { isFloor = false, ethUsd = null, anvil = false, showPrice = tr
   // quatre fois l'encre de base ; le poids n'en gagne que le double, parce
   // qu'il suit une racine carrée.
   const inkStory = reinked
-    ? ` · burning ${e.inkPrinter ? (e.inkPrinter / 4250).toFixed(0) : "more"}× the base ink` +
-      ` — ${fmtInt(e.inkPrinter)} $PRINTER burned · weight ${e.weight / 100}x`
+    ? ` · burning ${e.inkPrinter ? fmtExact(e.inkPrinter / 4250) : "more"}× the base ink` +
+      ` — ${fmtInt(e.inkPrinter)} $PRINTER burned · weight ${fmtExact(e.weight / 100)}x`
     : "";
 
   // L'anvil ne peut pas vendre sous sa propre offre : la marque n'a de sens que
@@ -389,7 +411,7 @@ function chip(e, { isFloor = false, ethUsd = null, anvil = false, showPrice = tr
     : !e.weight
       ? ` · earns nothing until it is inked, and nothing from this pot even then` +
         ` — a Machine inked during an epoch only starts earning at the next one`
-      : ` · takes ${fmtUsd(e.epochUsd)} of the pot waiting now, at weight ${e.weight / 100}x` +
+      : ` · takes ${fmtUsd(e.epochUsd)} of the pot waiting now, at weight ${fmtExact(e.weight / 100)}x` +
         ` — up to ${fmtUsd(e.epochUsd * 2)} if the vote lands on its desk`;
 
   const pointStory = perPoint !== null
@@ -714,14 +736,14 @@ export function machineDetailHtml(d, tokenId) {
 
   const facts =
     factRow("Class", esc(r.classLabel), `${fmtInt(r.chainCount)} machines are born in it`) +
-    factRow("Weight", e.weight ? `${e.weight / 100}x` : "0x",
+    factRow("Weight", e.weight ? `${fmtExact(e.weight / 100)}x` : "0x",
       dormant ? "dormant — nothing burned, so it earns and votes nothing"
         // « ×2.00 » seul se lisait comme « inkée deux fois ». Ce qui a été fait,
         // c'est brûler quatre fois l'encre de base ; le poids n'en gagne que le
         // double parce qu'il suit une racine carrée.
         : reinked && e.inkPrinter
-          ? `born ${esc(r.classLabel)} — burning ${(e.inkPrinter / 4250).toFixed(0)}× the base ink ` +
-            `lifts it to ${e.weight / 100}x, since weight follows the square root`
+          ? `born ${esc(r.classLabel)} — burning ${fmtExact(e.inkPrinter / 4250)}× the base ink ` +
+            `lifts it to ${fmtExact(e.weight / 100)}x, since weight follows the square root`
         : reinked ? `it outweighs its own class`
         : "activated at the base burn") +
     // La formule seule ment sur les machines qui touchent le plafond : le

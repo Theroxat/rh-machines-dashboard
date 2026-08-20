@@ -5,7 +5,7 @@ import {
   fmtEth, fmtRatio, halfCell, cellKey,
   bannerMessage, rowsHtml, contextHtml, legendHtml,
   matchesFilter, filterBarHtml, filterSummary, freshness, fmtCompact, crateLine,
-  perPointUsd, viewBarHtml, ballotBlock, dropNote, bestRow, yieldOf, BEST_LIMIT, DEFAULT_LIMIT, bestFit, walletCardHtml, walletDetailHtml, fmtShare, machineDetailHtml, findMachine, itemUrl, setContract, migrationNote,
+  perPointUsd, viewBarHtml, ballotBlock, dropNote, bestRow, yieldOf, BEST_LIMIT, DEFAULT_LIMIT, bestFit, walletCardHtml, walletDetailHtml, fmtShare, machineDetailHtml, findMachine, itemUrl, setContract, migrationNote, fmtWeightX, fmtExact,
 } from "../src/public/app.js";
 
 const entry = (tokenId, priceEth, image = `https://img/${tokenId}.webp`) => ({
@@ -1876,4 +1876,41 @@ test("the notice names the contract the service actually reads", () => {
 test("with no collection read the notice stays silent rather than reassuring wrongly", () => {
   assert.equal(migrationNote({ collection: {} }), "");
   assert.equal(migrationNote(null), "");
+});
+
+// Sur l'ancien contrat tout le monde plafonnait au même endroit et les poids
+// tombaient ronds. Une machine qui a brûlé 16 750 au lieu de 17 000 pèse
+// 3,96x, et « x2→3.96x » dans un badge se lit « 96x ».
+test("a weight is cut to one decimal in a badge, never rounded up", () => {
+  assert.equal(fmtWeightX(400), "4x");
+  assert.equal(fmtWeightX(396), "3.9x");     // pas « 4x » : elle n'y est pas
+  assert.equal(fmtWeightX(105), "1.0x");     // pas « 1x » : elle a brûlé plus
+  assert.equal(fmtWeightX(120), "1.2x");
+  assert.equal(fmtWeightX(1200), "12x");
+  assert.equal(fmtWeightX(0), "0x");
+});
+
+test("a badge never claims a class the machine has not reached", () => {
+  for (const w of [396, 399, 105, 199, 1199]) {
+    const shown = Number(fmtWeightX(w).replace("x", ""));
+    assert.ok(shown <= w / 100, `${fmtWeightX(w)} annonce plus que ${w / 100}`);
+  }
+});
+
+test("the badge is short while the tooltip keeps the exact figure", () => {
+  const e = { ...entry(1, 0.1), weight: 396, inkMult: 1.98, inkPrinter: 16750, epochUsd: 50 };
+  const html = bestRow({ ...BEST, rows: [{ classValue: 200, classLabel: "x2", docCount: 1, chainCount: 1,
+    inked: half({ entries: [e] }), dormant: half({ entries: [] }) }] }, { ethUsd: 2000 });
+  assert.match(html, /class="reink">x2&#8594;3\.9x</);
+  assert.match(html, /weight 3\.96x/);
+});
+
+// Deux décimales seulement si elles disent quelque chose : « 4× » au plafond,
+// « 3.94× » pour celle qui s'en approche.
+test("an exact figure carries decimals only when they mean something", () => {
+  assert.equal(fmtExact(4), "4");
+  assert.equal(fmtExact(3.9411), "3.94");
+  assert.equal(fmtExact(3.96), "3.96");
+  assert.equal(fmtExact(12), "12");
+  assert.equal(fmtExact(1.0), "1");
 });
