@@ -144,9 +144,38 @@
   }
   .banner.on { display: block; }
 
+  /* ---- les onglets ---- */
+
+  /* Quatre questions, quatre pages. Le mobilier explicatif ne pousse plus le
+     tableau vers le bas : il vit là où il répond à quelque chose. */
+  .tabs { display: flex; gap: 2px; margin-top: 16px; }
+  .tabs a {
+    padding: 7px 14px;
+    font-size: 12.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-decoration: none;
+    background: var(--paper-2);
+    border: 1px solid var(--rule);
+    border-bottom: 0;
+  }
+  .tabs a:hover { color: var(--text); }
+  /* L'onglet ouvert se raccroche à sa page : il partage son fond et perd le
+     filet qui l'en sépare. */
+  .tabs a[aria-selected="true"] {
+    color: var(--ink);
+    background: var(--paper);
+    border-color: var(--rule-2);
+    font-weight: 700;
+  }
+  /* Sans script, aucun onglet n'est marqué : la page doit alors tout montrer
+     plutôt que rien. */
+  .pane { padding-top: 18px; border-top: 1px solid var(--rule-2); margin-top: -1px; }
+  .pane[hidden] { display: none; }
+
   /* ---- filtres par trait ---- */
 
-  .filter-bar { margin-top: 20px; }
   /* La ligne de caisse suit directement les menus au lieu d'être poussée à
      l'autre bout, et s'aligne sur le bas des sélecteurs plutôt que sur le haut
      de leurs intitulés. */
@@ -286,6 +315,24 @@
   .d-v { display: block; font-size: 15px; font-weight: 700; color: var(--ink); }
   .d-x { display: block; font-size: 12px; color: var(--muted); }
 
+  /* ---- le dépouillement ---- */
+
+  /* Seize desks, et ce que chacun a tiré. Les barres se mesurent sur le premier
+     plutôt que sur cent : à 38% le vainqueur remplirait à peine un tiers, et
+     l'écart entre les seconds deviendrait illisible. */
+  .ballot { list-style: none; margin: 14px 0 0; padding: 0; font-size: 12.5px; }
+  .ballot li { display: flex; align-items: center; gap: 12px; padding: 4px 0; border-bottom: 1px solid var(--rule); }
+  .b-name { min-width: 72px; font-weight: 700; color: var(--ink); }
+  .b-sector { min-width: 130px; color: var(--dim); font-size: 11.5px; }
+  .b-bar { flex: 1; height: 9px; background: var(--paper-2); }
+  .b-bar span { display: block; height: 100%; background: var(--ink); }
+  .b-pct { min-width: 72px; text-align: right; color: var(--text); font-weight: 600; }
+  .b-w { min-width: 82px; text-align: right; color: var(--muted); font-size: 11.5px; }
+  /* Un desk absent du bulletin n'a pas perdu : on n'a pas pu voter pour lui. */
+  .ballot .b-off .b-name { color: var(--dim); font-weight: 400; }
+  .ballot .b-off .b-bar { display: none; }
+  .ballot .b-off .b-pct { color: var(--dim); font-weight: 400; font-size: 11.5px; min-width: 0; flex: 1; text-align: left; }
+
   /* ---- le portefeuille du visiteur ---- */
 
   /* Posé juste au-dessus de l'en-tête du tableau, et bâti comme les filtres :
@@ -295,7 +342,7 @@
   /* Aligné sur le milieu, pas sur le bas : ailleurs sur la page l'intitulé est
      au-dessus de sa commande, donc `flex-end` les met à la même base. Ici il
      est à côté, et la même règle le faisait plonger sous la boîte de saisie. */
-  .wallet-line { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 20px; }
+  .wallet-line { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 14px; }
   .wallet-line .label { flex: none; }
   #wallet-input {
     font-family: inherit; font-size: 13px; color: var(--text);
@@ -695,6 +742,8 @@
 
     .fl { width: 100%; }
     .fl select { width: 100%; min-width: 0; max-width: none; }
+    .tabs { flex-wrap: wrap; }
+    .tabs a { flex: 1 1 auto; text-align: center; padding: 7px 8px; font-size: 11.5px; }
     .d-veil { padding: 14px 10px; }
     .d-pic { width: 100%; }
     #wallet-input { min-width: 0; width: 100%; }
@@ -702,6 +751,8 @@
     .w-ticker { font-size: 26px; }
     #filters { gap: 10px; }
     /* Empilés, le filet vertical ne sépare plus rien : il devient horizontal. */
+    .tabs { flex-wrap: wrap; }
+    .tabs a { flex: 1 1 auto; text-align: center; padding: 7px 8px; font-size: 11.5px; }
     .d-veil { padding: 14px 10px; }
     .d-pic { width: 100%; }
     #wallet-input { min-width: 0; width: 100%; }
@@ -782,67 +833,92 @@
   </div>
   <p class="disclaimer"><span class="tag">Unofficial</span>An independent tool, not built by, affiliated with, or endorsed by the RH MACHINES team.</p>
   <p class="migrated" id="migrated"></p>
-  <div class="context" id="context"></div>
+
+  <!-- Le champ vit dans l'en-tête : la question « qu'est-ce que je possède »
+       se pose depuis n'importe quel onglet, et la réponse s'ouvre par-dessus
+       sans faire perdre sa place. -->
+  <div class="wallet-line" id="wallet-card"></div>
+
+  <!-- Les onglets. Le choix vit dans l'adresse : un lien partagé rouvre la
+       même page, et un rechargement ne renvoie pas au marché. -->
+  <nav class="tabs" id="tabs" role="tablist">
+    <a href="#market" role="tab" data-tab="market">Market</a>
+    <a href="#wallet" role="tab" data-tab="wallet">My wallet</a>
+    <a href="#vote"   role="tab" data-tab="vote">The vote</a>
+    <a href="#how"    role="tab" data-tab="how">How it works</a>
+  </nav>
   <div class="banner" id="banner" role="status"></div>
 </header>
-
-<section class="filter-bar">
-  <div class="filter-row">
-    <div id="view"></div>
-    <div id="filters"></div>
-    <div id="queue"></div>
-  </div>
-  <p id="filter-summary"></p>
-  <p id="drop-note"></p>
-</section>
 
 <!-- Le panneau de détail. Vide et masqué tant qu'on n'a cliqué sur rien. -->
 <div class="d-veil" id="detail" hidden>
   <div class="d-panel" role="dialog" aria-modal="true" aria-label="Machine detail" id="detail-panel"></div>
 </div>
 
-<div class="wallet-line" id="wallet-card"></div>
-<div id="wallet-out"></div>
+<!-- ═══ MARCHÉ ═══ -->
+<section class="pane" id="pane-market">
+  <div class="context" id="context"></div>
 
-<!-- La légende. Statique : elle ne dépend d'aucune donnée, donc elle ne peut
-     ni se tromper ni disparaître si un balayage échoue. -->
-<div class="key">
-  <span class="key-label">Reading a machine</span>
-  <span class="key-item"><span class="key-badge cls">x3</span>born a x3 — its sealed class</span>
-  <span class="key-item"><span class="key-badge re">x3&#8594;6x</span>re-inked: it burned 4× the base ink to weigh double, since weight follows a square root</span>
-  <span class="key-item"><span class="key-swatch amber"></span>what it costs</span>
-  <span class="key-item"><span class="key-swatch green"></span>its share of the pot waiting now — not a rate, the pot has never paid out yet</span>
-  <span class="key-item"><span class="key-swatch blue"></span>dormant — never inked, so it earns and votes nothing</span>
-  <span class="key-item"><span class="key-badge hold">+$12 inside</span>stock sitting in the machine's own account, which goes with it if it sells</span>
-</div>
+  <div class="filter-row">
+    <div id="view"></div>
+    <div id="filters"></div>
+    <div id="queue"></div>
+  </div>
+  <p id="filter-summary"></p>
 
-<div class="scroll">
-  <table>
-    <thead>
-      <tr class="label">
-        <th>Rarity</th>
-        <th class="g-ink edge">Inked — carries burned $PRINTER</th>
-        <th class="g-dormant edge">Dormant — never activated</th>
-      </tr>
-    </thead>
-    <tbody id="rows"></tbody>
-  </table>
-</div>
+  <!-- La légende. Statique : elle ne dépend d'aucune donnée, donc elle ne peut
+       ni se tromper ni disparaître si un balayage échoue. -->
+  <div class="key">
+    <span class="key-label">Reading a machine</span>
+    <span class="key-item"><span class="key-badge cls">x3</span>born a x3 — its sealed class</span>
+    <span class="key-item"><span class="key-badge re">x3&#8594;6x</span>re-inked: it burned 4× the base ink to weigh double, since weight follows a square root</span>
+    <span class="key-item"><span class="key-swatch amber"></span>what it costs</span>
+    <span class="key-item"><span class="key-swatch green"></span>its share of the pot waiting now — not a rate, the pot has never paid out yet</span>
+    <span class="key-item"><span class="key-swatch blue"></span>dormant — never inked, so it earns and votes nothing</span>
+    <span class="key-item"><span class="key-badge hold">+$12 inside</span>stock sitting in the machine's own account, which goes with it if it sells</span>
+  </div>
 
-<section class="legend-section">
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr class="label">
+          <th>Rarity</th>
+          <th class="g-ink edge">Inked — carries burned $PRINTER</th>
+          <th class="g-dormant edge">Dormant — never activated</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ═══ PORTEFEUILLE ═══ -->
+<section class="pane" id="pane-wallet">
+  <div id="wallet-out"></div>
+</section>
+
+<!-- ═══ LE VOTE ═══ -->
+<section class="pane" id="pane-vote">
+  <div class="context" id="vote-context"></div>
+  <p id="drop-note"></p>
+  <div id="ballot"></div>
+</section>
+
+<!-- ═══ COMMENT ÇA MARCHE ═══ -->
+<section class="pane" id="pane-how">
   <h2 class="label">Which headwear grants which rarity</h2>
   <p class="note">A Machine's rarity is sealed on chain, and it always matches the <b>Headwear</b> it
     wears. This table is derived from the collection itself on every boot, not written down — if a headwear
     ever appeared under two different rarities, it would be named here rather than filed under one of them.</p>
   <div id="legend"></div>
-</section>
 
-<footer>
-  <p class="disclaimer"><span class="tag">Unofficial</span><b>An independent tool.</b> It is not built by,
-    affiliated with, or endorsed by the RH MACHINES team, and nothing here is an official source. It is
-    read-only: it holds no keys, signs nothing, places no orders, and gives no advice. Prices come from
-    public OpenSea listings and public Robinhood Chain state, and can be wrong or stale — verify every price
-    on OpenSea before buying.</p>
-</footer>
+  <footer>
+    <p class="disclaimer"><span class="tag">Unofficial</span><b>An independent tool.</b> It is not built by,
+      affiliated with, or endorsed by the RH MACHINES team, and nothing here is an official source. It is
+      read-only: it holds no keys, signs nothing, places no orders, and gives no advice. Prices come from
+      public OpenSea listings and public Robinhood Chain state, and can be wrong or stale — verify every price
+      on OpenSea before buying.</p>
+  </footer>
+</section>
 
 <script type="module" src="/app.js"></script>

@@ -5,7 +5,7 @@ import {
   fmtEth, fmtRatio, halfCell, cellKey,
   bannerMessage, rowsHtml, contextHtml, legendHtml,
   matchesFilter, filterBarHtml, filterSummary, freshness, fmtCompact, crateLine,
-  perPointUsd, viewBarHtml, ballotBlock, dropNote, bestRow, yieldOf, BEST_LIMIT, DEFAULT_LIMIT, fmtUsdRound, bestFit, walletCardHtml, walletDetailHtml, fmtShare, machineDetailHtml, findMachine, itemUrl, setContract, migrationNote, fmtWeightX, fmtExact, fmtAmount,
+  perPointUsd, viewBarHtml, ballotBlock, dropNote, bestRow, yieldOf, BEST_LIMIT, DEFAULT_LIMIT, fmtUsdRound, bestFit, walletCardHtml, walletDetailHtml, fmtShare, machineDetailHtml, findMachine, itemUrl, setContract, migrationNote, fmtWeightX, fmtExact, fmtAmount, ballotHtml,
 } from "../src/public/app.js";
 
 const entry = (tokenId, priceEth, image = `https://img/${tokenId}.webp`) => ({
@@ -2077,4 +2077,68 @@ test("a round amount keeps its thousands", () => {
   assert.equal(fmtUsdRound(1343.93), "$1,344");
   assert.equal(fmtUsdRound(76), "$76");
   assert.equal(fmtUsdRound(null), "—");
+});
+
+// ---- le dépouillement, sur sa page ---------------------------------------
+
+const BALLOT = {
+  opened: true, finalized: false, closesAt: null,
+  desks: [
+    { index: 0, desk: "NVDA", sector: "energy", ticker: "NVDA", votedWeight: 3785, share: 0.3818 },
+    { index: 1, desk: "AMD", sector: "materials", ticker: "AMD", votedWeight: 1868, share: 0.1884 },
+    { index: 7, desk: "CRCL", sector: "tech", ticker: null, votedWeight: 0, share: 0 },
+  ],
+};
+
+test("the ballot shows every desk and what it drew", () => {
+  const html = ballotHtml(BALLOT, 2);
+  assert.match(html, /class="b-name">NVDA<\/span><span class="b-sector">energy</);
+  assert.match(html, /38\.2%/);
+  assert.match(html, /3,785x/);
+});
+
+// Un desk absent du bulletin n'a pas perdu le vote : on n'a pas pu voter pour
+// lui, et une barre à zéro le ferait passer pour un candidat rejeté.
+test("a desk left off the ballot is not shown as one that lost", () => {
+  const html = ballotHtml(BALLOT, 2);
+  assert.match(html, /class="b-off"/);
+  assert.match(html, /not on the ballot/);
+});
+
+// Les barres se mesurent sur le premier : à 38%, le vainqueur remplirait à
+// peine un tiers et l'écart entre les seconds deviendrait illisible.
+test("the bars are drawn against the leader, not against a hundred", () => {
+  const html = ballotHtml(BALLOT, 2);
+  assert.match(html, /width:100%/);
+  assert.match(html, /width:49%/);
+});
+
+test("no ballot open says what that means for the pot", () => {
+  const html = ballotHtml({ ...BALLOT, opened: false }, 3);
+  assert.match(html, /No ballot has opened for epoch 3/);
+  assert.match(html, /the pot rolls forward/);
+});
+
+test("an open ballot nobody has voted in says exactly that", () => {
+  const html = ballotHtml({ ...BALLOT, desks: BALLOT.desks.map((d) => ({ ...d, votedWeight: 0 })) }, 2);
+  assert.match(html, /not one Machine has voted/);
+});
+
+test("a ballot that could not be read says so rather than showing nothing", () => {
+  assert.match(ballotHtml(null, 2), /could not be read/);
+});
+
+test("a closed ballot says it is closed", () => {
+  assert.match(ballotHtml({ ...BALLOT, finalized: true }, 2), /closed and been finalised/);
+});
+
+// Sans ticker, le nom du desk EST son secteur : l'écrire deux fois donnait
+// « consumer staples consumer staples ».
+test("a desk with no ticker is named once, not twice", () => {
+  const html = ballotHtml({ ...BALLOT, desks: [
+    { index: 4, desk: "consumer staples", sector: "consumer staples", ticker: null, votedWeight: 0, share: 0 },
+    ...BALLOT.desks,
+  ] }, 2);
+  assert.doesNotMatch(html, /consumer staples<\/span><span class="b-sector">consumer staples/);
+  assert.match(html, /class="b-name">consumer staples<\/span><span class="b-sector"><\/span>/);
 });

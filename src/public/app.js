@@ -1190,6 +1190,49 @@ export function walletDetailHtml(w) {
   return head + why + `<ul class="w-list">${list}</ul>` + worthBlock;
 }
 
+/**
+ * Le dépouillement, desk par desk.
+ *
+ * Il tenait dans une carte du bandeau — un ticker et un pourcentage — alors que
+ * c'est ce qui décide de la taille de chaque tranche du pot. Sur sa propre
+ * page, il y a la place de montrer les seize et ce que chacun a tiré.
+ */
+export function ballotHtml(vote, epoch) {
+  if (!vote) return `<p class="w-small">The ballot could not be read.</p>`;
+  if (!vote.opened) {
+    return `<p class="w-small">No ballot has opened for epoch ${esc(String(epoch ?? "—"))} yet. ` +
+      `Until one does, nothing is bought and the pot rolls forward.</p>`;
+  }
+
+  const voted = vote.desks.filter((x) => x.votedWeight > 0);
+  if (!voted.length) {
+    return `<p class="w-small">The ballot is open and not one Machine has voted.</p>`;
+  }
+
+  const top = voted[0].votedWeight || 1;
+  const rows = vote.desks.map((dk) => {
+    const share = dk.share ?? 0;
+    const width = Math.round((dk.votedWeight / top) * 100);
+    // Un desk absent du bulletin n'a pas perdu le vote : on n'a pas pu voter
+    // pour lui, et une barre à zéro le ferait passer pour un candidat rejeté.
+    const off = !dk.ticker;
+    // Sans ticker, le nom du desk EST son secteur : l'écrire deux fois donnait
+    // « consumer staples consumer staples ».
+    const name = dk.ticker ?? dk.sector ?? `desk ${dk.index}`;
+    return `<li class="${off ? "b-off" : ""}">` +
+      `<span class="b-name">${esc(name)}</span>` +
+      `<span class="b-sector">${esc(dk.sector && dk.sector !== name ? dk.sector : "")}</span>` +
+      `<span class="b-bar"><span style="width:${width}%"></span></span>` +
+      `<span class="b-pct">${off ? "not on the ballot" : fmtRatio(share)}</span>` +
+      `<span class="b-w">${off ? "" : `${fmtInt(dk.votedWeight)}x`}</span></li>`;
+  }).join("");
+
+  return `<p class="w-small">Every Machine votes with its weight, and the pot is cut between the desks ` +
+    `in proportion to what they drew. A Machine counts <b>twice</b> on the slice bought for its own desk.</p>` +
+    `<ul class="ballot">${rows}</ul>` +
+    (vote.finalized ? `<p class="w-small">This ballot has closed and been finalised.</p>` : "");
+}
+
 /** Ce que le filtre laisse passer, sur l'ensemble du carnet. Silencieux tant
  *  qu'aucun filtre n'est posé : un compteur permanent serait du bruit. */
 export function filterSummary(d, filter) {
@@ -1357,6 +1400,33 @@ if (typeof document !== "undefined") {
     paint();
   });
 
+  // Les onglets.
+  //
+  // Le choix vit dans l'adresse plutôt qu'en mémoire : un lien partagé rouvre
+  // la même page, un rechargement ne renvoie pas au marché, et le bouton retour
+  // du navigateur fait ce qu'on attend de lui. Sans script, aucun onglet n'est
+  // marqué et les quatre pages restent visibles — dégradé, mais entier.
+  const TABS = ["market", "wallet", "vote", "how"];
+  const tabsEl = $("tabs");
+
+  const showTab = (name) => {
+    const wanted = TABS.includes(name) ? name : TABS[0];
+    for (const t of TABS) {
+      const pane = $(`pane-${t}`);
+      if (pane) pane.hidden = t !== wanted;
+      const link = tabsEl?.querySelector(`[data-tab="${t}"]`);
+      if (link) link.setAttribute("aria-selected", String(t === wanted));
+    }
+    return wanted;
+  };
+
+  let tab = showTab((location.hash || "").slice(1));
+  addEventListener("hashchange", () => {
+    tab = showTab((location.hash || "").slice(1));
+    // La bande de tête se mesure sur une page visible : cachée, elle rend zéro.
+    if (tab === "market" && measureBest()) { painted = ""; paint(); }
+  });
+
   // Le portefeuille du visiteur.
   //
   // Il vit hors du bandeau, qui se redessine toutes les quinze secondes : une
@@ -1494,6 +1564,9 @@ if (typeof document !== "undefined") {
     lastData = v.data;
     $("migrated").innerHTML = migrationNote(v.data);
     contextEl.innerHTML = contextHtml(v.data, serverNow);
+    // Le vote a sa page : le pot et le bulletin y sont chez eux, en grand.
+    $("vote-context").innerHTML = contextHtml(v.data, serverNow);
+    $("ballot").innerHTML = ballotHtml(v.data.vote, v.data.protocol?.epoch);
     paintFilters(v.data.traitFilters, v.data.vote);
     $("queue").innerHTML = crateLine(v.data.anvil);
     $("drop-note").innerHTML = dropNote(v.data);

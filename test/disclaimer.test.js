@@ -216,8 +216,11 @@ test("the wallet field sits between the filters and the table", () => {
 test("the field lives outside the bar that redraws itself", () => {
   const bar = page.indexOf('class="context" id="context"');
   const field = page.indexOf('id="wallet-card"');
-  assert.ok(bar < field, "le champ vient après le bandeau");
+  assert.ok(bar > 0 && field > 0);
+  // Le champ est dans l'en-tête, le bandeau dans la page du marché : rien ne
+  // peut le redessiner, où qu'il se trouve dans l'ordre du document.
   assert.doesNotMatch(page.slice(bar, bar + 200), /wallet-card/);
+  assert.ok(field < page.indexOf('id="pane-market"'), "le champ précède les pages");
 });
 
 // Il se fond dans la masse : même intitulé, même champ, même bordure que les
@@ -297,3 +300,34 @@ test("the migration notice sits with the header, before anything else", () => {
   assert.match(page, /\.migrated \{[^}]*var\(--alarm\)/);
 });
 
+
+// Quatre questions, quatre pages. Le mobilier explicatif ne pousse plus le
+// tableau vers le bas : il vit là où il répond à quelque chose.
+test("the page is cut into four panes, and the tabs name all four", () => {
+  for (const t of ["market", "wallet", "vote", "how"]) {
+    assert.match(page, new RegExp(`id="pane-${t}"`), `la page ${t} manque`);
+    assert.match(page, new RegExp(`data-tab="${t}"`), `l'onglet ${t} manque`);
+  }
+});
+
+// Le choix vit dans l'adresse : un lien partagé rouvre la même page, et le
+// bouton retour du navigateur fait ce qu'on attend de lui.
+test("the tabs are links to a hash, not buttons that swallow the address", () => {
+  assert.match(page, /<a href="#market"[^>]*data-tab="market"/);
+  const app = readFileSync(new URL("../src/public/app.js", import.meta.url), "utf8");
+  assert.match(app, /hashchange/);
+});
+
+// Sans script, aucun onglet n'est marqué : la page doit alors tout montrer
+// plutôt que rien.
+test("with no script every pane is still visible", () => {
+  assert.doesNotMatch(page, /<section class="pane" id="pane-\w+" hidden/);
+  assert.match(page, /\.pane\[hidden\] \{ display: none/);
+});
+
+test("the market pane is the one carrying the table", () => {
+  const market = page.slice(page.indexOf('id="pane-market"'), page.indexOf('id="pane-wallet"'));
+  assert.match(market, /id="rows"/);
+  assert.match(market, /id="filters"/);
+  assert.match(market, /class="key"/);
+});
