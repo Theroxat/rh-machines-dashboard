@@ -543,13 +543,21 @@ const withBid = (over = {}) => ({
   anvilBidPrinter: 19316, anvilBidEth: 0.1170, underBid: true, ...over,
 });
 
-test("a listing the protocol itself would pay more for is marked", () => {
+// L'offre de l'anvil est la même pour toutes les machines — 21 074 $PRINTER, à
+// plat — et la bande est triée par prix : l'écart décroît tout seul du premier
+// au dernier. Un badge par vignette répétait ce que l'ordre porte déjà.
+test("a listing the protocol would pay more for is named in words, not badged", () => {
   const html = halfCell(half({ entries: [withBid()] }), "ink", { ethUsd: 1896 });
-  assert.match(html, /class="under"/);
+  assert.match(html, /The Anvil pays <b>\$\d+<\/b> for any machine/);
+  assert.match(html, /in \$PRINTER and net of its sell fee/);
+  assert.match(html, /the cheapest first/);
+  // Aucune marque sur les vignettes : l'offre est plate, l'ordre porte l'écart.
+  assert.doesNotMatch(html, /class="under"/);
 });
 
-test("a listing above the anvil's bid carries no mark", () => {
+test("a cell with nothing under the bid says nothing about it", () => {
   const html = halfCell(half({ entries: [withBid({ underBid: false, anvilBidEth: 0.09 })] }), "ink", { ethUsd: 1896 });
+  assert.doesNotMatch(html, /The Anvil pays/);
   assert.doesNotMatch(html, /class="under"/);
 });
 
@@ -694,65 +702,26 @@ test("the shelf states its price like a price, in the token's own colour", () =>
   assert.match(html, /\$285/);
 });
 
-// « under bid » ne disait rien à personne : la case explique une fois, et
-// chaque vignette porte l'écart plutôt qu'un mot de jargon.
-// Le pourcentage taisait ce qui décide de l'affaire : l'anvil paie en $PRINTER,
-// pas en dollars, et l'encaisser suppose de revendre ce $PRINTER.
-test("a cell explains once what the green marks mean, and in what you are paid", () => {
-  const html = halfCell(half({ entries: [withBid()] }), "ink", { ethUsd: 1896 });
-  assert.match(html, /cost less than the Anvil pays/i);
-  assert.match(html, /paid in \$PRINTER/);
-  assert.match(html, /net of its sell fee/);
-  assert.match(html, /cashing it out means selling that \$PRINTER/);
-});
-
-// « +60% » — de quoi ? Posé sur une image, sans sa base, un pourcentage ne veut
-// rien dire. Tout le reste de la vignette est en dollars.
-test("a marked machine carries the gap in money, not as a bare percentage", () => {
-  const html = halfCell(half({ entries: [withBid()] }), "ink", { ethUsd: 1896 });
-  assert.match(html, /class="under">anvil \+\$\d+</);
-  assert.doesNotMatch(html, /class="under">[^<]*%/);
-  assert.doesNotMatch(html, />under bid</);
-});
-
-// Sans taux lu on ne montre rien plutôt qu'un pourcentage que personne ne sait
-// rapporter à un prix.
-test("with no eth rate the mark stays away rather than turning back into a percentage", () => {
-  const html = halfCell(half({ entries: [withBid()] }), "ink");
-  assert.doesNotMatch(html, /class="under"/);
-});
-
-test("a cell with nothing under the bid explains nothing", () => {
-  const html = halfCell(half({ entries: [withBid({ underBid: false })] }), "ink", { ethUsd: 1896 });
-  assert.doesNotMatch(html, /sell below the Anvil/i);
-});
-
-test("a gap smaller than a point says so rather than rounding to nothing", () => {
-  const html = halfCell(half({ entries: [withBid({ priceEth: 0.1169, anvilBidEth: 0.1170 })] }), "ink", { ethUsd: 1896 });
-  assert.match(html, /class="under">anvil \+\$\d/);
-  assert.doesNotMatch(html, /\+0%/);
-});
-
-
 
 // Les badges étaient positionnés sur la vignette entière : le vert, en bas,
 // retombait sur la ligne du prix en dollars et la recouvrait. Ils doivent être
 // ancrés sur l'image, pas sur le bloc.
-test("both badges live inside the image, not over the text", () => {
+test("the badge lives inside the image, not over the text", () => {
   const html = halfCell(half({ entries: [withBid({ weight: 200, inkMult: 2 })] }), "ink", { ethUsd: 1896 });
   const thumb = html.match(/<span class="thumb">[^]*?<\/span><\/span>/);
   assert.ok(thumb, "the image must sit in its own positioned wrapper");
   assert.match(thumb[0], /<img/);
   assert.match(thumb[0], /class="reink"/);
-  assert.match(thumb[0], /class="under"/);
   // et le prix reste dehors, donc rien ne peut le recouvrir
   assert.doesNotMatch(thumb[0], /class="price"/);
 });
 
 test("a machine with no picture still carries its marks", () => {
-  const html = halfCell(half({ entries: [withBid({ machine: null })] }), "ink", { ethUsd: 1896 });
+  const html = halfCell(half({ entries: [withBid({ machine: null, weight: 200, inkMult: 2, inkPrinter: 17000 })] }),
+    "ink", { ethUsd: 1896 });
   assert.match(html, /class="thumb"/);
-  assert.match(html, /class="under"/);
+  assert.match(html, /class="noimg"/);
+  assert.match(html, /class="reink"/);
 });
 
 // Les deux moitiés d'une case annoncent un prix, chacune avec le mot juste :
@@ -2009,14 +1978,4 @@ test("the panel shows the background, the one trait it was leaving out", () => {
     ...DETAIL.rows[0].inked.entries[0], tokenId: 3145,
     machine: { ...DETAIL.rows[0].inked.entries[0].machine, background: "Acid Lime" } }] }) }] };
   assert.match(machineDetailHtml(d, 3145), /Background<\/span><span class="d-v">Acid Lime</);
-});
-
-// Deux badges verts en « +$ » cohabitent sur la même vignette. « +$0.01 inside »
-// dit ce qu'il est ; « +$86 » ne disait rien, et on ne le devinait pas.
-test("the two green figures on a chip cannot be mistaken for one another", () => {
-  const e = { ...entry(1, 0.1), weight: 100, epochUsd: 5, anvilBidEth: 0.14, anvilBidPrinter: 2000, underBid: true,
-    holds: { usd: 12.48, lines: [{ symbol: "NVDA", amount: 0.037, usd: 12.48 }] } };
-  const html = halfCell(half({ entries: [e] }), "ink", { ethUsd: 2000 });
-  assert.match(html, /class="under">anvil \+\$80</);
-  assert.match(html, /class="holds"[^>]*>\+\$12\.48 inside</);
 });
