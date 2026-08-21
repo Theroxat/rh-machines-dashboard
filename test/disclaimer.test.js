@@ -330,3 +330,39 @@ test("the market pane is the one carrying the table", () => {
   assert.match(market, /id="filters"/);
   assert.match(market, /class="key"/);
 });
+
+// La page d'explication portait un tableau et un avertissement. Elle doit
+// répondre à « comment ça marche » — c'est son nom.
+test("the how-it-works page explains the protocol, not just the rarity table", () => {
+  const how = page.slice(page.indexOf('id="pane-how"'));
+  for (const heading of [
+    "What a Machine is", "Weight is the only thing that pays", "Three states",
+    "Where the money comes from", "The vote decides who gets bought",
+    "The stock lands inside the Machine", "The Anvil",
+    "What this page measures", "Where the numbers come from",
+  ]) assert.match(how, new RegExp(heading), `la section « ${heading} » manque`);
+});
+
+// Les deux choses qu'un lecteur risque de comprendre de travers, et qui ont
+// chacune coûté une correction sur ce site.
+test("the page says the square root and the Lit delay in plain words", () => {
+  const how = page.slice(page.indexOf('id="pane-how"'));
+  assert.match(how, /four times the ink buys twice/);
+  assert.match(how, /starts earning at the <b>next<\/b> one/);
+  assert.match(how, /an amount waiting, not a rate/);
+  assert.match(how, /sell the Machine and whatever is inside goes with/);
+});
+
+// Une page qui explique doit dire d'où elle tient ce qu'elle affirme, et ce
+// qu'elle ne sait pas.
+test("the page names its sources and admits what is derived", () => {
+  const how = page.slice(page.indexOf('id="pane-how"'));
+  assert.match(how, /read from the chain, not computed here/);
+  assert.match(how, /shown as unknown\s+rather than as zero/);
+  assert.match(how, /derived rather than read/);
+});
+
+// Au-delà de soixante-dix caractères, l'œil perd sa ligne.
+test("the prose is set to a reading width, not to the screen", () => {
+  assert.match(page, /\.doc \{ max-width: \d\dch/);
+});

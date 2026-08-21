@@ -286,6 +286,37 @@
   .d-v { display: block; font-size: 15px; font-weight: 700; color: var(--ink); }
   .d-x { display: block; font-size: 12px; color: var(--muted); }
 
+  /* ---- la page d'explication ---- */
+
+  /* Du texte, et rien d'autre. Une largeur de lecture plutôt que la largeur de
+     l'écran : au-delà de soixante-dix caractères, l'œil perd sa ligne. */
+  .doc { max-width: 74ch; }
+  .doc h2 {
+    margin: 26px 0 8px;
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink);
+    font-weight: 700;
+  }
+  .doc h2:first-child { margin-top: 0; }
+  .doc p { margin: 0 0 10px; font-size: 13.5px; color: var(--muted); line-height: 1.55; }
+  .doc b { color: var(--text); font-weight: 600; }
+  .doc .formula {
+    padding: 8px 12px;
+    border-left: 2px solid var(--ink);
+    background: var(--paper-2);
+    color: var(--text);
+    font-size: 14px;
+  }
+  .doc-table { border-collapse: collapse; margin: 0 0 10px; width: 100%; min-width: 0; }
+  .doc-table th {
+    text-align: left; vertical-align: top; white-space: nowrap;
+    padding: 5px 14px 5px 0; color: var(--text); font-weight: 700; font-size: 13px;
+  }
+  .doc-table td { padding: 5px 0; color: var(--muted); font-size: 13.5px; line-height: 1.5; }
+  .doc-table tr { border-bottom: 1px solid var(--rule); }
+
   /* ---- le dépouillement ---- */
 
   /* Seize desks, et ce que chacun a tiré. Les barres se mesurent sur le premier
@@ -880,6 +911,89 @@
 
 <!-- ═══ COMMENT ÇA MARCHE ═══ -->
 <section class="pane" id="pane-how">
+
+  <div class="doc">
+    <h2>What a Machine is</h2>
+    <p>Ten thousand of them, and two things about each are sealed at mint and never change.
+    Its <b>rarity</b> — x1 through x10 — which is read off its <b>headwear</b>. And its <b>desk</b>,
+    one of sixteen, which decides which stock it earns double on.</p>
+
+    <h2>Weight is the only thing that pays</h2>
+    <p>A Machine with no ink weighs nothing. It earns nothing and it cannot vote. Burning
+    <b>5,000 $PRINTER</b> switches it on — 4,250 of that becomes ink, 750 is an operating charge —
+    and it then weighs its class. A x2 weighs 2.</p>
+    <p class="formula">weight = class × √( ink ÷ 4,250 )</p>
+    <p>Burn more and it weighs more, but along a square root, so <b>four times the ink buys twice
+    the weight</b> and nine times buys three. A ceiling common to the whole fleet caps the
+    multiplier, and it rises as the community burns. Past it, a burn is refused rather than
+    quietly clipped.</p>
+    <p>Everything else follows weight. Your share of every payout is your weight over the fleet's,
+    and you vote with your weight rather than one vote per Machine.</p>
+
+    <h2>Three states, and they are not interchangeable</h2>
+    <table class="doc-table">
+      <tr><th>Dormant</th><td>no ink. Earns nothing, votes on nothing.</td></tr>
+      <tr><th>Lit</th><td>inked during this epoch. It starts earning at the <b>next</b> one — so a
+        Machine bought and switched on today takes no part in the pot that is waiting.</td></tr>
+      <tr><th>Earning</th><td>active for a full epoch. Earns, votes, counted for the drop.</td></tr>
+    </table>
+
+    <h2>Where the money comes from</h2>
+    <p>Selling $PRINTER costs a fee, and that fee is collected in USDG. Trading the NFTs now feeds
+    it too. The money piles up until a ballot closes, and then it is spent buying stock.</p>
+    <p>This means the pot and the token price pull in opposite directions: a calm market fills it
+    slowly. It also means the figure on the Market tab is <b>an amount waiting, not a rate</b> —
+    nothing has been paid at a regular interval, and the next drop will be worth whatever the
+    following days of trading put into it.</p>
+
+    <h2>The vote decides who gets bought</h2>
+    <p>Once an epoch, a ballot opens for 48 hours. Every awake Machine votes with its weight for one
+    of sixteen desks. The pot is then cut between the desks <b>in proportion to the votes they
+    drew</b> — nothing is winner-takes-all, and a desk nobody voted for gets nothing.</p>
+    <p>Inside each slice, every Machine is paid its weight over the fleet's, and a Machine sitting
+    on that slice's desk <b>counts twice</b>. So you receive every stock that was bought, whatever
+    your desk; your own desk only doubles your share of its own slice. That is the reason to vote
+    your own desk rather than the one you think will win.</p>
+    <p>A stock the protocol cannot buy — no pool on this chain — has its slice paid out in the
+    winning stock instead, keeping the same structure. Its desk's Machines still double.</p>
+
+    <h2>The stock lands inside the Machine</h2>
+    <p>Every Machine owns an account of its own, and that is where its stock is deposited. The
+    account belongs to the token, not to you: <b>sell the Machine and whatever is inside goes with
+    it</b>, unless you withdraw first. Buying one that is still loaded means buying its contents
+    too, which is why every listing here shows what it is carrying.</p>
+
+    <h2>The Anvil</h2>
+    <p>A market maker run by the protocol. It publishes a standing bid — the same amount for any
+    Machine, whatever its rarity — and it pays in $PRINTER, net of the sell fee. It also holds a
+    shelf of Machines it will sell, and a crate you can open for one drawn at random.</p>
+    <p>Because its bid is denominated in $PRINTER while listings are priced in ETH, the two drift
+    apart whenever the token moves. When the bid climbs above a listing, this page says so.</p>
+
+    <h2>What this page measures, and what it cannot</h2>
+    <table class="doc-table">
+      <tr><th>Floor price</th><td>the cheapest asking price in a class and state. An asking price is
+        not a price obtained.</td></tr>
+      <tr><th>Price per weight point</th><td>what one x1 point of weight costs here. It is the only
+        figure that compares a x1 to a x10, since seven floors side by side price seven different
+        things. A dormant Machine carries its activation.</td></tr>
+      <tr><th>Best ROI</th><td>the pot share plus the stock already inside, over the price. It
+        counts what a buyer receives, not what the Machine will earn later.</td></tr>
+      <tr><th>Wallet worth</th><td>each Machine at the better of its class floor and the Anvil's
+        bid, plus the stock inside, plus what the wallet itself holds.</td></tr>
+    </table>
+
+    <h2>Where the numbers come from</h2>
+    <p>Weights, ink, desks, the ballot and the pot are read from the chain, not computed here.
+    Listings and pictures come from the public OpenSea API. Token prices come from DexScreener. The
+    book is swept every minute, ink every ten. Anything that cannot be read is shown as unknown
+    rather than as zero — a zero and a failed read are not the same thing, and confusing them is how
+    a dashboard lies quietly.</p>
+    <p>Two things are derived rather than read: which headwear grants which rarity, and the split
+    between what a Machine earns from each desk's slice. Both are checked against the chain on every
+    boot, and the first is set out below.</p>
+  </div>
+
   <h2 class="label">Which headwear grants which rarity</h2>
   <p class="note">A Machine's rarity is sealed on chain, and it always matches the <b>Headwear</b> it
     wears. This table is derived from the collection itself on every boot, not written down — if a headwear
