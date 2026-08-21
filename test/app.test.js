@@ -1787,7 +1787,9 @@ test("nowhere on the page does an amount claim to arrive every epoch", () => {
 test("the amounts say what they are — a share of the pot as it stands", () => {
   assert.match(halfCell(half({ entries: [{ ...entry(1, 0.1), weight: 100, epochUsd: 12.6 }] }), "ink", { ethUsd: 2000 }),
     /class="per">this drop</);
-  assert.match(bestRow(BEST, { ethUsd: 2000 }), /class="unit">of the pot</);
+  // La bande compte deux choses — la part du pot et les actions dedans — donc
+  // son unité ne peut pas dire « of the pot ».
+  assert.match(bestRow(BEST, { ethUsd: 2000 }), /class="unit">back</);
   assert.match(walletCardHtml(WALLET), /of the pot waiting/);
   assert.match(dropNote({ pot: { usd: 170000 }, vote: { opened: false } }), /never yet paid out/);
 });
