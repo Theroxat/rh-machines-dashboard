@@ -143,3 +143,21 @@ test("the same machine at another price is another deal", () => {
   assert.equal(h.claimAlert("gap:7:0.04", 7, "gap", 2000), true);
   h.close();
 });
+
+// Une annonce retirée et remise à un centime près est la même : la machine ne
+// doit pas sonner deux fois dans la journée, quel que soit son prix.
+test("a machine that already sounded stays quiet for its cooldown", () => {
+  const h = openHistory(":memory:");
+  const day = 6 * 60 * 60 * 1000;
+  assert.equal(h.claimAlert("margin:7:0.052", 7, "margin", 1000, day), true);
+  assert.equal(h.claimAlert("margin:7:0.051", 7, "margin", 2000, day), false);
+  assert.equal(h.claimAlert("margin:7:0.051", 7, "margin", 1000 + day + 1, day), true);
+  h.close();
+});
+
+test("without a cooldown only the exact same deal is refused", () => {
+  const h = openHistory(":memory:");
+  assert.equal(h.claimAlert("margin:7:0.052", 7, "margin", 1000), true);
+  assert.equal(h.claimAlert("margin:7:0.051", 7, "margin", 2000), true);
+  h.close();
+});

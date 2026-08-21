@@ -17,9 +17,24 @@ export const MIN_GAP_PCT = 0.40;
 /** Et l'écart doit peser : 40% d'une machine à $20 ne vaut pas un message. */
 export const MIN_GAP_USD = 60;
 
-/** Acheter, retirer les actions, revendre à l'anvil. La marge se mesure en
- *  part du prix ; le maximum observé le jour du calibrage était de 54%. */
-export const MIN_MARGIN_PCT = 0.60;
+/**
+ * Acheter, retirer les actions, revendre à l'anvil.
+ *
+ * Un seuil absolu ne tient pas ici. J'en avais posé un à 60% quand le carnet
+ * plafonnait à 54% ; le $PRINTER a monté, l'offre de l'anvil est libellée
+ * dedans, et quarante-deux annonces le dépassaient trois heures plus tard. Le
+ * seuil mesurait l'état du token, pas une affaire.
+ *
+ * Ce qui sort du lot ne se mesure donc que contre le reste du carnet : la
+ * meilleure marge, et seulement si elle devance nettement la deuxième. Il
+ * reste un plancher absolu, pour que « la moins mauvaise d'un carnet médiocre »
+ * ne sonne pas non plus.
+ */
+export const MIN_MARGIN_PCT = 0.40;
+/** De combien la meilleure doit devancer la suivante pour être une exception. */
+export const MIN_MARGIN_LEAD = 0.10;
+/** Jamais plus que cela en un balayage : au-delà, ce n'est plus une alerte. */
+export const MAX_PER_SWEEP = 3;
 
 const usd = (eth, rate) => (eth === null || eth === undefined || !rate ? null : eth * rate);
 
@@ -29,10 +44,12 @@ const usd = (eth, rate) => (eth === null || eth === undefined || !rate ? null : 
  */
 export function findDeals(d, {
   minGapPct = MIN_GAP_PCT, minGapUsd = MIN_GAP_USD, minMarginPct = MIN_MARGIN_PCT,
+  minMarginLead = MIN_MARGIN_LEAD, maxPerSweep = MAX_PER_SWEEP,
 } = {}) {
   const rate = d?.eth?.usd;
   if (!rate) return [];
   const out = [];
+  const margins = [];
 
   // Tout ce qui décrit la machine voyage avec l'affaire : le message est lu sur
   // un téléphone, loin du tableau, et renvoyer quelqu'un chercher les chiffres
@@ -78,15 +95,16 @@ export function findDeals(d, {
         }
       }
 
-      // 2. Le filet : acheter, retirer le contenu, revendre à l'anvil.
+      // 2. Le filet : acheter, retirer le contenu, revendre à l'anvil. Toutes
+      // les marges sont rassemblées ici, et triées ensuite : ce qui compte
+      // n'est pas qu'une marge existe, c'est qu'elle devance les autres.
       for (const e of list) {
         const p = usd(e.priceEth, rate);
         const bid = usd(e.anvilBidEth, rate);
         if (!p || !bid) continue;
         const inside = e.holds?.usd ?? 0;
         const margin = bid + inside - p;
-        if (margin / p < minMarginPct) continue;
-        out.push({
+        margins.push({
           kind: "margin", tokenId: e.tokenId, priceEth: e.priceEth, priceUsd: p,
           marginUsd: margin, marginPct: margin / p,
           ...facts(e, r, side),
@@ -95,9 +113,22 @@ export function findDeals(d, {
     }
   }
 
+  // Une seule marge peut sortir : la meilleure, et seulement si elle devance
+  // nettement la suivante. Quarante annonces au-dessus d'un seuil ne sont pas
+  // quarante affaires, c'est un marché.
+  margins.sort((a, b) => b.marginPct - a.marginPct);
+  const [best, second] = margins;
+  if (best && best.marginPct >= minMarginPct &&
+      (!second || best.marginPct - second.marginPct >= minMarginLead)) {
+    out.push({ ...best, leadPct: second ? best.marginPct - second.marginPct : best.marginPct });
+  }
+
   // La plus grosse affaire d'abord : si une seule ligne devait être lue, autant
-  // que ce soit celle-là.
-  return out.sort((a, b) => (b.gapUsd ?? b.marginUsd) - (a.gapUsd ?? a.marginUsd));
+  // que ce soit celle-là. Et jamais plus de trois — au-delà ce n'est plus une
+  // alerte, c'est un flux.
+  return out
+    .sort((a, b) => (b.gapUsd ?? b.marginUsd) - (a.gapUsd ?? a.marginUsd))
+    .slice(0, maxPerSweep);
 }
 
 const OPENSEA = "https://opensea.io/assets/robinhood";
@@ -171,7 +202,13 @@ export function dealMessage(deal, contract) {
  * Une annonce qui reste en place des heures ne doit sonner qu'une fois — mais
  * si son prix change, c'est une autre affaire, et elle mérite d'être redite.
  */
-export const dealKey = (deal) => `${deal.kind}:${deal.tokenId}:${deal.priceEth}`;
+export const dealKey = (deal) =>
+  // Le prix est arrondi : « 0.052 » et « 0.0519999998 » sont le même prix, et
+  // les distinguer a fait sonner la même machine quatre-vingt-quatorze fois.
+  `${deal.kind}:${deal.tokenId}:${Number(deal.priceEth).toFixed(6)}`;
+
+/** Une machine ne sonne pas deux fois dans la journée, quel que soit son prix. */
+export const COOLDOWN_MS = 6 * 60 * 60 * 1000;
 
 /** Envoie, et ne casse rien en cas d'échec : un webhook injoignable est un
  *  message perdu, pas un balayage perdu. */

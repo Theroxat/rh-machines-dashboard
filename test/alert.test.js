@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { findDeals, dealEmbed, dealMessage, dealKey, postToDiscord, MIN_GAP_PCT } from "../src/alert.js";
+import { findDeals, dealEmbed, dealMessage, dealKey, postToDiscord, MIN_GAP_PCT, MAX_PER_SWEEP } from "../src/alert.js";
 
 const CONTRACT = "0x8c71d170fbd94bcba93bb08fc2cfd0e8620cd9ce";
 const at = (tokenId, priceEth, over = {}) => ({
@@ -50,9 +50,48 @@ test("a margin over the anvil's bid and the stock inside is a deal", () => {
   assert.equal(deals[0].marginPct.toFixed(2), "0.80");
 });
 
-test("the margins the book is full of stay quiet", () => {
-  // +54%, ce que le carnet offrait partout le jour du calibrage
-  assert.deepEqual(findDeals(snap([at(1, 0.05, { anvilBidEth: 0.077 })])), []);
+// Un seuil absolu mesurait l'état du $PRINTER, pas une affaire : quarante-deux
+// annonces le dépassaient trois heures après l'avoir posé. Ce qui sort du lot
+// ne se mesure que contre le reste du carnet.
+test("a margin the whole book shares is not an exception", () => {
+  const commun = [
+    at(1, 0.05, { anvilBidEth: 0.09 }),   // +80%
+    at(2, 0.05, { anvilBidEth: 0.089 }),  // +78%
+    at(3, 0.05, { anvilBidEth: 0.088 }),  // +76%
+  ];
+  assert.deepEqual(findDeals(snap(commun)).filter((x) => x.kind === "margin"), []);
+});
+
+test("a margin that clearly leads the rest is one", () => {
+  const deals = findDeals(snap([
+    at(1, 0.05, { anvilBidEth: 0.12 }),   // +140%
+    at(2, 0.05, { anvilBidEth: 0.089 }),  // +78%
+    at(3, 0.05, { anvilBidEth: 0.088 }),
+  ])).filter((x) => x.kind === "margin");
+  assert.equal(deals.length, 1);
+  assert.equal(deals[0].tokenId, 1);
+  assert.ok(deals[0].leadPct > 0.5);
+});
+
+// « La moins mauvaise d'un carnet médiocre » ne sonne pas non plus.
+test("the best of a poor book is still not a deal", () => {
+  assert.deepEqual(findDeals(snap([
+    at(1, 0.05, { anvilBidEth: 0.06 }),   // +20%, seule
+  ])).filter((x) => x.kind === "margin"), []);
+});
+
+// Le prix brut faisait de « 0.052 » et « 0.0519999998 » deux affaires
+// distinctes, et la même machine a sonné quatre-vingt-quatorze fois.
+test("floating point noise in a price is not a new deal", () => {
+  const a = { kind: "margin", tokenId: 6622, priceEth: 0.052 };
+  const b = { kind: "margin", tokenId: 6622, priceEth: 0.0519999998 };
+  assert.equal(dealKey(a), dealKey(b));
+});
+
+// Au-delà de trois, ce n'est plus une alerte, c'est un flux.
+test("a sweep never sends more than a handful", () => {
+  const many = Array.from({ length: 40 }, (_, i) => at(i + 1, 0.001 + i / 1000));
+  assert.ok(findDeals(snap(many)).length <= MAX_PER_SWEEP);
 });
 
 test("without an eth rate nothing is called a deal", () => {

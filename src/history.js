@@ -227,9 +227,15 @@ export function openHistory(path) {
     },
 
     /** Vrai si l'affaire n'avait jamais sonné — et elle est alors notée. */
-    claimAlert(key, tokenId, kind, t) {
+    claimAlert(key, tokenId, kind, t, cooldownMs = 0) {
       const seen = db.prepare("SELECT 1 FROM alerted WHERE key = ?").get(key);
       if (seen) return false;
+      // Et pas deux fois pour la même machine dans la journée, quel que soit son
+      // prix : une annonce retirée et remise à un centime près est la même.
+      if (cooldownMs) {
+        const last = db.prepare("SELECT MAX(t) t FROM alerted WHERE tokenId = ?").get(tokenId);
+        if (last?.t && t - last.t < cooldownMs) return false;
+      }
       db.prepare("INSERT INTO alerted VALUES (?,?,?,?)").run(key, t, tokenId, kind);
       return true;
     },

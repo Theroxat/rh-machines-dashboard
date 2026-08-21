@@ -19,7 +19,7 @@ import { readBallotTickers } from "./ballot.js";
 import { readOwners, tokensOf } from "./owners.js";
 import { openHistory } from "./history.js";
 import { readStockTokens, readHoldings, valueHoldings } from "./holdings.js";
-import { findDeals, dealEmbed, dealMessage, dealKey, postToDiscord } from "./alert.js";
+import { findDeals, dealEmbed, dealMessage, dealKey, postToDiscord, COOLDOWN_MS } from "./alert.js";
 import { fetchStockPrices } from "./prices.js";
 import { analyseWallet, isAddress } from "./wallet.js";
 import { valueWallet } from "./worth.js";
@@ -208,7 +208,7 @@ async function sweepBook() {
   if (cfg.discordWebhook && history) {
     for (const deal of findDeals(composed)) {
       try {
-        if (!history.claimAlert(dealKey(deal), deal.tokenId, deal.kind, composed.at)) continue;
+        if (!history.claimAlert(dealKey(deal), deal.tokenId, deal.kind, composed.at, COOLDOWN_MS)) continue;
         // La fiche d'abord ; la ligne si Discord la refuse — un message
         // dégradé vaut mieux qu'un silence.
         let ok = await postToDiscord(cfg.discordWebhook, dealEmbed(deal, ADDRESSES.MACHINES));
