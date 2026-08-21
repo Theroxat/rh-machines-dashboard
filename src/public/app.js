@@ -862,8 +862,17 @@ export function yieldOf(e, { side, classValue, potUsd, fleetWeight, activationUs
   const weight = dormant ? classValue : e?.weight;
   if (!weight) return null;
 
-  const earns = (potUsd * weight) / fleetWeight;
-  return earns / (priceUsd + (dormant ? activationUsd : 0));
+  // Deux choses attendent l'acheteur, et les deux comptent.
+  //
+  // Sa part du pot, qui tombera au prochain drop — et les actions déjà posées
+  // dans le compte de la machine, qui sont à lui à la seconde où il l'achète,
+  // puisque le compte appartient au jeton. Ne compter que la première faisait
+  // passer une machine à $261 contenant $26 pour l'égale d'une machine vide au
+  // même prix, alors qu'un dixième du prix lui revient immédiatement.
+  const fromPot = (potUsd * weight) / fleetWeight;
+  const inside = e?.holds?.usd ?? 0;
+  const cost = priceUsd + (dormant ? activationUsd : 0);
+  return (fromPot + inside) / cost;
 }
 
 /**
@@ -935,14 +944,18 @@ export function bestRow(d, { limit = BEST_LIMIT, step = REVEAL_STEP, shown = nul
   return `<tr class="best-row">` +
     `<td class="cls-cell"><span class="cls">Best ROI</span>` +
       `<span class="cls-point">${fmtRatio(head.y)}` +
-      `<span class="per">of its price</span><span class="from">already waiting</span></span>` +
+      `<span class="per">of its price</span><span class="from">pot + stock inside</span></span>` +
       `<span class="census">${fmtInt(book.length)} ranked</span></td>` +
     `<td class="edge half best" colspan="2">` +
       `<span class="market">On OpenSea</span>` +
       `<span class="cell-floor"><span class="label">${label}</span>` +
-        `<span class="price">${fmtUsd(head.e.epochUsd ?? 0)}</span> <span class="unit">of the pot</span>` +
+        // Le grand chiffre doit être celui que le pourcentage mesure. Il
+        // annonçait la seule part du pot pendant que le ratio comptait aussi
+        // les actions dedans — c'est-à-dire, aujourd'hui, l'essentiel.
+        `<span class="price">${fmtUsd((head.e.epochUsd ?? 0) + (head.e.holds?.usd ?? 0))}</span> ` +
+        `<span class="unit">back</span>` +
         `<span class="usd-big">for ${fmtUsdShort(usdOf(head.e.priceEth, ethUsd)) || "—"}</span></span>` +
-      `<span class="depth">every class, machines already earning, most pot per dollar first` +
+      `<span class="depth">every class, machines already earning, most back per dollar first` +
         (active ? ` · ${fmtInt(book.length)} match your filter` : "") + `</span>` +
       strip(book.slice(0, visible)) + more + shelfPart +
     `</td>` +

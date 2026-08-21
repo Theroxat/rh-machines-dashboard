@@ -1976,3 +1976,44 @@ test("the shelf keeps its own note, which is not a constant", () => {
   const html = halfCell(half({ floorEth: 0.2, anvilEntries: [shelfEntry({ askEth: 0.1 })] }), "ink", { ethUsd: 1896 });
   assert.match(html, /Cheaper than anything on OpenSea here/);
 });
+
+// Le compte appartient au jeton : les actions qu'il contient sont à l'acheteur
+// à la seconde où il achète. Les ignorer faisait passer une machine à $261
+// contenant $26 pour l'égale d'une machine vide au même prix.
+test("the ranking counts the stock already sitting in the machine", () => {
+  const common = { side: "ink", classValue: 100, potUsd: 100000, fleetWeight: 1000000, priceUsd: 200 };
+  const vide = yieldOf({ weight: 100 }, common);
+  const pleine = yieldOf({ weight: 100, holds: { usd: 20 } }, common);
+  assert.equal(vide.toFixed(4), "0.0500");        // 10 de pot sur 200
+  assert.equal(pleine.toFixed(4), "0.1500");      // 10 de pot + 20 dedans
+  assert.ok(pleine > vide);
+});
+
+test("a machine holding nothing is ranked exactly as before", () => {
+  const common = { side: "ink", classValue: 100, potUsd: 100000, fleetWeight: 1000000, priceUsd: 200 };
+  assert.equal(yieldOf({ weight: 100, holds: null }, common), yieldOf({ weight: 100 }, common));
+  assert.equal(yieldOf({ weight: 100, holds: { usd: null } }, common), yieldOf({ weight: 100 }, common));
+});
+
+test("a dormant machine still carries its activation, and its stock too", () => {
+  const y = yieldOf({ weight: 0, holds: { usd: 20 } },
+    { side: "dormant", classValue: 100, potUsd: 100000, fleetWeight: 1000000, activationUsd: 50, priceUsd: 200 });
+  assert.equal(y.toFixed(4), "0.1200");           // (10 + 20) sur (200 + 50)
+});
+
+test("the band says the figure covers both, not the pot alone", () => {
+  const html = bestRow(BEST, { ethUsd: 2000 });
+  assert.match(html, /pot \+ stock inside/);
+  assert.match(html, /most back per dollar first/);
+});
+
+// Le grand chiffre doit être celui que le pourcentage mesure : il annonçait la
+// seule part du pot pendant que le ratio comptait aussi les actions dedans.
+test("the band's headline figure is the one its percentage measures", () => {
+  const held = { ...entry(9, 0.10), weight: 1000, epochUsd: 100, holds: { usd: 20, lines: [] } };
+  const html = bestRow({ ...BEST, rows: [{ classValue: 1000, classLabel: "x10", docCount: 1, chainCount: 1,
+    inked: half({ entries: [held] }), dormant: half({ entries: [] }) }] }, { ethUsd: 2000 });
+  assert.match(html, /class="price">\$120\.00<\/span> <span class="unit">back</);
+  assert.match(html, /for \$200</);
+  assert.match(html, /60\.0%/);   // 120 sur 200
+});
