@@ -373,18 +373,10 @@
   }
   /* Le verdict s'écrit sur la même ligne, à la suite du champ. */
   .w-said { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; font-size: 13px; }
-  /* L'ordre à donner : ambre, comme tout ce sur quoi on agit. */
+  /* Le portefeuille lu : ambre, comme tout ce sur quoi on agit. Les chiffres
+     qui l'accompagnaient sont partis dans les cartes, qui les disaient déjà. */
   .w-said .v { font-size: 17px; font-weight: 700; color: var(--ink); }
-  /* Ce que le portefeuille pèse : vert, comme tout ce que le protocole verse,
-     et à la taille du chiffre qu'on vient chercher. Il tenait en petit au bout
-     d'une phrase, entre une adresse tronquée et un poids. */
-  .w-cut { font-size: 22px; font-weight: 700; color: var(--under); line-height: 1.1; }
-  .w-cut small {
-    display: block; font-size: 9.5px; font-weight: 400; letter-spacing: 0.12em;
-    text-transform: uppercase; color: var(--under); opacity: 0.72;
-  }
   .w-said .x { color: var(--muted); font-size: 12.5px; }
-  .w-said b { color: var(--text); font-weight: 600; }
 
   /* Le détail, sous la ligne, et seulement s'il y a quelque chose à dire. */
   #wallet-out { margin-top: 10px; }
@@ -394,12 +386,6 @@
   .w-small { margin: 0 0 10px; font-size: 12.5px; color: var(--muted); max-width: 86ch; }
   .w-small b { color: var(--text); font-weight: 600; }
 
-  /* Ce que le portefeuille vaut. Vert comme tout ce qui revient au porteur. */
-  .w-worth { font-size: 22px; font-weight: 700; color: var(--under); line-height: 1.1; }
-  .w-worth small {
-    display: block; font-size: 9.5px; font-weight: 400; letter-spacing: 0.12em;
-    text-transform: uppercase; color: var(--under); opacity: 0.72;
-  }
 
   /* Deux questions, deux cartes : ce que ça vaut, et quoi en faire. Elles se
      lisaient l'une après l'autre en travers de toute la page, montants à mille

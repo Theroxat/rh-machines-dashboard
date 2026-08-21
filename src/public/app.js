@@ -1096,19 +1096,12 @@ export function walletCardHtml(w) {
       `<button class="w-again" type="button">try another</button></span>`;
   }
 
-  // Deux réponses, pas une : pour quoi voter, et combien le portefeuille pèse.
-  // La seconde était en petit au bout d'une phrase — c'est pourtant le chiffre
-  // qu'on vient chercher, et il se lit maintenant comme sur les vignettes.
-  const best = w.advice?.best;
-  const worth = w.worth?.total
-    ? `<span class="w-worth">${fmtUsdRound(w.worth.total)}<small>wallet worth</small></span>`
-    : "";
+  // La barre portait le verdict, la valeur et la part du pot. Les trois sont
+  // repris en grand cent pixels plus bas, dans les cartes : la barre les
+  // répétait sans rien y ajouter. Ne reste ici que ce sur quoi on agit —
+  // quel portefeuille est lu, et par où en lire un autre.
   return label + `<span class="w-said">` +
-    `<span class="v">${best ? `Vote ${esc(best.ticker)}` : "No ballot open"}</span>` +
-    worth +
-    (w.cutUsd === null ? ""
-      : `<span class="w-cut">${fmtUsd(w.cutUsd)}<small>of the pot waiting, all ${fmtInt(w.machines.length)} machines</small></span>`) +
-    `<span class="x">${esc(short)} · <b>${(w.weight / 100).toFixed(2)}x</b> of the fleet</span>` +
+    `<span class="v">${esc(short)}</span>` +
     `<button class="w-again" type="button">another wallet</button></span>`;
 }
 
@@ -1121,16 +1114,17 @@ export function walletCardHtml(w) {
 export function walletDetailHtml(w) {
   if (!w || w.error || w.pending || !w.machines?.length) return "";
 
-  const short = `${w.address.slice(0, 6)}…${w.address.slice(-4)}`;
   const held = w.dormant
     ? `${fmtInt(w.awake)} earning · ${fmtInt(w.dormant)} dormant`
     : `${fmtInt(w.machines.length)} machines`;
 
-  // Une seule ligne d'identité, en tête. Elle était dite deux fois : dans le
-  // verdict et de nouveau juste en dessous.
-  const who = `<p class="w-who"><b>${esc(short)}</b> · ${held} · ` +
-    `<b>${(w.weight / 100).toFixed(2)}x</b> of the fleet` +
-    (w.share === null ? "" : ` · ${fmtShare(w.share)}`) + `</p>`;
+  // L'adresse est dite une fois pour toutes, dans la barre juste au-dessus.
+  // Restent ici la composition et le poids — et « 6.00x of the fleet » disait
+  // le contraire de ce qu'il comptait : 6.00x est un poids, la part du parc
+  // est le pourcentage qui suit.
+  const who = `<p class="w-who">${held} · ` +
+    `<b>${(w.weight / 100).toFixed(2)}x</b> of weight` +
+    (w.share === null ? "" : ` · ${fmtShare(w.share)} of the fleet`) + `</p>`;
 
   // Deux questions, deux colonnes : ce que ça vaut, et quoi en faire. Elles
   // se lisaient l'une après l'autre en travers de toute la page, avec les

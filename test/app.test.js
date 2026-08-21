@@ -1445,11 +1445,16 @@ const WALLET = {
   advice: { base: 39.09, best: { index: 10, desk: "real estate", ticker: "SPCX", held: true, heldWeight: 200, cutUsd: 39.12, gainUsd: 0.046 }, options: [] },
 };
 
-test("the line carries the verdict, on one line, with the field's own words", () => {
+// Le bandeau répétait, à cent pixels d'écart, les trois chiffres des cartes du
+// dessous : le verdict, la valeur et la part du pot. Ne reste que ce sur quoi
+// on agit — quel portefeuille est lu, et par où en lire un autre.
+test("the bar repeats none of the answers it sits above", () => {
   const html = walletCardHtml(WALLET);
-  assert.match(html, /class="v">Vote SPCX</);
-  assert.match(html, /3\.00x<\/b> of the fleet/);
+  assert.match(html, /class="v">0xe908…3211</);
   assert.match(html, /another wallet/);
+  assert.doesNotMatch(html, /\$/);
+  assert.doesNotMatch(html, /Vote /);
+  assert.doesNotMatch(html, /of the fleet/);
 });
 
 // Tant que rien n'est demandé, la carte est le champ : elle ne prend pas une
@@ -1499,7 +1504,6 @@ test("a wallet holding nothing is told so, rather than shown an empty table", ()
 });
 
 test("with no ballot open nothing is advised rather than guessed", () => {
-  assert.match(walletCardHtml({ ...WALLET, advice: null }), /class="v">No ballot open</);
   assert.match(walletDetailHtml({ ...WALLET, advice: null }), /class="w-big w-none">no ballot</);
   assert.match(walletDetailHtml({ ...WALLET, advice: null }), /None is open/);
 });
@@ -1521,8 +1525,8 @@ test("nothing from the response reaches the page unescaped", () => {
   });
   for (const html of [walletCardHtml(payload), walletDetailHtml(payload)]) {
     assert.doesNotMatch(html, /<img src=x/);
-    assert.match(html, /&lt;img src=x/);
   }
+  assert.match(walletDetailHtml(payload), /&lt;img src=x/);
 });
 
 test("an error is shown in the card, and opens no empty detail", () => {
@@ -1720,16 +1724,20 @@ test("with no ceiling read the line claims none", () => {
 // Le montant tenait en petit au bout d'une phrase, entre une adresse tronquée
 // et un poids. C'est pourtant le chiffre qu'on vient chercher.
 test("what the wallet is owed is read as a figure, not as the end of a sentence", () => {
-  const html = walletCardHtml(WALLET);
-  assert.match(html, /class="w-cut">\$39\.12<small>of the pot waiting, all 2 machines<\/small>/);
+  const html = walletDetailHtml(WALLET);
+  assert.match(html, /These 2 machines take <b>\$39\.12<\/b> of the pot waiting now/);
 });
 
 // Vert pour ce que le protocole verse, ambre pour l'ordre à donner : les deux
 // grands nombres de la ligne ne disent pas la même chose.
-test("the amount and the instruction do not wear the same colour", () => {
+// Ambre pour ce sur quoi on agit, vert pour ce que le protocole verse. La
+// barre n'a plus qu'un sujet — le portefeuille lu — et aucune règle morte ne
+// traîne derrière les chiffres qui en sont partis.
+test("the bar wears the colour of what one acts on, and nothing else", () => {
   const css = readFileSync(new URL("../src/public/index.html", import.meta.url), "utf8");
   assert.match(css, /\.w-said \.v \{[^}]*var\(--ink\)/);
-  assert.match(css, /\.w-cut \{[^}]*var\(--under\)/);
+  assert.match(css, /\.w-big \{[^}]*var\(--under\)/);
+  assert.doesNotMatch(css, /\.w-cut|\.w-worth/);
 });
 
 // L'état n'était qu'en tête de tableau. Passé la première ligne, deux cases
@@ -1801,7 +1809,7 @@ test("the amounts say what they are — a share of the pot as it stands", () => 
   // La bande compte deux choses — la part du pot et les actions dedans — donc
   // son unité ne peut pas dire « of the pot ».
   assert.match(bestRow(BEST, { ethUsd: 2000 }), /class="unit">back</);
-  assert.match(walletCardHtml(WALLET), /of the pot waiting/);
+  assert.match(walletDetailHtml(WALLET), /of the pot waiting/);
   assert.match(dropNote({ pot: { usd: 170000 }, vote: { opened: false } }), /never yet paid out/);
 });
 
@@ -2018,9 +2026,10 @@ const WORTH = {
   },
 };
 
-test("the wallet line leads with what the whole thing is worth", () => {
-  const html = walletCardHtml(WORTH);
-  assert.match(html, /class="w-worth">\$1,344<small>wallet worth<\/small>/);
+// Elle était dite deux fois : en tête de barre, puis en grand dans la carte.
+test("what the whole thing is worth is stated once, in the card", () => {
+  assert.doesNotMatch(walletCardHtml(WORTH), /1,344/);
+  assert.match(walletDetailHtml(WORTH), /What it is worth<\/span><span class="w-big">\$1,344</);
 });
 
 // Deux questions, deux cartes : ce que ça vaut, et quoi en faire.
@@ -2035,9 +2044,12 @@ test("the worth card breaks the total into the four things it counts", () => {
 
 // L'identité était dite deux fois : dans le verdict et de nouveau en dessous.
 test("the address and the count are stated once, at the head", () => {
-  const html = walletDetailHtml(WORTH);
+  const html = walletCardHtml(WORTH) + walletDetailHtml(WORTH);
   assert.equal((html.match(/0xe908…3211/g) ?? []).length, 1);
   assert.match(html, /class="w-who"/);
+  // 6.00x est un poids ; la part du parc est le pourcentage, pas le multiple.
+  assert.doesNotMatch(html, /x<\/b> of the fleet/);
+  assert.match(html, /3\.00x<\/b> of weight/);
 });
 
 // Un gain de quatre dixièmes de centime s'écrivait « $0.00 », ce qui fait
@@ -2070,7 +2082,7 @@ test("a machine nothing can price is left out, and counted out loud", () => {
 });
 
 test("a wallet whose worth could not be read shows none rather than zero", () => {
-  assert.doesNotMatch(walletCardHtml({ ...WALLET, worth: null }), /wallet worth/);
+  assert.doesNotMatch(walletDetailHtml({ ...WALLET, worth: null }), /What it is worth/);
   assert.doesNotMatch(walletDetailHtml({ ...WALLET, worth: null }), /w-worth-block/);
 });
 
