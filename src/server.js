@@ -18,6 +18,8 @@ import { readPot, epochUsd } from "./pot.js";
 import { readBallotTickers } from "./ballot.js";
 import { readOwners, tokensOf } from "./owners.js";
 import { openHistory } from "./history.js";
+import { readStockTokens, readHoldings } from "./holdings.js";
+import { fetchStockPrices } from "./prices.js";
 import { analyseWallet, isAddress } from "./wallet.js";
 import { SECTORS } from "./desks.js";
 import { deskName, crossCheckDesks, crossCheckWeights } from "./desks.js";
@@ -97,6 +99,9 @@ let owners = { byToken: new Map(), byOwner: new Map(), failures: null };
 // Quel ticker occupe quel desk cette epoch, et le dépouillement en cours.
 let tickers = null;
 let tally = new Array(16).fill(0);
+// Les actions que le protocole a déjà achetées, et ce qu'elles valent.
+let stockTokens = [];
+let stockPrices = new Map();
 
 async function sweepOwners() {
   owners = await readOwners({
@@ -153,6 +158,16 @@ async function sweepBook() {
     batchSize: cfg.multicallBatchSize,
   }).catch((e) => { console.error(`anvil: ${e.message}`); return null; });
 
+  // Ce que chaque machine en vente contient. Le compte appartient au jeton :
+  // vendre la machine vend ses actions, et rien ne le disait nulle part.
+  if (protocol?.epoch && !stockTokens.length) {
+    stockTokens = await readStockTokens({ provider, epoch: protocol.epoch }).catch(() => []);
+    if (stockTokens.length) console.log(`stocks: ${stockTokens.length} tickers ever bought — ${stockTokens.map((t) => t.symbol).join(", ")}`);
+  }
+  if (stockTokens.length) {
+    stockPrices = await fetchStockPrices(stockTokens).catch(() => stockPrices);
+  }
+
   const grid = buildGrid({
     listings: book.listings, traits, ink, pelotonSize: cfg.pelotonSize,
     shelf: anvil?.shelfListings,
@@ -162,10 +177,25 @@ async function sweepBook() {
   const sectorWeight = new Array(16).fill(0);
   for (const [tokenId, index] of deskIndex) sectorWeight[index] += Number(weights.get(tokenId) ?? 0n);
 
+  // Seules les machines en vente : lire les dix mille comptes à chaque
+  // balayage coûterait cent mille appels pour une information que personne ne
+  // regarde sur une machine qui n'est pas à vendre.
+  const listedIds = [...book.listings.keys()];
+  const accounts = listedIds
+    .map((id) => [id, meta.get(id)?.wallet])
+    .filter(([, w]) => w);
+  const held = accounts.length && stockTokens.length
+    ? await readHoldings({
+        aggregate3: multicallOf(provider, ADDRESSES.MULTICALL3),
+        accounts, tokens: stockTokens, batchSize: cfg.multicallBatchSize,
+      }).catch((e) => { console.error(`holdings: ${e.message}`); return null; })
+    : null;
+
   const composed = composeSnapshot({
     grid, printer, eth, protocol, stats,
     book: { listed: book.listings.size, pages: book.pages, skipped: book.skipped },
-    inkMeta, meta, legend, ink, weights, anvil, deskIndex, vote, potUsd, sectorWeight, tickers, now: Date.now(),
+    inkMeta, meta, legend, ink, weights, anvil, deskIndex, vote, potUsd, sectorWeight, tickers,
+    holdings: held?.holdings, stockPrices, now: Date.now(),
   });
   store.succeed(composed);
 

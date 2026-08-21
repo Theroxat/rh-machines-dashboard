@@ -5,7 +5,7 @@ import { OPENSEA, ADDRESSES, TOTAL_MACHINES } from "./config.js";
 /** Le cache est versionné : une version antérieure ne portait pas Eyes, et la
  *  relire telle quelle donnerait un filtre qui ne trouve jamais rien, sans la
  *  moindre erreur. Un changement de forme force la relecture. */
-const CACHE_VERSION = 4;
+const CACHE_VERSION = 5;
 
 /** Background vaut « Acid Lime » sur les 10 000 machines : il ne distingue rien
  *  et n'est donc pas stocké. Les trois autres traits varient. */
@@ -29,6 +29,9 @@ function traitsOf(nft, image) {
     // sur les dix mille machines à chaque démarrage.
     weight: t.Weight === undefined ? null : Number(t.Weight),
     multiplier: t.Multiplier === undefined ? null : Number(t.Multiplier),
+    // Le compte propre du NFT : c'est là que les actions atterrissent, et il
+    // appartient au jeton, pas au porteur.
+    wallet: t.Wallet ?? null,
   };
 }
 
@@ -129,6 +132,7 @@ export function readCache(path) {
       desk: v.desk ?? null,
       weight: v.weight ?? null,
       multiplier: v.multiplier ?? null,
+      wallet: v.wallet ?? null,
     });
   }
   return map;

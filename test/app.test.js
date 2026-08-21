@@ -5,7 +5,7 @@ import {
   fmtEth, fmtRatio, halfCell, cellKey,
   bannerMessage, rowsHtml, contextHtml, legendHtml,
   matchesFilter, filterBarHtml, filterSummary, freshness, fmtCompact, crateLine,
-  perPointUsd, viewBarHtml, ballotBlock, dropNote, bestRow, yieldOf, BEST_LIMIT, DEFAULT_LIMIT, bestFit, walletCardHtml, walletDetailHtml, fmtShare, machineDetailHtml, findMachine, itemUrl, setContract, migrationNote, fmtWeightX, fmtExact,
+  perPointUsd, viewBarHtml, ballotBlock, dropNote, bestRow, yieldOf, BEST_LIMIT, DEFAULT_LIMIT, bestFit, walletCardHtml, walletDetailHtml, fmtShare, machineDetailHtml, findMachine, itemUrl, setContract, migrationNote, fmtWeightX, fmtExact, fmtAmount,
 } from "../src/public/app.js";
 
 const entry = (tokenId, priceEth, image = `https://img/${tokenId}.webp`) => ({
@@ -1913,4 +1913,50 @@ test("an exact figure carries decimals only when they mean something", () => {
   assert.equal(fmtExact(3.96), "3.96");
   assert.equal(fmtExact(12), "12");
   assert.equal(fmtExact(1.0), "1");
+});
+
+// Le compte appartient au jeton : ce qu'il contient part avec la machine à la
+// vente. Une x1 à $100 avec $12 dedans n'est pas la même affaire que la même vidée.
+const HELD = { ...entry(1, 0.1), weight: 100, epochUsd: 12.6,
+  holds: { usd: 12.48, lines: [{ symbol: "NVDA", amount: 0.03705, usd: 8.06 }, { symbol: "SPCX", amount: 0.004425, usd: 0.6 }] } };
+
+test("a chip says what the machine is carrying, apart from its price", () => {
+  const html = halfCell(half({ entries: [HELD] }), "ink", { ethUsd: 2000 });
+  assert.match(html, /class="holds"[^>]*>\+\$12\.48 inside</);
+  assert.match(html, /0\.03705 NVDA · 0\.004425 SPCX/);
+});
+
+test("an emptied machine claims nothing, rather than nothing-dollars", () => {
+  const html = halfCell(half({ entries: [{ ...HELD, holds: null }] }), "ink", { ethUsd: 2000 });
+  assert.doesNotMatch(html, /class="holds"/);
+  assert.doesNotMatch(html, /inside/);
+});
+
+test("the panel lists every stock inside, and says it travels with the sale", () => {
+  const d = { ...DETAIL, rows: [{ ...DETAIL.rows[0], inked: half({ entries: [{ ...HELD, tokenId: 3145 }] }) }] };
+  const html = machineDetailHtml(d, 3145);
+  assert.match(html, /Inside the machine/);
+  assert.match(html, /they go with it if it sells/);
+  assert.match(html, /NVDA<\/span><span class="h-amt">0\.03705<\/span><span class="h-usd">\$8\.06</);
+  assert.match(html, /\$12\.48 in all/);
+});
+
+// Une action sans prix garde sa quantité : la compter à zéro ferait passer une
+// machine pleine pour une machine vide.
+test("a stock nobody quotes still shows its amount, with no dollar figure", () => {
+  const d = { ...DETAIL, rows: [{ ...DETAIL.rows[0], inked: half({ entries: [{ ...HELD, tokenId: 3145,
+    holds: { usd: null, lines: [{ symbol: "MYSTERY", amount: 9, usd: null }] } }] }) }] };
+  const html = machineDetailHtml(d, 3145);
+  assert.match(html, /MYSTERY<\/span><span class="h-amt">9<\/span><span class="h-usd">—</);
+  assert.doesNotMatch(html, /in all/);
+});
+
+// Les actions arrivent par fractions minuscules. Deux décimales les
+// écraseraient toutes à « 0.04 » et une machine chargée ressemblerait à une
+// machine à peine servie.
+test("a token amount keeps the digits that tell two machines apart", () => {
+  assert.equal(fmtAmount(0.037050014664164968), "0.03705");
+  assert.equal(fmtAmount(0.004424788452893450), "0.004425");
+  assert.equal(fmtAmount(0.000076247801140718), "0.00007625");
+  assert.equal(fmtAmount(9), "9");
 });

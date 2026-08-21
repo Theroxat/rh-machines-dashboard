@@ -3,12 +3,13 @@ import { TOTAL_MACHINES, OPERATING_CHARGE_PRINTER, ADDRESSES, OPENSEA } from "./
 import { deskShares } from "./vote.js";
 import { deskName } from "./desks.js";
 import { epochUsd } from "./pot.js";
+import { valueHoldings } from "./holdings.js";
 
 /** Assemblage pur de tout ce dont la page a besoin. Une dérivation qui
  *  diviserait par une valeur non lue produit null plutôt qu'un zéro confiant. */
 export function composeSnapshot({
   grid, printer, eth, protocol, stats, book, inkMeta, meta, legend, ink, weights, anvil,
-  deskIndex, vote, potUsd, sectorWeight, tickers, now,
+  deskIndex, vote, potUsd, sectorWeight, tickers, holdings, stockPrices, now,
 }) {
   const activationPrinter = protocol?.activationInk
     ? Number(BigInt(protocol.activationInk) / 10n ** 15n) / 1000
@@ -66,6 +67,16 @@ export function composeSnapshot({
   // Le dépouillement en cours, dans l'ordre des desks : sans lui on ne peut pas
   // découper le pot en tranches, et le partage à plat est le seul honnête.
   const tally = vote ? Array.from({ length: 16 }, (_, d) => Number(vote.tally.get(d) ?? 0n)) : null;
+  // Ce que la machine contient déjà, et ce que ça vaut. Le compte appartient
+  // au jeton : cela part avec elle à la vente.
+  const priceOf = (sym) => stockPrices?.get(sym) ?? null;
+  const heldBy = (tokenId) => {
+    const list = holdings?.get(tokenId);
+    if (!list?.length) return null;
+    const v = valueHoldings(list, priceOf);
+    return { lines: v.lines, usd: v.usd };
+  };
+
   const returnOf = (tokenId, weight) => epochUsd({
     weight, deskIndex: deskIndex?.get(tokenId) ?? null,
     totalWeight: fleetWeight, potUsd, tally, sectorWeight,
@@ -126,6 +137,7 @@ export function composeSnapshot({
         weight,
         inkPrinter: i === undefined ? null : Number(i / PRINTER),
         epochUsd: returnOf(e.tokenId, weight),
+        holds: heldBy(e.tokenId),
         // Une machine dormante ne pèse rien : un rapport n'aurait aucun sens.
         inkMult: weight ? weight / classValue : null,
         anvilBidPrinter: anvil?.bids?.get(e.tokenId) ?? null,

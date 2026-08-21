@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { fetchPrinter, fetchEthUsd } from "../src/prices.js";
+import { fetchPrinter, fetchEthUsd, fetchStockPrices } from "../src/prices.js";
 import { ADDRESSES } from "../src/config.js";
 
 const ok = (body) => ({ ok: true, status: 200, json: async () => body });
@@ -69,4 +69,51 @@ test("coingecko being unreachable does not take the pool price down with it", as
   assert.ok(res.local > 1800);
   assert.equal(res.coingecko, null);
   assert.equal(res.spreadPct, null);
+});
+
+// DexScreener cote les actions tokenisées. Un jeton sans paire garde sa
+// quantité et reste hors des totaux : un prix inventé ferait plus de dégâts.
+test("a stock is priced on its deepest pair, not on the thinnest", async () => {
+  const fetchImpl = async () => ({ ok: true, json: async () => ({ pairs: [
+    { priceUsd: "999", liquidity: { usd: 12 } },
+    { priceUsd: "217.66", liquidity: { usd: 400000 } },
+  ] }) });
+  const p = await fetchStockPrices([{ address: "0x1", symbol: "NVDA" }], fetchImpl);
+  assert.equal(p.get("NVDA"), 217.66);
+});
+
+test("a stock nobody quotes gets no price rather than a wrong one", async () => {
+  const none = await fetchStockPrices([{ address: "0x1", symbol: "X" }], async () => ({ ok: true, json: async () => ({ pairs: [] }) }));
+  assert.equal(none.has("X"), false);
+  const down = await fetchStockPrices([{ address: "0x1", symbol: "X" }], async () => { throw new Error("offline"); });
+  assert.equal(down.size, 0);
+});
+
+// DexScreener a retourné la paire un matin : base et quote ont changé de place
+// sans prévenir, et le garde par adresse a refusé la vraie paire pendant que le
+// site ne servait plus rien. Les deux jetons comptent, leur ordre non.
+const USDG = "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168";
+const WETH = "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73";
+const pairOf = (b, q, priceNative, priceUsd) => async () => ({
+  ok: true, json: async () => ({ pairs: [{ baseToken: { address: b }, quoteToken: { address: q }, priceNative, priceUsd }] }),
+});
+
+test("eth is priced with USDG in base, as it always was", async () => {
+  const r = await fetchEthUsd(pairOf(USDG, WETH, "0.00025", "1.0"));
+  assert.equal(Math.round(r.local), 4000);
+});
+
+test("eth is priced just the same when the pair comes back flipped", async () => {
+  const r = await fetchEthUsd(pairOf(WETH, USDG, "4000", "4000"));
+  assert.equal(Math.round(r.local), 4000);
+});
+
+// Le garde reste : le faux USDG doit toujours être écarté, dans les deux sens.
+test("a pair holding neither of the pinned tokens is still refused", async () => {
+  await assert.rejects(fetchEthUsd(pairOf("0x" + "9".repeat(40), WETH, "1", "1")), /unexpected tokens/);
+});
+
+test("a depegged USDG is caught whichever side it sits on", async () => {
+  await assert.rejects(fetchEthUsd(pairOf(USDG, WETH, "0.00025", "0.90")), /depeg/);
+  await assert.rejects(fetchEthUsd(pairOf(WETH, USDG, "4000", "3600")), /depeg/);
 });

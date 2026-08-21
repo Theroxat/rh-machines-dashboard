@@ -32,6 +32,12 @@ export const usdOf = (eth, ethUsd) =>
  *  une machine au plafond, « 3.94× » pour celle qui s'en approche. */
 export const fmtExact = (n) => String(Number(Number(n).toFixed(2)));
 
+/** Une quantité de jeton. Les actions arrivent par fractions minuscules —
+ *  0,03705 NVDA — et deux décimales les écraseraient toutes à « 0.04 ». On
+ *  garde quatre chiffres significatifs, ce qui distingue une machine chargée
+ *  d'une machine à peine servie. */
+export const fmtAmount = (n) => String(Number(Number(n).toPrecision(4)));
+
 export const fmtWeightX = (weight) => {
   if (!weight) return "0x";
   const x = weight / 100;
@@ -378,6 +384,14 @@ function chip(e, { isFloor = false, ethUsd = null, anvil = false, showPrice = tr
     ? ""
     : `<span class="earns">${fmtUsd(e.epochUsd)}</span>` +
       `<span class="per">this drop</span>`;
+
+  // Ce que la machine contient déjà. Le compte appartient au jeton, donc cela
+  // part avec elle : une x1 à $100 avec $12 d'actions dedans et la même vidée
+  // ne sont pas la même affaire, et rien ne le disait — ni ici, ni sur OpenSea.
+  const holds = e.holds?.usd
+    ? `<span class="holds" title="${esc(e.holds.lines.map((l) => `${fmtAmount(l.amount)} ${l.symbol}`).join(" · "))}">` +
+      `+${fmtUsd(e.holds.usd)} inside</span>`
+    : "";
   // « ×2.00 » se lisait « inkée deux fois ». Ce qui a été fait, c'est brûler
   // quatre fois l'encre de base ; le poids n'en gagne que le double, parce
   // qu'il suit une racine carrée.
@@ -427,6 +441,7 @@ function chip(e, { isFloor = false, ethUsd = null, anvil = false, showPrice = tr
     (showPrice ? `<span class="price">${price}</span>` : "") +
     (showPrice && dollars ? `<span class="usd">${dollars}</span>` : "") +
     earns +
+    holds +
     `<span class="tok">#${e.tokenId}</span>` +
   `</a>`;
 }
@@ -782,6 +797,18 @@ export function machineDetailHtml(d, tokenId) {
     factRow("Body", m.body ? esc(m.body) : null, "cosmetic — the desk is read from the chain") +
     factRow("Eyes", m.eyes ? esc(m.eyes) : null, "cosmetic");
 
+  // Le détail de ce que le compte du NFT contient. C'est la seule partie du
+  // panneau qui décrit un bien qui change de main avec la machine.
+  const inside = e.holds?.lines?.length
+    ? `<div class="d-holds"><span class="label">Inside the machine</span>` +
+      `<span class="d-x">its own account holds these, and they go with it if it sells</span>` +
+      `<ul>${e.holds.lines.map((l) =>
+        `<li><span class="h-sym">${esc(l.symbol)}</span>` +
+        `<span class="h-amt">${fmtAmount(l.amount)}</span>` +
+        `<span class="h-usd">${l.usd === null ? "—" : fmtUsd(l.usd)}</span></li>`).join("")}</ul>` +
+      (e.holds.usd ? `<span class="d-total">${fmtUsd(e.holds.usd)} in all</span>` : "") + `</div>`
+    : "";
+
   const where = anvil
     ? `<a class="d-go" href="${ANVIL_URL}" target="_blank" rel="noopener">Buy on the Anvil &#8599;</a>`
     : `<a class="d-go" href="${itemUrl(e.tokenId)}" target="_blank" rel="noopener">View on OpenSea &#8599;</a>`;
@@ -790,7 +817,7 @@ export function machineDetailHtml(d, tokenId) {
     `<span class="d-where">${anvil ? "on the Anvil" : "on OpenSea"} · ${dormant ? "dormant" : "inked"}` +
     ` · ${esc(r.classLabel)}</span>` +
     `<button class="d-close" type="button" aria-label="Close">×</button></div>` +
-    `<div class="d-body"><div class="d-pic">${img}${where}</div>` +
+    `<div class="d-body"><div class="d-pic">${img}${where}${inside}</div>` +
     `<div class="d-facts">${facts}</div></div>`;
 }
 /**

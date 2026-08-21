@@ -37,7 +37,7 @@ test("each machine keeps its image and every trait that varies", async () => {
     image: "https://img/1253.webp",
     headwear: "Blueberries",
     body: "Sky",
-    eyes: "Rage", desk: null, weight: null, multiplier: null,
+    eyes: "Rage", desk: null, weight: null, multiplier: null, wallet: null,
   });
 });
 
@@ -109,7 +109,7 @@ test("an entry with no usable image is skipped and counted, never half-stored", 
 // le 2026-08-16 : présent sur l'endpoint individuel, absent des 50 pages.
 // Un trou qu'on sait combler ne reste pas un trou.
 test("machines the bulk pages dropped are fetched one by one", async () => {
-  const meta = new Map([[1, { image: "u", headwear: "Fez", body: "Sky", eyes: "UwU", desk: null, weight: null, multiplier: null }]]);
+  const meta = new Map([[1, { image: "u", headwear: "Fez", body: "Sky", eyes: "UwU", desk: null, weight: null, multiplier: null, wallet: null }]]);
   const asked = [];
   const filled = await backfillMetadata({
     apiKey: "k", meta, wanted: [1, 765], limit: 50,
@@ -123,7 +123,7 @@ test("machines the bulk pages dropped are fetched one by one", async () => {
   });
   assert.deepEqual(asked, ["765"]);          // le 1 déjà connu n'est pas redemandé
   assert.equal(filled, 1);
-  assert.deepEqual(meta.get(765), { image: "https://img/765.webp", headwear: "Fez", body: "Cobalt", eyes: null, desk: null, weight: null, multiplier: null });
+  assert.deepEqual(meta.get(765), { image: "https://img/765.webp", headwear: "Fez", body: "Cobalt", eyes: null, desk: null, weight: null, multiplier: null, wallet: null });
 });
 
 test("a backfill that fails leaves the map alone rather than poisoning it", async () => {
@@ -150,8 +150,8 @@ test("a backfill refuses to hammer the API when the gap is not a gap but a failu
 
 test("a written cache reads back as the same map", () => {
   const path = tmp();
-  writeCache(path, new Map([[1, { image: "u", headwear: "Halo", body: "Sky", eyes: "UwU", desk: null, weight: null, multiplier: null }]]));
-  assert.deepEqual(readCache(path).get(1), { image: "u", headwear: "Halo", body: "Sky", eyes: "UwU", desk: null, weight: null, multiplier: null });
+  writeCache(path, new Map([[1, { image: "u", headwear: "Halo", body: "Sky", eyes: "UwU", desk: null, weight: null, multiplier: null, wallet: null }]]));
+  assert.deepEqual(readCache(path).get(1), { image: "u", headwear: "Halo", body: "Sky", eyes: "UwU", desk: null, weight: null, multiplier: null, wallet: null });
 });
 
 test("a corrupt or missing cache is treated as absent, never half-trusted", () => {
@@ -166,7 +166,7 @@ test("a corrupt or missing cache is treated as absent, never half-trusted", () =
 test("a cache that predates the desk trait is dropped once the trait appears", async () => {
   const path = tmp();
   writeCache(path, new Map(Array.from({ length: 10 }, (_, i) =>
-    [i + 1, { image: "u", headwear: "Halo", body: "Sky", eyes: "UwU", desk: null, weight: null, multiplier: null }])));
+    [i + 1, { image: "u", headwear: "Halo", body: "Sky", eyes: "UwU", desk: null, weight: null, multiplier: null, wallet: null }])));
 
   let asked = 0;
   const fetchImpl = async (url) => {
@@ -197,7 +197,7 @@ test("a cache that already carries desks is not thrown away for nothing", async 
 test("a probe that fails keeps the cache, rather than refetching ten thousand", async () => {
   const path = tmp();
   writeCache(path, new Map(Array.from({ length: 10 }, (_, i) =>
-    [i + 1, { image: "u", headwear: "Halo", body: "Sky", eyes: "UwU", desk: null, weight: null, multiplier: null }])));
+    [i + 1, { image: "u", headwear: "Halo", body: "Sky", eyes: "UwU", desk: null, weight: null, multiplier: null, wallet: null }])));
   const fetchImpl = async () => { throw new Error("network down"); };
   const { meta } = await loadMetadata({ apiKey: "k", cachePath: path, maxPages: 1, total: 10, fetchImpl });
   assert.equal(meta.size, 10);

@@ -40,18 +40,35 @@ export async function fetchEthUsd(fetchImpl = fetch) {
 
   const base = (p.baseToken?.address ?? "").toLowerCase();
   const quote = (p.quoteToken?.address ?? "").toLowerCase();
-  if (base !== ADDRESSES.USDG.toLowerCase() || quote !== ADDRESSES.WETH.toLowerCase()) {
+  const usdg = ADDRESSES.USDG.toLowerCase();
+  const weth = ADDRESSES.WETH.toLowerCase();
+
+  // DexScreener a retourné cette paire un matin : `base` et `quote` ont changé
+  // de place sans prévenir, et le garde par adresse — écrit pour écarter le
+  // faux USDG — a refusé la vraie paire pendant que le site ne servait plus
+  // rien. Les deux jetons comptent, leur ordre non : c'est l'orientation qui
+  // décide comment lire le prix, pas ce qu'on accepte.
+  const pairIs = (a, b) => base === a && quote === b;
+  if (!pairIs(usdg, weth) && !pairIs(weth, usdg)) {
     throw new Error(`ETH pair holds unexpected tokens: ${base} / ${quote}`);
   }
+  const usdgFirst = pairIs(usdg, weth);
 
-  const usdgInWeth = num(p.priceNative);
-  const usdgUsd = num(p.priceUsd);
-  if (!usdgInWeth || usdgInWeth <= 0 || !usdgUsd) throw new Error("ETH pair is unreadable");
+  const native = num(p.priceNative);
+  const inUsd = num(p.priceUsd);
+  if (!native || native <= 0 || !inUsd) throw new Error("ETH pair is unreadable");
+
+  // `priceUsd` cote toujours le jeton de base. Le peg de l'USDG se vérifie donc
+  // sur ce prix quand il est en base, et sur `priceUsd ÷ priceNative` quand
+  // c'est le WETH qui l'est — dans les deux cas, ce que vaut un USDG.
+  const usdgUsd = usdgFirst ? inUsd : inUsd / native;
   if (Math.abs(usdgUsd - 1) > DEX.usdgDepegTolerance) {
     throw new Error(`USDG depeg: quoted at ${usdgUsd}, outside the ${DEX.usdgDepegTolerance} tolerance`);
   }
 
-  const local = (1 / usdgInWeth) * usdgUsd;
+  // USDG en base : `priceNative` est le prix d'un USDG en WETH, donc l'ETH vaut
+  // son inverse. WETH en base : `priceUsd` est déjà le prix de l'ETH.
+  const local = usdgFirst ? (1 / native) * usdgUsd : inUsd;
 
   let coingecko = null;
   try {
@@ -67,4 +84,32 @@ export async function fetchEthUsd(fetchImpl = fetch) {
     coingecko,
     spreadPct: coingecko ? Math.abs(local - coingecko) / coingecko * 100 : null,
   };
+}
+
+
+/**
+ * Ce que valent les actions tokenisées, une requête par jeton.
+ *
+ * DexScreener les cote toutes. Un jeton sans paire garde sa quantité et reste
+ * hors des totaux — mieux vaut une ligne sans prix qu'un prix inventé, parce
+ * qu'un zéro ferait passer une machine pleine pour une machine vide.
+ */
+export async function fetchStockPrices(tokens, fetchImpl = fetch) {
+  const out = new Map();
+  await Promise.all((tokens ?? []).map(async (t) => {
+    try {
+      const res = await fetchImpl(`https://api.dexscreener.com/latest/dex/tokens/${t.address}`);
+      if (!res.ok) return;
+      const pairs = (await res.json())?.pairs ?? [];
+      // La paire la plus liquide : sur un jeton coté à plusieurs endroits, la
+      // plus fine donne un prix que personne ne pourrait obtenir.
+      const best = pairs
+        .filter((x) => Number(x?.priceUsd) > 0)
+        .sort((a, b) => (Number(b?.liquidity?.usd) || 0) - (Number(a?.liquidity?.usd) || 0))[0];
+      if (best) out.set(t.symbol, Number(best.priceUsd));
+    } catch {
+      // Sans prix, la quantité reste affichée et le total se tait.
+    }
+  }));
+  return out;
 }
