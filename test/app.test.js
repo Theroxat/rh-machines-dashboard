@@ -846,16 +846,16 @@ test("each cell shows its own shelf price, never a neighbour's", () => {
 
 // Sept vignettes portant le même prix que l'en-tête vient d'annoncer, c'est
 // quatorze nombres pour une information. Il ne se répète que s'il varie.
-test("a shelf whose machines share one price states it once", () => {
+// Je les avais tues pour ne pas répéter l'en-tête. À côté d'un carnet où
+// chaque machine affiche son prix, trois vignettes muettes se lisent comme une
+// donnée manquante — l'économie coûtait plus qu'elle ne rapportait.
+test("a shelf machine carries its price even when they all share one", () => {
   const same = [shelfEntry({ tokenId: 1 }), shelfEntry({ tokenId: 2 }), shelfEntry({ tokenId: 3 })];
   const html = halfCell(half({ anvilEntries: same }), "ink", { ethUsd: 1896 });
   const shelf = html.slice(html.indexOf('class="shelf"'));
-  // seul l'en-tête l'affiche ; les vignettes n'en portent aucune trace visible
-  assert.match(shelf, /class="price">23,465</);
-  assert.equal((shelf.match(/class="price">23,465</g) || []).length, 1);
-  assert.doesNotMatch(shelf, /class="usd">/);
-  assert.match(shelf, /#1</);   // les numéros restent
-  assert.match(shelf, /#3</);
+  // l'en-tête, puis une fois par vignette
+  assert.equal((shelf.match(/class="price">23,465</g) || []).length, 4);
+  assert.equal((shelf.match(/class="usd">\$285</g) || []).length, 3);
 });
 
 test("a shelf whose prices differ keeps them on every machine", () => {

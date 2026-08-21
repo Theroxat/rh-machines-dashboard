@@ -495,11 +495,11 @@ function shelfStrip(anvilEntries, floorEth, state = null) {
     ` <span class="unit">$PRINTER</span>` +
     (first.askUsd ? ` <span class="usd-big">${fmtUsdShort(first.askUsd)}</span>` : "") + `</span>`;
 
-  // Un prix identique sur chaque vignette répète ce que l'en-tête vient de
-  // dire. Il ne s'affiche que s'il varie d'une machine à l'autre — ce qui
-  // arrive, la courbe de l'anvil pouvant séparer deux positions de file.
-  const uniform = new Set(anvilEntries.map((e) => Math.round(e.askPrinter))).size === 1;
-  const chips = anvilEntries.map((e) => chip(e, { anvil: true, showPrice: !uniform })).join("");
+  // Chaque vignette porte son prix, même quand elles l'ont toutes en commun.
+  // Je les avais tues pour ne pas répéter l'en-tête ; à côté d'un carnet où
+  // chaque machine affiche le sien, trois vignettes muettes se lisent comme une
+  // donnée manquante, et l'économie coûtait plus qu'elle ne rapportait.
+  const chips = anvilEntries.map((e) => chip(e, { anvil: true })).join("");
 
   // La comparaison existait dans un seul sens, et ce sens dépend d'une offre
   // d'achat que le protocole peut suspendre. Celui-ci tient dans tous les cas :
