@@ -402,7 +402,8 @@ function chip(e, { isFloor = false, ethUsd = null, anvil = false, showPrice = tr
 
   // L'anvil ne peut pas vendre sous sa propre offre : la marque n'a de sens que
   // sur le carnet OpenSea.
-  const under = !anvil && e.underBid ? `<span class="under">${gapLabel(e)}</span>` : "";
+  const gap = !anvil && e.underBid ? gapLabel(e, ethUsd) : null;
+  const under = gap ? `<span class="under">${gap}</span>` : "";
   const bidStory = !anvil && e.anvilBidEth
     ? ` · anvil pays ${fmtEth(e.anvilBidEth)} ETH (${fmtInt(e.anvilBidPrinter)} $PRINTER, net of the sell fee)`
     : "";
@@ -446,11 +447,17 @@ function chip(e, { isFloor = false, ethUsd = null, anvil = false, showPrice = tr
   `</a>`;
 }
 
-/** Un écart réel mais inférieur au point de pourcentage s'arrondissait à
- *  « +0% », ce qui se lit comme « aucun gain » — l'inverse de ce qu'il dit. */
-function gapLabel(e) {
-  const gap = Math.round((100 * (e.anvilBidEth - e.priceEth)) / e.priceEth);
-  return gap < 1 ? "&lt;1%" : `+${gap}%`;
+/**
+ * Ce que l'anvil donnerait en plus, en argent.
+ *
+ * C'était un pourcentage — « +60% » — et un pourcentage de quoi ? Posé sur une
+ * image, sans sa base, il ne voulait rien dire. Tout le reste de la vignette
+ * est en dollars ; l'écart aussi, désormais. Sans taux lu on ne montre rien
+ * plutôt qu'un pourcentage que personne ne sait rapporter à un prix.
+ */
+function gapLabel(e, ethUsd) {
+  const gain = usdOf(e.anvilBidEth - e.priceEth, ethUsd);
+  return gain === null ? null : `+${fmtUsd(gain, 0)}`;
 }
 
 /** Le desk d'abord : c'est un secteur scellé au mint que la chaîne publie, et
@@ -632,11 +639,14 @@ function renderHalf(half, g, { shown: count, step, limit, key, depth, state, eth
   // toutes lettres et avec le chiffre, plutôt que de compter sur un badge de
   // deux mots pour porter une idée entière.
   const underBidEntries = half.entries.filter((e) => e.underBid);
+  // Le pourcentage taisait ce qui décide de l'affaire : l'anvil paie en
+  // $PRINTER, pas en dollars. Encaisser suppose de revendre ce $PRINTER, et
+  // c'est sa hausse de la journée qui a ouvert l'écart.
   const underNote = underBidEntries.length
-    ? `<span class="under-note">${fmtInt(underBidEntries.length)} of these sell below the Anvil's ` +
-      `standing bid of ${fmtEth(underBidEntries[0].anvilBidEth)} ETH` +
-      (ethUsd ? ` (${fmtUsdShort(usdOf(underBidEntries[0].anvilBidEth, ethUsd))})` : "") +
-      ` — the green mark is how much more it would pay.</span>`
+    ? `<span class="under-note">${fmtInt(underBidEntries.length)} of these cost less than the Anvil pays: ` +
+      (ethUsd ? `${fmtUsdShort(usdOf(underBidEntries[0].anvilBidEth, ethUsd))} a machine` : `${fmtEth(underBidEntries[0].anvilBidEth)} ETH a machine`) +
+      `, paid in $PRINTER and already net of its sell fee. The green figure is what you would be up — ` +
+      `cashing it out means selling that $PRINTER.</span>`
     : "";
 
   // Le floor en tête, en grand et nommé : c'est le chiffre qu'on vient chercher.

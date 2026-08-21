@@ -548,9 +548,11 @@
     color: var(--under);
   }
 
+  /* En haut à gauche : le badge de classe et celui du parcours occupent le bas.
+     Un écart en argent est plus large qu'un pourcentage et se chevauchait. */
   .under {
     position: absolute;
-    left: 0; bottom: 0;
+    left: 0; top: 0;
     padding: 0 3px;
     background: var(--under);
     color: var(--paper);

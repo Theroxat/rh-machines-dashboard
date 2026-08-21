@@ -696,16 +696,30 @@ test("the shelf states its price like a price, in the token's own colour", () =>
 
 // « under bid » ne disait rien à personne : la case explique une fois, et
 // chaque vignette porte l'écart plutôt qu'un mot de jargon.
-test("a cell explains once what the green marks mean", () => {
+// Le pourcentage taisait ce qui décide de l'affaire : l'anvil paie en $PRINTER,
+// pas en dollars, et l'encaisser suppose de revendre ce $PRINTER.
+test("a cell explains once what the green marks mean, and in what you are paid", () => {
   const html = halfCell(half({ entries: [withBid()] }), "ink", { ethUsd: 1896 });
-  assert.match(html, /sell below the Anvil/i);
-  assert.match(html, /0\.1170 ETH/);
+  assert.match(html, /cost less than the Anvil pays/i);
+  assert.match(html, /paid in \$PRINTER/);
+  assert.match(html, /net of its sell fee/);
+  assert.match(html, /cashing it out means selling that \$PRINTER/);
 });
 
-test("each marked machine carries the gap rather than a phrase", () => {
+// « +60% » — de quoi ? Posé sur une image, sans sa base, un pourcentage ne veut
+// rien dire. Tout le reste de la vignette est en dollars.
+test("a marked machine carries the gap in money, not as a bare percentage", () => {
   const html = halfCell(half({ entries: [withBid()] }), "ink", { ethUsd: 1896 });
-  assert.match(html, /class="under">\+11%</);
+  assert.match(html, /class="under">\+\$\d+</);
+  assert.doesNotMatch(html, /class="under">[^<]*%/);
   assert.doesNotMatch(html, />under bid</);
+});
+
+// Sans taux lu on ne montre rien plutôt qu'un pourcentage que personne ne sait
+// rapporter à un prix.
+test("with no eth rate the mark stays away rather than turning back into a percentage", () => {
+  const html = halfCell(half({ entries: [withBid()] }), "ink");
+  assert.doesNotMatch(html, /class="under"/);
 });
 
 test("a cell with nothing under the bid explains nothing", () => {
@@ -715,7 +729,7 @@ test("a cell with nothing under the bid explains nothing", () => {
 
 test("a gap smaller than a point says so rather than rounding to nothing", () => {
   const html = halfCell(half({ entries: [withBid({ priceEth: 0.1169, anvilBidEth: 0.1170 })] }), "ink", { ethUsd: 1896 });
-  assert.match(html, /&lt;1%/);
+  assert.match(html, /class="under">\+\$\d/);
   assert.doesNotMatch(html, /\+0%/);
 });
 
