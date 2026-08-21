@@ -43,6 +43,14 @@ export const fmtAmount = (n) => String(Number(Number(n).toPrecision(4)));
 export const fmtUsdRound = (v) =>
   v === null || v === undefined ? "—" : `$${fmtInt(Math.round(v))}`;
 
+/** Un gain de quatre dixièmes de centime s'écrivait « $0.00 », ce qui fait
+ *  passer un conseil pour inutile. Sous le centime, on le dit en toutes lettres
+ *  plutôt que de l'arrondir à rien. */
+export const fmtTiny = (v) =>
+  v === null || v === undefined ? "—"
+    : Math.abs(v) < 0.01 ? "less than a cent"
+    : fmtUsd(v);
+
 export const fmtWeightX = (weight) => {
   if (!weight) return "0x";
   const x = weight / 100;
@@ -1116,52 +1124,58 @@ export function walletDetailHtml(w) {
   const short = `${w.address.slice(0, 6)}…${w.address.slice(-4)}`;
   const held = w.dormant
     ? `${fmtInt(w.awake)} earning · ${fmtInt(w.dormant)} dormant`
-    : `${fmtInt(w.machines.length)} Machines`;
+    : `${fmtInt(w.machines.length)} machines`;
 
-  const head = `<p class="w-who"><b>${esc(short)}</b> — ${held}` +
-    (w.share === null ? "" : ` · ${fmtShare(w.share)} of the fleet`) + `</p>`;
+  // Une seule ligne d'identité, en tête. Elle était dite deux fois : dans le
+  // verdict et de nouveau juste en dessous.
+  const who = `<p class="w-who"><b>${esc(short)}</b> · ${held} · ` +
+    `<b>${(w.weight / 100).toFixed(2)}x</b> of the fleet` +
+    (w.share === null ? "" : ` · ${fmtShare(w.share)}`) + `</p>`;
 
-  const best = w.advice?.best;
-  const why = !best
-    ? `<p class="w-small">No ballot is open, so there is nothing to vote for yet.</p>`
-    : `<p class="w-small"><b>${esc(best.desk)}</b> — ` +
-      (best.heldWeight
-        ? `${(best.heldWeight / 100).toFixed(2)}x of your ${(w.weight / 100).toFixed(2)}x sit there. `
-        : `you hold nothing there, but it is still your best slice. `) +
-      `Voting it is worth <b>${fmtUsd(best.gainUsd)}</b> against not voting — one wallet barely moves a ` +
-      `ballot. What moves your share is where the vote lands.</p>`;
-
-  // Quatre choses, et elles ne se valorisent pas de la même façon. Les
-  // machines n'ont pas de prix, seulement un marché : on retient le plus
-  // offrant entre le floor de leur case et l'offre de l'anvil, et on dit
-  // lequel, parce qu'un floor est un prix demandé et pas un prix obtenu.
+  // Deux questions, deux colonnes : ce que ça vaut, et quoi en faire. Elles
+  // se lisaient l'une après l'autre en travers de toute la page, avec les
+  // montants à mille neuf cents pixels de leurs intitulés.
   const wo = w.worth;
-  const worthBlock = !wo?.total ? "" :
-    `<div class="w-worth-block"><span class="label">What this wallet holds</span><ul>` +
+  const worthCard = !wo?.total ? "" :
+    `<div class="w-card"><span class="label">What it is worth</span>` +
+    `<span class="w-big">${fmtUsdRound(wo.total)}</span><ul>` +
     (wo.machinesUsd === null ? "" :
       `<li><span class="ww-k">${fmtInt(w.machines.length)} machines</span>` +
-      `<span class="ww-x">at the better of their class floor and the Anvil's standing bid</span>` +
-      `<span class="ww-v">${fmtUsdRound(wo.machinesUsd)}</span></li>`) +
+      `<span class="ww-v">${fmtUsdRound(wo.machinesUsd)}</span>` +
+      `<span class="ww-x">at the better of their class floor and the Anvil's standing bid</span></li>`) +
     (wo.insideUsd === null ? "" :
       `<li><span class="ww-k">stock inside them</span>` +
-      `<span class="ww-x">in their own accounts — it goes with the machine if it sells</span>` +
-      `<span class="ww-v">${fmtUsd(wo.insideUsd)}</span></li>`) +
+      `<span class="ww-v">${fmtUsd(wo.insideUsd)}</span>` +
+      `<span class="ww-x">in their own accounts — it goes with the machine if it sells</span></li>`) +
     (wo.stockUsd === null ? "" :
       `<li><span class="ww-k">stock withdrawn</span>` +
-      `<span class="ww-x">${esc(wo.ownStock.map((x) => `${fmtAmount(x.amount)} ${x.symbol}`).join(" · "))}</span>` +
-      `<span class="ww-v">${fmtUsd(wo.stockUsd)}</span></li>`) +
+      `<span class="ww-v">${fmtUsd(wo.stockUsd)}</span>` +
+      `<span class="ww-x">${esc(wo.ownStock.map((x) => `${fmtAmount(x.amount)} ${x.symbol}`).join(" · "))}</span></li>`) +
     (wo.printerUsd === null ? "" :
       `<li><span class="ww-k">$PRINTER</span>` +
-      `<span class="ww-x">${fmtInt(Math.round(wo.printerAmount))} held</span>` +
-      `<span class="ww-v">${fmtUsd(wo.printerUsd)}</span></li>`) +
-    `</ul><span class="ww-total">${fmtUsdRound(wo.total)} in all</span>` +
-    (wo.unpriced ? `<span class="w-small">${fmtInt(wo.unpriced)} machine(s) left out — nothing comparable is on sale and the Anvil would not bid.</span>` : "") +
-    `<span class="w-small">A floor is what others are asking, not what you would be paid. ` +
-    `The Anvil's bid is the part you could take today, and it pays in $PRINTER.</span></div>`;
+      `<span class="ww-v">${fmtUsd(wo.printerUsd)}</span>` +
+      `<span class="ww-x">${fmtInt(Math.round(wo.printerAmount))} held</span></li>`) +
+    `</ul>` +
+    (wo.unpriced ? `<p class="w-small">${fmtInt(wo.unpriced)} machine(s) left out — nothing comparable is on sale and the Anvil would not bid.</p>` : "") +
+    `<p class="w-small">A floor is what others are asking, not what you would be paid. ` +
+    `The Anvil's bid is the part you could take today, and it pays in $PRINTER.</p></div>`;
 
-  // Les machines, en vignettes. Cette page était la seule à parler de machines
-  // sans en montrer une : on y lisait « #4347 · real estate » là où le marché
-  // affiche une image, un poids et ce que la machine contient.
+  const best = w.advice?.best;
+  const voteCard = `<div class="w-card"><span class="label">What to vote</span>` +
+    (!best
+      ? `<span class="w-big w-none">no ballot</span>` +
+        `<p class="w-small">None is open, so there is nothing to vote for yet.</p>`
+      : `<span class="w-big">${esc(best.ticker)}</span>` +
+        `<p class="w-small"><b>${esc(best.desk)}</b> — ` +
+        (best.heldWeight
+          ? `${(best.heldWeight / 100).toFixed(2)}x of your ${(w.weight / 100).toFixed(2)}x sit there.`
+          : `you hold nothing there, but it is still your best slice.`) +
+        ` Voting it is worth <b>${fmtTiny(best.gainUsd)}</b> against not voting — one wallet barely ` +
+        `moves a ballot. What moves your share is where the vote lands.</p>`) +
+    (w.cutUsd === null ? "" :
+      `<p class="w-small">These ${fmtInt(w.machines.length)} machines take <b>${fmtUsd(w.cutUsd)}</b> ` +
+      `of the pot waiting now.</p>`) + `</div>`;
+
   const list = w.machines
     .map((m) => chip(
       { tokenId: m.tokenId, machine: { image: m.image, headwear: null, desk: m.desk },
@@ -1170,7 +1184,10 @@ export function walletDetailHtml(w) {
     ))
     .join("");
 
-  return head + why + `<span class="strip w-strip">${list}</span>` + worthBlock;
+  return who +
+    `<div class="w-cards">${worthCard}${voteCard}</div>` +
+    `<span class="label w-mine">Your machines</span>` +
+    `<span class="strip w-strip">${list}</span>`;
 }
 
 /**

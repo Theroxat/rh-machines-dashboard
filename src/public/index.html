@@ -400,13 +400,31 @@
     display: block; font-size: 9.5px; font-weight: 400; letter-spacing: 0.12em;
     text-transform: uppercase; color: var(--under); opacity: 0.72;
   }
-  .w-worth-block { margin-top: 14px; border-top: 1px solid var(--rule-2); padding-top: 9px; }
-  .w-worth-block ul { list-style: none; margin: 6px 0 0; padding: 0; font-size: 12.5px; }
-  .w-worth-block li { display: flex; gap: 12px; align-items: baseline; padding: 3px 0; border-bottom: 1px solid var(--rule); }
-  .ww-k { min-width: 140px; color: var(--text); font-weight: 600; }
-  .ww-x { flex: 1; color: var(--muted); font-size: 11.5px; }
-  .ww-v { color: var(--text); font-weight: 600; }
-  .ww-total { display: block; margin-top: 8px; font-size: 17px; font-weight: 700; color: var(--under); }
+
+  /* Deux questions, deux cartes : ce que ça vaut, et quoi en faire. Elles se
+     lisaient l'une après l'autre en travers de toute la page, montants à mille
+     neuf cents pixels de leurs intitulés. */
+  .w-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 0;
+    margin-top: 12px;
+    border-top: 1px solid var(--rule-2);
+  }
+  .w-card { padding: 12px 22px 14px 0; }
+  .w-card + .w-card { padding-left: 22px; border-left: 1px solid var(--rule); }
+  .w-big { display: block; font-size: 30px; font-weight: 700; color: var(--under); line-height: 1.15; margin-top: 2px; }
+  .w-card .w-big.w-none { color: var(--dim); font-size: 22px; }
+  .w-card ul { list-style: none; margin: 10px 0 0; padding: 0; font-size: 12.5px; }
+  .w-card li {
+    display: grid; grid-template-columns: 1fr auto; column-gap: 14px;
+    padding: 4px 0; border-bottom: 1px solid var(--rule);
+  }
+  .ww-k { color: var(--text); font-weight: 600; }
+  .ww-v { color: var(--text); font-weight: 600; text-align: right; }
+  .ww-x { grid-column: 1 / -1; color: var(--muted); font-size: 11.5px; line-height: 1.4; }
+  .w-card .w-small { margin: 9px 0 0; }
+  .w-mine { display: block; margin-top: 20px; }
 
   /* Les machines du portefeuille, en vignettes comme au marché. Le badge du
      bas porte leur desk plutôt que leur classe : sur cette page on cherche

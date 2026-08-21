@@ -5,7 +5,7 @@ import {
   fmtEth, fmtRatio, halfCell, cellKey,
   bannerMessage, rowsHtml, contextHtml, legendHtml,
   matchesFilter, filterBarHtml, filterSummary, freshness, fmtCompact, crateLine,
-  perPointUsd, viewBarHtml, ballotBlock, dropNote, bestRow, yieldOf, BEST_LIMIT, DEFAULT_LIMIT, fmtUsdRound, bestFit, walletCardHtml, walletDetailHtml, fmtShare, machineDetailHtml, findMachine, itemUrl, setContract, fmtWeightX, fmtExact, fmtAmount, ballotHtml,
+  perPointUsd, viewBarHtml, ballotBlock, dropNote, bestRow, yieldOf, BEST_LIMIT, DEFAULT_LIMIT, fmtUsdRound, bestFit, walletCardHtml, walletDetailHtml, fmtShare, machineDetailHtml, findMachine, itemUrl, setContract, fmtWeightX, fmtExact, fmtAmount, fmtTiny, ballotHtml,
 } from "../src/public/app.js";
 
 const entry = (tokenId, priceEth, image = `https://img/${tokenId}.webp`) => ({
@@ -1500,7 +1500,8 @@ test("a wallet holding nothing is told so, rather than shown an empty table", ()
 
 test("with no ballot open nothing is advised rather than guessed", () => {
   assert.match(walletCardHtml({ ...WALLET, advice: null }), /class="v">No ballot open</);
-  assert.match(walletDetailHtml({ ...WALLET, advice: null }), /No ballot is open/);
+  assert.match(walletDetailHtml({ ...WALLET, advice: null }), /class="w-big w-none">no ballot</);
+  assert.match(walletDetailHtml({ ...WALLET, advice: null }), /None is open/);
 });
 
 // La carte doit dire qu'elle travaille : sans ça un clic sans effet visible
@@ -2022,13 +2023,32 @@ test("the wallet line leads with what the whole thing is worth", () => {
   assert.match(html, /class="w-worth">\$1,344<small>wallet worth<\/small>/);
 });
 
-test("the detail breaks the worth into the four things it counts", () => {
+// Deux questions, deux cartes : ce que ça vaut, et quoi en faire.
+test("the worth card breaks the total into the four things it counts", () => {
   const html = walletDetailHtml(WORTH);
-  assert.match(html, /2 machines<\/span><span class="ww-x">at the better of their class floor and the Anvil's standing bid<\/span><span class="ww-v">\$1,116</);
-  assert.match(html, /stock inside them.*goes with the machine if it sells.*\$76\.17/s);
-  assert.match(html, /stock withdrawn.*0\.1434 NVDA.*\$30\.00/s);
-  assert.match(html, /\$PRINTER<\/span><span class="ww-x">11,104 held<\/span><span class="ww-v">\$121\.92</);
-  assert.match(html, /\$1,344 in all/);
+  assert.match(html, /What it is worth<\/span><span class="w-big">\$1,344</);
+  assert.match(html, /2 machines<\/span><span class="ww-v">\$1,116<\/span><span class="ww-x">at the better of their class floor/);
+  assert.match(html, /stock inside them.*\$76\.17.*goes with the machine if it sells/s);
+  assert.match(html, /stock withdrawn.*\$30\.00.*0\.1434 NVDA/s);
+  assert.match(html, /\$PRINTER<\/span><span class="ww-v">\$121\.92<\/span><span class="ww-x">11,104 held/);
+});
+
+// L'identité était dite deux fois : dans le verdict et de nouveau en dessous.
+test("the address and the count are stated once, at the head", () => {
+  const html = walletDetailHtml(WORTH);
+  assert.equal((html.match(/0xe908…3211/g) ?? []).length, 1);
+  assert.match(html, /class="w-who"/);
+});
+
+// Un gain de quatre dixièmes de centime s'écrivait « $0.00 », ce qui fait
+// passer le conseil pour inutile.
+test("a gain under a cent is said in words, not rounded to nothing", () => {
+  assert.equal(fmtTiny(0.004), "less than a cent");
+  assert.equal(fmtTiny(0.05), "$0.05");
+  assert.equal(fmtTiny(null), "—");
+  const html = walletDetailHtml({ ...WORTH, advice: { ...WORTH.advice, best: { ...WORTH.advice.best, gainUsd: 0.004 } } });
+  assert.match(html, /worth <b>less than a cent<\/b>/);
+  assert.doesNotMatch(html, /worth <b>\$0\.00<\/b>/);
 });
 
 // Un floor est un prix demandé, pas un prix obtenu. Le dire vaut mieux que le
