@@ -296,3 +296,11 @@ test("the migration notice sits with the header, before anything else", () => {
   assert.ok(note < page.indexOf('class="context" id="context"'));
   assert.match(page, /\.migrated \{[^}]*var\(--alarm\)/);
 });
+
+// Deux badges verts vivent sur les vignettes. La légende doit les distinguer,
+// sinon elle explique la moitié de ce qu'on voit.
+test("the legend names both green badges, not just one", () => {
+  assert.match(page, /anvil \+\$86<\/span>the Anvil would pay that much more/);
+  assert.match(page, /\+\$12 inside<\/span>stock sitting in the machine's own account/);
+  assert.match(page, /\.key-badge\.anvil \{[^}]*var\(--under\)/);
+});

@@ -710,7 +710,7 @@ test("a cell explains once what the green marks mean, and in what you are paid",
 // rien dire. Tout le reste de la vignette est en dollars.
 test("a marked machine carries the gap in money, not as a bare percentage", () => {
   const html = halfCell(half({ entries: [withBid()] }), "ink", { ethUsd: 1896 });
-  assert.match(html, /class="under">\+\$\d+</);
+  assert.match(html, /class="under">anvil \+\$\d+</);
   assert.doesNotMatch(html, /class="under">[^<]*%/);
   assert.doesNotMatch(html, />under bid</);
 });
@@ -729,7 +729,7 @@ test("a cell with nothing under the bid explains nothing", () => {
 
 test("a gap smaller than a point says so rather than rounding to nothing", () => {
   const html = halfCell(half({ entries: [withBid({ priceEth: 0.1169, anvilBidEth: 0.1170 })] }), "ink", { ethUsd: 1896 });
-  assert.match(html, /class="under">\+\$\d/);
+  assert.match(html, /class="under">anvil \+\$\d/);
   assert.doesNotMatch(html, /\+0%/);
 });
 
@@ -2009,4 +2009,14 @@ test("the panel shows the background, the one trait it was leaving out", () => {
     ...DETAIL.rows[0].inked.entries[0], tokenId: 3145,
     machine: { ...DETAIL.rows[0].inked.entries[0].machine, background: "Acid Lime" } }] }) }] };
   assert.match(machineDetailHtml(d, 3145), /Background<\/span><span class="d-v">Acid Lime</);
+});
+
+// Deux badges verts en « +$ » cohabitent sur la même vignette. « +$0.01 inside »
+// dit ce qu'il est ; « +$86 » ne disait rien, et on ne le devinait pas.
+test("the two green figures on a chip cannot be mistaken for one another", () => {
+  const e = { ...entry(1, 0.1), weight: 100, epochUsd: 5, anvilBidEth: 0.14, anvilBidPrinter: 2000, underBid: true,
+    holds: { usd: 12.48, lines: [{ symbol: "NVDA", amount: 0.037, usd: 12.48 }] } };
+  const html = halfCell(half({ entries: [e] }), "ink", { ethUsd: 2000 });
+  assert.match(html, /class="under">anvil \+\$80</);
+  assert.match(html, /class="holds"[^>]*>\+\$12\.48 inside</);
 });

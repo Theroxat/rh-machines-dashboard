@@ -457,7 +457,9 @@ function chip(e, { isFloor = false, ethUsd = null, anvil = false, showPrice = tr
  */
 function gapLabel(e, ethUsd) {
   const gain = usdOf(e.anvilBidEth - e.priceEth, ethUsd);
-  return gain === null ? null : `+${fmtUsd(gain, 0)}`;
+  // Nommé, sinon deux badges verts en « +$ » cohabitent sur la même vignette et
+  // un seul dit ce qu'il est : « +$0.01 inside » s'explique, « +$86 » non.
+  return gain === null ? null : `anvil +${fmtUsd(gain, 0)}`;
 }
 
 /** Le desk d'abord : c'est un secteur scellé au mint que la chaîne publie, et
