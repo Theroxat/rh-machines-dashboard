@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { findDeals, dealMessage, dealKey, postToDiscord, MIN_GAP_PCT } from "../src/alert.js";
+import { findDeals, dealEmbed, dealMessage, dealKey, postToDiscord, MIN_GAP_PCT } from "../src/alert.js";
 
 const CONTRACT = "0x8c71d170fbd94bcba93bb08fc2cfd0e8620cd9ce";
 const at = (tokenId, priceEth, over = {}) => ({
@@ -112,4 +112,61 @@ test("nobody gets pinged by a machine's name", async () => {
 
 test("the gap threshold is a real bar, not a formality", () => {
   assert.ok(MIN_GAP_PCT >= 0.3, "un seuil trop bas rend l'alerte illisible");
+});
+
+// Le message arrive sur un téléphone, loin du tableau. Une ligne obligeait à
+// ouvrir le lien pour savoir si l'affaire valait quelque chose.
+const rich = (over = {}) => findDeals({
+  eth: { usd: 2000 },
+  pot: { usd: 100000, fleetWeight: 1000000 },
+  ink: { activationTotalUsd: 50 },
+  rows: [{ classValue: 200, classLabel: "x2", dormant: cell([]), inked: cell([
+    at(1, 0.05, { weight: 400, inkMult: 2, inkPrinter: 17000, epochUsd: 40,
+      holds: { usd: 12.5, lines: [] }, anvilBidEth: 0.06,
+      machine: { desk: "GME", sector: "utilities", ticker: "GME", headwear: "Halo", image: "https://img/1.webp" }, ...over }),
+    at(2, 0.15),
+  ]) }],
+})[0];
+
+test("the card carries what the machine is, without opening the link", () => {
+  const e = dealEmbed(rich(), CONTRACT);
+  assert.match(e.title, /Machine #1 — x2 → 4x/);
+  assert.equal(e.url, `https://opensea.io/assets/robinhood/${CONTRACT}/1`);
+  assert.equal(e.thumbnail.url, "https://img/1.webp");
+  const by = Object.fromEntries(e.fields.map((f) => [f.name, f.value]));
+  assert.equal(by.Weight, "4x (born x2)");
+  assert.equal(by["Ink burned"], "17,000 $PRINTER");
+  assert.equal(by.Desk, "GME");
+  assert.equal(by["Takes from the pot"], "$40.00");
+  assert.equal(by["Stock inside"], "$12.50");
+  assert.equal(by["Anvil bids"], "$120");
+  assert.equal(by.Headwear, "Halo");
+});
+
+test("a machine holding nothing says nothing rather than nothing-dollars", () => {
+  const by = Object.fromEntries(dealEmbed(rich({ holds: null }), CONTRACT).fields.map((f) => [f.name, f.value]));
+  assert.equal(by["Stock inside"], "nothing");
+});
+
+test("a desk left off this epoch's ballot is marked as such", () => {
+  const by = Object.fromEntries(dealEmbed(rich({
+    machine: { desk: "CRCL", sector: "tech", ticker: null, headwear: "Halo" } }), CONTRACT).fields.map((f) => [f.name, f.value]));
+  assert.equal(by.Desk, "CRCL (off ballot)");
+});
+
+test("the card says why it was sent, in its own first line", () => {
+  assert.match(dealEmbed(rich(), CONTRACT).description, /the next one in its cell asks/);
+  assert.match(dealEmbed(rich(), CONTRACT).footer.text, /well under its own cell/);
+});
+
+// Si Discord refuse la fiche, un message dégradé vaut mieux qu'un silence.
+test("a card and a plain line are both accepted by the poster", async () => {
+  let sent;
+  const spy = async (u, o) => { sent = JSON.parse(o.body); return { ok: true }; };
+  await postToDiscord("https://x", dealEmbed(rich(), CONTRACT), spy);
+  assert.equal(sent.embeds.length, 1);
+  assert.equal(sent.content, undefined);
+  await postToDiscord("https://x", "plain", spy);
+  assert.equal(sent.content, "plain");
+  assert.equal(sent.embeds, undefined);
 });

@@ -19,7 +19,7 @@ import { readBallotTickers } from "./ballot.js";
 import { readOwners, tokensOf } from "./owners.js";
 import { openHistory } from "./history.js";
 import { readStockTokens, readHoldings } from "./holdings.js";
-import { findDeals, dealMessage, dealKey, postToDiscord } from "./alert.js";
+import { findDeals, dealEmbed, dealMessage, dealKey, postToDiscord } from "./alert.js";
 import { fetchStockPrices } from "./prices.js";
 import { analyseWallet, isAddress } from "./wallet.js";
 import { SECTORS } from "./desks.js";
@@ -208,7 +208,10 @@ async function sweepBook() {
     for (const deal of findDeals(composed)) {
       try {
         if (!history.claimAlert(dealKey(deal), deal.tokenId, deal.kind, composed.at)) continue;
-        const ok = await postToDiscord(cfg.discordWebhook, dealMessage(deal, ADDRESSES.MACHINES));
+        // La fiche d'abord ; la ligne si Discord la refuse — un message
+        // dégradé vaut mieux qu'un silence.
+        let ok = await postToDiscord(cfg.discordWebhook, dealEmbed(deal, ADDRESSES.MACHINES));
+        if (!ok) ok = await postToDiscord(cfg.discordWebhook, dealMessage(deal, ADDRESSES.MACHINES));
         console.log(`alert: ${deal.kind} on #${deal.tokenId} — ${ok ? "sent" : "webhook refused it"}`);
       } catch (e) {
         console.error(`alert: ${e.message}`);
