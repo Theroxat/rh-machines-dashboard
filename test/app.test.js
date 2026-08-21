@@ -543,24 +543,6 @@ const withBid = (over = {}) => ({
   anvilBidPrinter: 19316, anvilBidEth: 0.1170, underBid: true, ...over,
 });
 
-// L'offre de l'anvil est la même pour toutes les machines — 21 074 $PRINTER, à
-// plat — et la bande est triée par prix : l'écart décroît tout seul du premier
-// au dernier. Un badge par vignette répétait ce que l'ordre porte déjà.
-test("a listing the protocol would pay more for is named in words, not badged", () => {
-  const html = halfCell(half({ entries: [withBid()] }), "ink", { ethUsd: 1896 });
-  assert.match(html, /The Anvil pays <b>\$\d+<\/b> for any machine/);
-  assert.match(html, /in \$PRINTER and net of its sell fee/);
-  assert.match(html, /the cheapest first/);
-  // Aucune marque sur les vignettes : l'offre est plate, l'ordre porte l'écart.
-  assert.doesNotMatch(html, /class="under"/);
-});
-
-test("a cell with nothing under the bid says nothing about it", () => {
-  const html = halfCell(half({ entries: [withBid({ underBid: false, anvilBidEth: 0.09 })] }), "ink", { ethUsd: 1896 });
-  assert.doesNotMatch(html, /The Anvil pays/);
-  assert.doesNotMatch(html, /class="under"/);
-});
-
 test("the mark says what the anvil would pay, in both currencies", () => {
   const html = halfCell(half({ entries: [withBid()] }), "ink", { ethUsd: 1896 });
   assert.match(html, /anvil pays 0\.1170 ETH/);
@@ -1978,4 +1960,19 @@ test("the panel shows the background, the one trait it was leaving out", () => {
     ...DETAIL.rows[0].inked.entries[0], tokenId: 3145,
     machine: { ...DETAIL.rows[0].inked.entries[0].machine, background: "Acid Lime" } }] }) }] };
   assert.match(machineDetailHtml(d, 3145), /Background<\/span><span class="d-v">Acid Lime</);
+});
+
+// L'offre de l'anvil est la même pour toutes les machines et la bande est
+// triée par prix : une phrase par case répétait ce que l'ordre porte déjà.
+test("the OpenSea book says nothing about the anvil's bid", () => {
+  const html = halfCell(half({ entries: [withBid()] }), "ink", { ethUsd: 1896 });
+  assert.doesNotMatch(html, /The Anvil pays/);
+  assert.doesNotMatch(html, /class="under"/);
+});
+
+// Le rayon garde la sienne : lui vend, et ce qu'il vend change d'une case à
+// l'autre — c'est une information par case, pas une constante répétée.
+test("the shelf keeps its own note, which is not a constant", () => {
+  const html = halfCell(half({ floorEth: 0.2, anvilEntries: [shelfEntry({ askEth: 0.1 })] }), "ink", { ethUsd: 1896 });
+  assert.match(html, /Cheaper than anything on OpenSea here/);
 });

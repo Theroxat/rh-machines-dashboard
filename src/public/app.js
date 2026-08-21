@@ -629,20 +629,10 @@ function renderHalf(half, g, { shown: count, step, limit, key, depth, state, eth
         ? `<button class="more" type="button" data-key="${esc(key)}" data-next="${limit}">▴ show fewer</button>`
         : "");
 
-  // « under bid » ne disait rien à personne : la case l'explique une fois, en
-  // toutes lettres et avec le chiffre, plutôt que de compter sur un badge de
-  // deux mots pour porter une idée entière.
-  const underBidEntries = half.entries.filter((e) => e.underBid);
-  // Le pourcentage taisait ce qui décide de l'affaire : l'anvil paie en
-  // $PRINTER, pas en dollars. Encaisser suppose de revendre ce $PRINTER, et
-  // c'est sa hausse de la journée qui a ouvert l'écart.
-  const underNote = underBidEntries.length
-    ? `<span class="under-note">The Anvil pays ` +
-      (ethUsd ? `<b>${fmtUsdShort(usdOf(underBidEntries[0].anvilBidEth, ethUsd))}</b>` : `<b>${fmtEth(underBidEntries[0].anvilBidEth)} ETH</b>`) +
-      ` for any machine, in $PRINTER and net of its sell fee. ` +
-      `<b>${fmtInt(underBidEntries.length)}</b> here are listed below that — the cheapest first, so the ones ` +
-      `at the front of the strip are the furthest under.</span>`
-    : "";
+  // L'anvil ne s'annonce plus dans le carnet OpenSea. Son offre est la même
+  // pour toutes les machines et la bande est triée par prix : la phrase
+  // répétait, en travers de chaque case, ce que l'ordre porte déjà. Le rayon
+  // garde la sienne — lui vend, et ce qu'il vend change d'une case à l'autre.
 
   // Le floor en tête, en grand et nommé : c'est le chiffre qu'on vient chercher.
   // Sous un filtre ce n'est plus le floor de la classe mais le moins cher de la
@@ -666,7 +656,6 @@ function renderHalf(half, g, { shown: count, step, limit, key, depth, state, eth
     `<span class="market">On OpenSea${stateTag(state)}</span>` +
     head +
     `<span class="depth">${depth}</span>` +
-    underNote +
     `<span class="strip">${shown.map((e, i) => chip(e, { isFloor: i === 0, ethUsd, perPoint: valued ? e.perPoint : null })).join("")}</span>` +
     more +
     shelfStrip(half.anvilEntries, half.floorEth, state) +
