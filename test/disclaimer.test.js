@@ -363,6 +363,10 @@ test("the page names its sources and admits what is derived", () => {
 });
 
 // Au-delà de soixante-dix caractères, l'œil perd sa ligne.
-test("the prose is set to a reading width, not to the screen", () => {
-  assert.match(page, /\.doc \{ max-width: \d\dch/);
+test("the prose keeps a reading width while filling the page", () => {
+  // Une largeur de lecture par colonne, et des colonnes qui remplissent la
+  // page : une colonne unique laissait 1 400 px de vide à droite.
+  assert.match(page, /\.doc \{[^}]*grid-template-columns: repeat\(auto-fill, minmax\(340px/);
+  assert.match(page, /\.doc p \{[^}]*max-width: \d\dch/);
+  assert.match(page, /\.doc-block \{[^}]*break-inside: avoid/);
 });

@@ -288,19 +288,27 @@
 
   /* ---- la page d'explication ---- */
 
-  /* Du texte, et rien d'autre. Une largeur de lecture plutôt que la largeur de
-     l'écran : au-delà de soixante-dix caractères, l'œil perd sa ligne. */
-  .doc { max-width: 74ch; }
+  /* Une largeur de lecture, mais pas une colonne unique perdue au milieu d'un
+     écran vide : les sections se rangent en colonnes qui remplissent la page,
+     comme les cartes du bandeau. Chacune garde ses soixante-dix caractères. */
+  .doc {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 0 36px;
+    align-items: start;
+  }
+  /* Un titre ne doit jamais se retrouver seul au bas d'une colonne. */
+  .doc-block { break-inside: avoid; padding: 14px 0 16px; border-top: 1px solid var(--rule); }
   .doc h2 {
-    margin: 26px 0 8px;
+    margin: 0 0 8px;
     font-size: 12px;
     letter-spacing: 0.14em;
     text-transform: uppercase;
     color: var(--ink);
     font-weight: 700;
   }
-  .doc h2:first-child { margin-top: 0; }
-  .doc p { margin: 0 0 10px; font-size: 13.5px; color: var(--muted); line-height: 1.55; }
+  .doc p { margin: 0 0 10px; font-size: 13.5px; color: var(--muted); line-height: 1.55; max-width: 72ch; }
+  .doc p:last-child { margin-bottom: 0; }
   .doc b { color: var(--text); font-weight: 600; }
   .doc .formula {
     padding: 8px 12px;
@@ -913,11 +921,13 @@
 <section class="pane" id="pane-how">
 
   <div class="doc">
+    <div class="doc-block">
     <h2>What a Machine is</h2>
     <p>Ten thousand of them, and two things about each are sealed at mint and never change.
     Its <b>rarity</b> — x1 through x10 — which is read off its <b>headwear</b>. And its <b>desk</b>,
     one of sixteen, which decides which stock it earns double on.</p>
-
+    </div>
+    <div class="doc-block">
     <h2>Weight is the only thing that pays</h2>
     <p>A Machine with no ink weighs nothing. It earns nothing and it cannot vote. Burning
     <b>5,000 $PRINTER</b> switches it on — 4,250 of that becomes ink, 750 is an operating charge —
@@ -929,7 +939,8 @@
     quietly clipped.</p>
     <p>Everything else follows weight. Your share of every payout is your weight over the fleet's,
     and you vote with your weight rather than one vote per Machine.</p>
-
+    </div>
+    <div class="doc-block">
     <h2>Three states, and they are not interchangeable</h2>
     <table class="doc-table">
       <tr><th>Dormant</th><td>no ink. Earns nothing, votes on nothing.</td></tr>
@@ -937,7 +948,8 @@
         Machine bought and switched on today takes no part in the pot that is waiting.</td></tr>
       <tr><th>Earning</th><td>active for a full epoch. Earns, votes, counted for the drop.</td></tr>
     </table>
-
+    </div>
+    <div class="doc-block">
     <h2>Where the money comes from</h2>
     <p>Selling $PRINTER costs a fee, and that fee is collected in USDG. Trading the NFTs now feeds
     it too. The money piles up until a ballot closes, and then it is spent buying stock.</p>
@@ -945,7 +957,8 @@
     slowly. It also means the figure on the Market tab is <b>an amount waiting, not a rate</b> —
     nothing has been paid at a regular interval, and the next drop will be worth whatever the
     following days of trading put into it.</p>
-
+    </div>
+    <div class="doc-block">
     <h2>The vote decides who gets bought</h2>
     <p>Once an epoch, a ballot opens for 48 hours. Every awake Machine votes with its weight for one
     of sixteen desks. The pot is then cut between the desks <b>in proportion to the votes they
@@ -956,20 +969,23 @@
     your own desk rather than the one you think will win.</p>
     <p>A stock the protocol cannot buy — no pool on this chain — has its slice paid out in the
     winning stock instead, keeping the same structure. Its desk's Machines still double.</p>
-
+    </div>
+    <div class="doc-block">
     <h2>The stock lands inside the Machine</h2>
     <p>Every Machine owns an account of its own, and that is where its stock is deposited. The
     account belongs to the token, not to you: <b>sell the Machine and whatever is inside goes with
     it</b>, unless you withdraw first. Buying one that is still loaded means buying its contents
     too, which is why every listing here shows what it is carrying.</p>
-
+    </div>
+    <div class="doc-block">
     <h2>The Anvil</h2>
     <p>A market maker run by the protocol. It publishes a standing bid — the same amount for any
     Machine, whatever its rarity — and it pays in $PRINTER, net of the sell fee. It also holds a
     shelf of Machines it will sell, and a crate you can open for one drawn at random.</p>
     <p>Because its bid is denominated in $PRINTER while listings are priced in ETH, the two drift
     apart whenever the token moves. When the bid climbs above a listing, this page says so.</p>
-
+    </div>
+    <div class="doc-block">
     <h2>What this page measures, and what it cannot</h2>
     <table class="doc-table">
       <tr><th>Floor price</th><td>the cheapest asking price in a class and state. An asking price is
@@ -982,7 +998,8 @@
       <tr><th>Wallet worth</th><td>each Machine at the better of its class floor and the Anvil's
         bid, plus the stock inside, plus what the wallet itself holds.</td></tr>
     </table>
-
+    </div>
+    <div class="doc-block">
     <h2>Where the numbers come from</h2>
     <p>Weights, ink, desks, the ballot and the pot are read from the chain, not computed here.
     Listings and pictures come from the public OpenSea API. Token prices come from DexScreener. The
@@ -992,6 +1009,8 @@
     <p>Two things are derived rather than read: which headwear grants which rarity, and the split
     between what a Machine earns from each desk's slice. Both are checked against the chain on every
     boot, and the first is set out below.</p>
+  </div>
+    </div>
   </div>
 
   <h2 class="label">Which headwear grants which rarity</h2>
