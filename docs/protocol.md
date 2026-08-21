@@ -293,22 +293,57 @@ dénominateur change à chaque tas. Intégré en §5.
    fois ouvert : c'est probablement la liste des desks ayant reçu des voix, et
    elle éviterait de sonder les 16 index un par un.
 
-### La liste de contrôle du premier drop
+### Le premier drop a eu lieu — 2026-08-21
 
-Quand la première distribution aura eu lieu, ces vérifications tranchent tout :
+Le bulletin de l'epoch 2 est clos et finalisé. Le pot est passé de **$170 023 à
+$19 828** : environ **$150 000 dépensés en actions**, versées dans le compte
+ERC-6551 de chaque machine.
 
-- [ ] Prendre deux machines du **même desk**, de poids différents. Le rapport
-      de leurs gains doit égaler le rapport de leurs poids. Si oui, la
-      proportionnalité au poids est confirmée et la métrique du dashboard est
-      exacte.
-- [ ] Prendre deux machines de **même poids sur des desks différents**. Le
-      rapport de leurs gains donne le coefficient de desk réel, à comparer à
-      `tally`.
-- [ ] Vérifier qu'une machine **Lit** de l'epoch précédente a bien touché zéro.
-- [ ] Vérifier si le dénominateur est le poids **earning** ou le poids total.
-- [ ] Comparer la somme distribuée aux frais de vente encaissés sur la période.
+**Le modèle est confirmé, et dans le détail.**
 
----
+| vérification | résultat |
+|---|---|
+| deux machines du même desk, poids différents | #4347 (poids 200) reçoit **exactement le double** de #5769 (poids 100), sur chacune des sept actions |
+| le doublement sur son propre desk | #5769 (desk SPCX) reçoit `0.008849576905786901` de SPCX, #463 (desk GME) `0.004424788452893450` — **ratio 2,0000** |
+| chacun touche tout, quel que soit son desk | les sept actions distribuées apparaissent dans **chaque** compte |
+| le dénominateur | `totalWeight`, et la dilution en `W + W_desk` est confirmée |
+| le montant annoncé par la page | **$77.77 prédit, $76.49 reçu — 1,6 % d'écart** |
+
+Le test le plus dur porte sur le terme de dilution, celui que le partage naïf
+ignore. Calée sur la seule tranche `energy`, la formule prédit les trois autres :
+
+| tranche | voix | poids du desk | prédit | observé | écart |
+|---|---|---|---|---|---|
+| energy | 38,18 % | 1 728x | *(calage)* | 0,020967567 | — |
+| materials | 18,84 % | 1 564x | 0,010465451 | 0,010481821 | **0,16 %** |
+| financials | 5,66 % | 1 208x | 0,003225458 | 0,003217661 | **0,24 %** |
+| utilities | 2,04 % | 827x | 0,001195128 | 0,001191483 | **0,31 %** |
+
+Le résidu vient des machines qui ont brûlé depuis la distribution.
+
+### Ce que personne n'avait annoncé : les tranches non achetables
+
+Trois actions votées **n'ont pas été distribuées sous leur propre nom** : AMD
+(18,84 %), AMZN (5,66 %) et GME (2,04 %) — 26,5 % du pot. Aucun compte n'en
+contient.
+
+Leurs tranches ont été **versées en NVDA**, l'action la plus votée, **en
+conservant la structure de chaque tranche** : les machines du desk AMD touchent
+toujours le double sur la tranche AMD, simplement payée en NVDA. C'est ce qui
+explique qu'une machine du desk `materials` reçoive 29 % de NVDA de plus qu'une
+machine de même poids sur un autre desk, et une machine `utilities` 3,3 % de
+plus — exactement les rapports que la part de vote de chaque desk prédit.
+
+Le protocole a donc géré l'impossibilité d'achat sans casser la répartition.
+Rien dans la documentation ne le mentionne.
+
+### Ce qui reste à vérifier
+
+- **Une machine « Lit » a-t-elle bien touché zéro ?** Non testé : il aurait
+  fallu repérer avant la clôture une machine inkée pendant l'epoch.
+- **Deux comptes sur huit sont vides** sur le desk gagnant (#4 et #12, tous deux
+  inkés). Leurs propriétaires ont probablement vidé le compte ERC-6551, qui leur
+  appartient — mais ce n'est pas démontré.
 
 ## 8. Sécurité — état au 2026-08-17
 
