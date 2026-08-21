@@ -38,6 +38,11 @@ export const fmtExact = (n) => String(Number(Number(n).toFixed(2)));
  *  d'une machine à peine servie. */
 export const fmtAmount = (n) => String(Number(Number(n).toPrecision(4)));
 
+/** Un montant rond, avec ses milliers. « $1344 » se lit moins bien que
+ *  « $1,344 », et c'est le chiffre de tête d'un portefeuille. */
+export const fmtUsdRound = (v) =>
+  v === null || v === undefined ? "—" : `$${fmtInt(Math.round(v))}`;
+
 export const fmtWeightX = (weight) => {
   if (!weight) return "0x";
   const x = weight / 100;
@@ -1107,8 +1112,12 @@ export function walletCardHtml(w) {
   // La seconde était en petit au bout d'une phrase — c'est pourtant le chiffre
   // qu'on vient chercher, et il se lit maintenant comme sur les vignettes.
   const best = w.advice?.best;
+  const worth = w.worth?.total
+    ? `<span class="w-worth">${fmtUsdRound(w.worth.total)}<small>wallet worth</small></span>`
+    : "";
   return label + `<span class="w-said">` +
     `<span class="v">${best ? `Vote ${esc(best.ticker)}` : "No ballot open"}</span>` +
+    worth +
     (w.cutUsd === null ? ""
       : `<span class="w-cut">${fmtUsd(w.cutUsd)}<small>of the pot waiting, all ${fmtInt(w.machines.length)} machines</small></span>`) +
     `<span class="x">${esc(short)} · <b>${(w.weight / 100).toFixed(2)}x</b> of the fleet</span>` +
@@ -1142,6 +1151,34 @@ export function walletDetailHtml(w) {
       `Voting it is worth <b>${fmtUsd(best.gainUsd)}</b> against not voting — one wallet barely moves a ` +
       `ballot. What moves your share is where the vote lands.</p>`;
 
+  // Quatre choses, et elles ne se valorisent pas de la même façon. Les
+  // machines n'ont pas de prix, seulement un marché : on retient le plus
+  // offrant entre le floor de leur case et l'offre de l'anvil, et on dit
+  // lequel, parce qu'un floor est un prix demandé et pas un prix obtenu.
+  const wo = w.worth;
+  const worthBlock = !wo?.total ? "" :
+    `<div class="w-worth-block"><span class="label">What this wallet holds</span><ul>` +
+    (wo.machinesUsd === null ? "" :
+      `<li><span class="ww-k">${fmtInt(w.machines.length)} machines</span>` +
+      `<span class="ww-x">at the better of their class floor and the Anvil's standing bid</span>` +
+      `<span class="ww-v">${fmtUsdRound(wo.machinesUsd)}</span></li>`) +
+    (wo.insideUsd === null ? "" :
+      `<li><span class="ww-k">stock inside them</span>` +
+      `<span class="ww-x">in their own accounts — it goes with the machine if it sells</span>` +
+      `<span class="ww-v">${fmtUsd(wo.insideUsd)}</span></li>`) +
+    (wo.stockUsd === null ? "" :
+      `<li><span class="ww-k">stock withdrawn</span>` +
+      `<span class="ww-x">${esc(wo.ownStock.map((x) => `${fmtAmount(x.amount)} ${x.symbol}`).join(" · "))}</span>` +
+      `<span class="ww-v">${fmtUsd(wo.stockUsd)}</span></li>`) +
+    (wo.printerUsd === null ? "" :
+      `<li><span class="ww-k">$PRINTER</span>` +
+      `<span class="ww-x">${fmtInt(Math.round(wo.printerAmount))} held</span>` +
+      `<span class="ww-v">${fmtUsd(wo.printerUsd)}</span></li>`) +
+    `</ul><span class="ww-total">${fmtUsdRound(wo.total)} in all</span>` +
+    (wo.unpriced ? `<span class="w-small">${fmtInt(wo.unpriced)} machine(s) left out — nothing comparable is on sale and the Anvil would not bid.</span>` : "") +
+    `<span class="w-small">A floor is what others are asking, not what you would be paid. ` +
+    `The Anvil's bid is the part you could take today, and it pays in $PRINTER.</span></div>`;
+
   const list = w.machines.map((m) => {
     const desk = m.desk ? `${esc(m.desk)}${m.ticker ? ` · ${esc(m.ticker)}` : ""}` : "no desk read";
     return `<li><a href="${itemUrl(m.tokenId)}" target="_blank" rel="noopener">#${m.tokenId}</a>` +
@@ -1150,7 +1187,7 @@ export function walletDetailHtml(w) {
       `<span class="w-earn">${m.epochUsd === null ? "—" : fmtUsd(m.epochUsd)}</span></li>`;
   }).join("");
 
-  return head + why + `<ul class="w-list">${list}</ul>`;
+  return head + why + `<ul class="w-list">${list}</ul>` + worthBlock;
 }
 
 /** Ce que le filtre laisse passer, sur l'ensemble du carnet. Silencieux tant

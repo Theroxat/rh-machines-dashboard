@@ -5,7 +5,7 @@ import {
   fmtEth, fmtRatio, halfCell, cellKey,
   bannerMessage, rowsHtml, contextHtml, legendHtml,
   matchesFilter, filterBarHtml, filterSummary, freshness, fmtCompact, crateLine,
-  perPointUsd, viewBarHtml, ballotBlock, dropNote, bestRow, yieldOf, BEST_LIMIT, DEFAULT_LIMIT, bestFit, walletCardHtml, walletDetailHtml, fmtShare, machineDetailHtml, findMachine, itemUrl, setContract, migrationNote, fmtWeightX, fmtExact, fmtAmount,
+  perPointUsd, viewBarHtml, ballotBlock, dropNote, bestRow, yieldOf, BEST_LIMIT, DEFAULT_LIMIT, fmtUsdRound, bestFit, walletCardHtml, walletDetailHtml, fmtShare, machineDetailHtml, findMachine, itemUrl, setContract, migrationNote, fmtWeightX, fmtExact, fmtAmount,
 } from "../src/public/app.js";
 
 const entry = (tokenId, priceEth, image = `https://img/${tokenId}.webp`) => ({
@@ -2018,4 +2018,63 @@ test("the band's headline figure is the one its percentage measures", () => {
   assert.match(html, /class="price">\$120\.00<\/span> <span class="unit">back</);
   assert.match(html, /for \$200</);
   assert.match(html, /60\.0%/);   // 120 sur 200
+});
+
+// Quatre choses vivent dans un portefeuille et ne se valorisent pas pareil.
+const WORTH = {
+  ...WALLET,
+  worth: {
+    machinesUsd: 1115.84, unpriced: 0, insideUsd: 76.17,
+    stockUsd: 30, ownStock: [{ symbol: "NVDA", amount: 0.1434, usd: 30 }],
+    printerUsd: 121.92, printerAmount: 11104, total: 1343.93,
+  },
+};
+
+test("the wallet line leads with what the whole thing is worth", () => {
+  const html = walletCardHtml(WORTH);
+  assert.match(html, /class="w-worth">\$1,344<small>wallet worth<\/small>/);
+});
+
+test("the detail breaks the worth into the four things it counts", () => {
+  const html = walletDetailHtml(WORTH);
+  assert.match(html, /2 machines<\/span><span class="ww-x">at the better of their class floor and the Anvil's standing bid<\/span><span class="ww-v">\$1,116</);
+  assert.match(html, /stock inside them.*goes with the machine if it sells.*\$76\.17/s);
+  assert.match(html, /stock withdrawn.*0\.1434 NVDA.*\$30\.00/s);
+  assert.match(html, /\$PRINTER<\/span><span class="ww-x">11,104 held<\/span><span class="ww-v">\$121\.92</);
+  assert.match(html, /\$1,344 in all/);
+});
+
+// Un floor est un prix demandé, pas un prix obtenu. Le dire vaut mieux que le
+// sous-entendre sous un total qui a l'air d'un solde bancaire.
+test("the panel says a floor is an asking price, not a payout", () => {
+  const html = walletDetailHtml(WORTH);
+  assert.match(html, /what others are asking, not what you would be paid/);
+  assert.match(html, /pays in \$PRINTER/);
+});
+
+test("a machine nothing can price is left out, and counted out loud", () => {
+  const html = walletDetailHtml({ ...WORTH, worth: { ...WORTH.worth, unpriced: 2 } });
+  assert.match(html, /2 machine\(s\) left out/);
+  assert.match(html, /nothing comparable is on sale/);
+});
+
+test("a wallet whose worth could not be read shows none rather than zero", () => {
+  assert.doesNotMatch(walletCardHtml({ ...WALLET, worth: null }), /wallet worth/);
+  assert.doesNotMatch(walletDetailHtml({ ...WALLET, worth: null }), /w-worth-block/);
+});
+
+test("a wallet holding no token claims none of it", () => {
+  const bare = { ...WORTH, worth: { ...WORTH.worth, printerUsd: null, stockUsd: null, insideUsd: null } };
+  const html = walletDetailHtml(bare);
+  assert.doesNotMatch(html, /\$PRINTER<\/span>/);
+  assert.doesNotMatch(html, /stock withdrawn/);
+  assert.doesNotMatch(html, /stock inside them/);
+  assert.match(html, /machines/);
+});
+
+// « $1344 » se lit moins bien que « $1,344 », et c'est le chiffre de tête.
+test("a round amount keeps its thousands", () => {
+  assert.equal(fmtUsdRound(1343.93), "$1,344");
+  assert.equal(fmtUsdRound(76), "$76");
+  assert.equal(fmtUsdRound(null), "—");
 });

@@ -18,10 +18,11 @@ import { readPot, epochUsd } from "./pot.js";
 import { readBallotTickers } from "./ballot.js";
 import { readOwners, tokensOf } from "./owners.js";
 import { openHistory } from "./history.js";
-import { readStockTokens, readHoldings } from "./holdings.js";
+import { readStockTokens, readHoldings, valueHoldings } from "./holdings.js";
 import { findDeals, dealEmbed, dealMessage, dealKey, postToDiscord } from "./alert.js";
 import { fetchStockPrices } from "./prices.js";
 import { analyseWallet, isAddress } from "./wallet.js";
+import { valueWallet } from "./worth.js";
 import { SECTORS } from "./desks.js";
 import { deskName, crossCheckDesks, crossCheckWeights } from "./desks.js";
 import { buildGrid } from "./floors.js";
@@ -257,7 +258,45 @@ function loop(name, fn, intervalMs, { runNow = true } = {}) {
   else setTimeout(tick, intervalMs).unref?.();
 }
 
-const server = createServer((req, res) => {
+/**
+ * Les soldes d'une adresse : son $PRINTER et les actions qu'elle a déjà
+ * retirées des comptes de ses machines. Lus à la demande — une adresse par
+ * requête, jamais dix mille à chaque balayage.
+ */
+const ERC20_BAL = new ethers.Interface(["function balanceOf(address) view returns (uint256)"]);
+
+/** Ce que l'anvil paierait, en dollars. La même somme pour n'importe quelle
+ *  machine — vérifié sur les 467 annonces — donc un seul chiffre suffit. Le
+ *  frais de vente est déduit : encaisser suppose de revendre ce $PRINTER. */
+function anvilBidUsd(snap) {
+  const spot = snap?.anvil?.spotPrinter;
+  const price = snap?.printer?.usd;
+  const fee = snap?.protocol?.sellFeeBps;
+  if (!spot || !price || fee === null || fee === undefined) return null;
+  return spot * price * (1 - fee / 10000);
+}
+
+async function readWalletBalances(address) {
+  const bal = async (token, decimals) => {
+    try {
+      const raw = await provider.call({ to: token, data: ERC20_BAL.encodeFunctionData("balanceOf", [address]) });
+      return raw === "0x" ? 0 : Number(ethers.formatUnits(ERC20_BAL.decodeFunctionResult("balanceOf", raw)[0], decimals));
+    } catch {
+      return 0;
+    }
+  };
+  const printer = await bal(ADDRESSES.TOKEN, 18);
+  const stock = [];
+  for (const t of stockTokens) {
+    const amount = await bal(t.address, t.decimals);
+    if (!amount) continue;
+    const price = stockPrices.get(t.symbol) ?? null;
+    stock.push({ symbol: t.symbol, amount, usd: price === null ? null : amount * price });
+  }
+  return { printer, stock };
+}
+
+const server = createServer(async (req, res) => {
   if (req.url === "/api/snapshot") {
     const p = apiPayload();
     const headers = {
@@ -306,8 +345,44 @@ const server = createServer((req, res) => {
       tally, potUsd: snap?.pot?.usd ?? null, fleetWeight, sectorWeight,
       tickers: tickers ?? new Array(16).fill(null),
     });
+    // Ce que le portefeuille vaut : les machines, ce qu'elles contiennent, les
+    // actions déjà retirées et le $PRINTER. Tout se lit à la demande — une
+    // adresse par requête, jamais dix mille à chaque balayage — et un échec
+    // n'enlève rien au reste de la réponse.
+    let worth = null;
+    try {
+      const ids = body.machines.map((m) => m.tokenId);
+      const accounts = ids.map((id) => [id, meta.get(id)?.wallet]).filter(([, w]) => w);
+      const [own, mine] = await Promise.all([
+        readWalletBalances(address),
+        accounts.length && stockTokens.length
+          ? readHoldings({
+              aggregate3: multicallOf(provider, ADDRESSES.MULTICALL3),
+              accounts, tokens: stockTokens, batchSize: cfg.multicallBatchSize,
+            })
+          : { holdings: new Map() },
+      ]);
+
+      const priceOf = (sym) => stockPrices.get(sym) ?? null;
+      worth = valueWallet({
+        machines: body.machines.map((m) => ({
+          tokenId: m.tokenId,
+          weight: m.weight,
+          classValue: traits.get(m.tokenId)?.weightClass ?? null,
+          holds: valueHoldings(mine.holdings.get(m.tokenId), priceOf),
+        })),
+        rows: snap?.rows,
+        ethUsd: snap?.eth?.usd ?? null,
+        anvilBidUsd: anvilBidUsd(snap),
+        printer: { amount: own.printer, usd: snap?.printer?.usd ?? null },
+        ownStock: own.stock,
+      });
+    } catch (e) {
+      console.error(`wallet: could not value ${address.slice(0, 10)} — ${e.message}`);
+    }
+
     res.writeHead(200, headers);
-    res.end(JSON.stringify({ ...body, sectors: SECTORS, closesAt: snap?.vote?.closesAt ?? null }));
+    res.end(JSON.stringify({ ...body, worth, sectors: SECTORS, closesAt: snap?.vote?.closesAt ?? null }));
     return;
   }
   if (req.url === appPath) {
