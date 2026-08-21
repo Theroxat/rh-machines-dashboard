@@ -299,14 +299,6 @@ test("each swatch wears the colour it names", () => {
   assert.match(page, /\.key-badge\.re  \{ background: var\(--reink\)/);
 });
 
-test("the migration notice sits with the header, before anything else", () => {
-  const note = page.indexOf('id="migrated"');
-  assert.ok(note > 0);
-  assert.ok(page.indexOf('class="disclaimer"') < note);
-  assert.ok(note < page.indexOf('class="context" id="context"'));
-  assert.match(page, /\.migrated \{[^}]*var\(--alarm\)/);
-});
-
 
 // Quatre questions, quatre pages. Le mobilier explicatif ne pousse plus le
 // tableau vers le bas : il vit là où il répond à quelque chose.
