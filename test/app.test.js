@@ -2075,6 +2075,59 @@ test("the panel says a floor is an asking price, not a payout", () => {
   assert.doesNotMatch(html, /Anvil/);
 });
 
+// Le total disait $1,344 pour l'ensemble ; savoir laquelle des machines en
+// porte quelle part demandait de refaire la répartition de tête.
+test("each machine carries its own estimate, not just the total", () => {
+  const html = walletDetailHtml({
+    ...WORTH,
+    worth: { ...WORTH.worth, lines: [
+      { tokenId: 4347, machineUsd: 238, insideUsd: 25.38 },
+      { tokenId: 463, machineUsd: 194, insideUsd: 12.36 },
+    ] },
+  });
+  assert.match(html, /<span class="price">\$238\.00<\/span><span class="per est">class floor</);
+  assert.match(html, /<span class="price">\$194\.00<\/span><span class="per est">class floor</);
+  assert.match(html, /worth about \$238\.00 at the floor of its class and state/);
+  // Neutre, pas vert : ce n'est pas ce que le protocole verse.
+  const css = readFileSync(new URL("../src/public/index.html", import.meta.url), "utf8");
+  assert.match(css, /\.chip \.per\.est \{[^}]*var\(--muted\)/);
+});
+
+// Additionner les vignettes doit retomber sur le total de la carte : arrondies
+// au dollar, cinq machines à $179.48 en perdent deux en route.
+test("the tiles add up to the total stated above them", () => {
+  const lines = [
+    { tokenId: 4347, machineUsd: 263.23, insideUsd: 0 },
+    { tokenId: 463, machineUsd: 179.48, insideUsd: 0 },
+  ];
+  const html = walletDetailHtml({ ...WORTH, worth: { ...WORTH.worth, lines, machinesUsd: 442.71 } });
+  const tiles = [...html.matchAll(/<span class="price">\$([\d,.]+)<\/span><span class="per est">/g)]
+    .map((m) => Number(m[1].replace(/,/g, "")));
+  assert.equal(tiles.reduce((a, b) => a + b, 0).toFixed(2), "442.71");
+});
+
+// Une machine que rien ne peut estimer laisserait un trou, et un trou entre un
+// prix et un revenu se lit comme un zéro.
+test("a machine with no comparable on sale says so on its own tile", () => {
+  const html = walletDetailHtml({
+    ...WORTH,
+    worth: { ...WORTH.worth, unpriced: 1, lines: [
+      { tokenId: 4347, machineUsd: null, insideUsd: 0 },
+      { tokenId: 463, machineUsd: 194, insideUsd: 0 },
+    ] },
+  });
+  assert.match(html, /<span class="price none">&#8212;<\/span><span class="per est">no floor</);
+  assert.match(html, /nothing comparable is on sale, so there is no floor to read/);
+});
+
+// Les vignettes du marché portent un prix demandé, pas une estimation : rien
+// ne doit s'ajouter sous celles-là.
+test("the market tiles gain no estimate they were never given", () => {
+  const html = halfCell(half({ entries: [entry(1, 0.1)] }), "ink", { ethUsd: 2000 });
+  assert.doesNotMatch(html, /class="per est"/);
+  assert.doesNotMatch(html, /class="price none"/);
+});
+
 test("a machine nothing can price is left out, and counted out loud", () => {
   const html = walletDetailHtml({ ...WORTH, worth: { ...WORTH.worth, unpriced: 2 } });
   assert.match(html, /2 machine\(s\) left out/);

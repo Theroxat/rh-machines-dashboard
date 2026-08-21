@@ -335,7 +335,7 @@ export function contextHtml(d, now = null) {
  * dérivé : le badge de re-encrage n'existait que du côté OpenSea, si bien
  * qu'une x10 re-inkée au plafond passait pour une x10 ordinaire sur le rayon.
  */
-function chip(e, { isFloor = false, ethUsd = null, anvil = false, showPrice = true, perPoint = null, classLabel = null } = {}) {
+function chip(e, { isFloor = false, ethUsd = null, anvil = false, showPrice = true, perPoint = null, classLabel = null, estUsd } = {}) {
   const hw = e.machine?.headwear ? ` · ${headwearLabel(e.machine.headwear)}` : "";
   const img = e.machine?.image
     ? `<img src="${esc(e.machine.image)}" alt="Machine #${e.tokenId}" loading="lazy" width="78" height="78">`
@@ -377,6 +377,17 @@ function chip(e, { isFloor = false, ethUsd = null, anvil = false, showPrice = tr
     ? ""
     : `<span class="earns">${fmtUsd(e.epochUsd)}</span>` +
       `<span class="per">this drop</span>`;
+
+  // Ce que la machine vaut, sur sa propre vignette. Le total disait $1,024 pour
+  // les cinq ensemble ; savoir laquelle en porte $238 demandait de refaire la
+  // répartition de tête. Une machine que rien ne peut estimer le dit, plutôt
+  // que de laisser un trou qui se lirait comme zéro.
+  const est = estUsd === undefined ? ""
+    : estUsd === null
+      ? `<span class="price none">&#8212;</span><span class="per est">no floor</span>`
+      // Au centime : arrondies au dollar, cinq vignettes font $979 quand la
+      // carte au-dessus en annonce $981, et c'est la carte qui a raison.
+      : `<span class="price">${fmtUsd(estUsd)}</span><span class="per est">class floor</span>`;
 
   // Ce que la machine contient déjà. Le compte appartient au jeton, donc cela
   // part avec elle : une x1 à $100 avec $12 d'actions dedans et la même vidée
@@ -428,6 +439,11 @@ function chip(e, { isFloor = false, ethUsd = null, anvil = false, showPrice = tr
       : ` · takes ${fmtUsd(e.epochUsd)} of the pot waiting now, at weight ${fmtExact(e.weight / 100)}x` +
         ` — up to ${fmtUsd(e.epochUsd * 2)} if the vote lands on its desk`;
 
+  const estStory = estUsd === undefined ? ""
+    : estUsd === null
+      ? ` · nothing comparable is on sale, so there is no floor to read`
+      : ` · worth about ${fmtUsd(estUsd)} at the floor of its class and state`;
+
   const pointStory = perPoint !== null
     ? ` · ${fmtUsd(perPoint, 0)} per weight point` +
       (e.dormantHere ? ", activation included" : "") +
@@ -436,8 +452,9 @@ function chip(e, { isFloor = false, ethUsd = null, anvil = false, showPrice = tr
 
   return `<a class="chip${isFloor ? " floor" : ""}${anvil ? " anvil" : ""}${!anvil && e.underBid ? " is-under" : ""}${reinked ? " is-reinked" : ""}"` +
     ` href="${anvil ? ANVIL_URL : itemUrl(e.tokenId)}" target="_blank" rel="noopener"` +
-    ` title="${esc(`#${e.tokenId}${hw}${earnStory}${pointStory}${inkStory}${bidStory}${anvilStory}`)}">` +
+    ` title="${esc(`#${e.tokenId}${hw}${estStory}${earnStory}${pointStory}${inkStory}${bidStory}${anvilStory}`)}">` +
     `<span class="thumb">${img}${badge}${cls}${under}</span>` +
+    est +
     (showPrice ? `<span class="price">${price}</span>` : "") +
     (showPrice && dollars ? `<span class="usd">${dollars}</span>` : "") +
     earns +
@@ -1170,11 +1187,17 @@ export function walletDetailHtml(w) {
       `<p class="w-small">These ${fmtInt(w.machines.length)} machines take <b>${fmtUsd(w.cutUsd)}</b> ` +
       `of the pot waiting now.</p>`) + `</div>`;
 
+  // Le prix est déjà calculé, une ligne par machine, pour faire le total de la
+  // carte. Il descend jusqu'à la vignette plutôt que de rester agrégé.
+  const estOf = new Map((wo?.lines ?? []).map((l) => [l.tokenId, l.machineUsd]));
   const list = w.machines
     .map((m) => chip(
       { tokenId: m.tokenId, machine: { image: m.image, headwear: null, desk: m.desk },
         weight: m.weight, inkMult: null, epochUsd: m.epochUsd, holds: m.holds },
-      { showPrice: false, classLabel: m.desk ?? null },
+      // Portefeuille non valorisé du tout : pas de ligne, plutôt qu'un « no
+      // floor » sur chacune — l'absence de calcul n'est pas l'absence de marché.
+      { showPrice: false, classLabel: m.desk ?? null,
+        estUsd: wo ? estOf.get(m.tokenId) ?? null : undefined },
     ))
     .join("");
 
