@@ -247,7 +247,9 @@ test("the wallet label faces its field rather than sinking under it", () => {
 // Le rouge dit « re-inkée » et l'ambre dit « un prix ». La rareté n'est ni l'un
 // ni l'autre : son badge reste neutre, sinon il emprunte un sens qui n'est pas le sien.
 test("the class badge borrows neither the re-inking red nor the price amber", () => {
-  const rule = page.match(/\.cls-badge \{[^}]*\}/)[0];
+  // Ancré sur la règle de base : « .w-strip .cls-badge » contient la même
+  // chaîne et se faisait attraper à sa place.
+  const rule = page.match(/\n  \.cls-badge \{[^}]*\}/)[0];
   assert.doesNotMatch(rule, /var\(--reink\)|var\(--ink\)/);
   assert.match(rule, /bottom: 0; left: 0/);
 });

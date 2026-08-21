@@ -328,12 +328,29 @@ const server = createServer(async (req, res) => {
       return;
     }
     const snap = store.get().data;
+    // Les avoirs des machines du portefeuille : lus une fois, servis à la
+    // fois aux vignettes et au calcul de valeur.
+    const ownedIds = tokensOf(owners.byOwner, address);
+    const ownedAccounts = ownedIds.map((id) => [id, meta.get(id)?.wallet]).filter(([, w]) => w);
+    const ownedHeld = ownedAccounts.length && stockTokens.length
+      ? await readHoldings({
+          aggregate3: multicallOf(provider, ADDRESSES.MULTICALL3),
+          accounts: ownedAccounts, tokens: stockTokens, batchSize: cfg.multicallBatchSize,
+        }).catch(() => ({ holdings: new Map() }))
+      : { holdings: new Map() };
+    const priceOfStock = (sym) => stockPrices.get(sym) ?? null;
+    const holdsOf = (id) => {
+      const v = valueHoldings(ownedHeld.holdings.get(id), priceOfStock);
+      return v.lines.length ? { lines: v.lines, usd: v.usd } : null;
+    };
     const sectorWeight = new Array(16).fill(0);
     for (const [tokenId, index] of deskIndex) sectorWeight[index] += Number(weights.get(tokenId) ?? 0n);
     const fleetWeight = snap?.pot?.fleetWeight ?? null;
     const body = analyseWallet({
       address: address.trim().toLowerCase(),
-      tokenIds: tokensOf(owners.byOwner, address),
+      tokenIds: ownedIds,
+      imageOf: (id) => meta.get(id)?.image ?? null,
+      holdsOf,
       weightOf: (id) => Number(weights.get(id) ?? 0n),
       deskOf: (id) => deskIndex.get(id) ?? null,
       // La même fonction que le tableau : sans quoi la somme des machines d'un
@@ -351,25 +368,13 @@ const server = createServer(async (req, res) => {
     // n'enlève rien au reste de la réponse.
     let worth = null;
     try {
-      const ids = body.machines.map((m) => m.tokenId);
-      const accounts = ids.map((id) => [id, meta.get(id)?.wallet]).filter(([, w]) => w);
-      const [own, mine] = await Promise.all([
-        readWalletBalances(address),
-        accounts.length && stockTokens.length
-          ? readHoldings({
-              aggregate3: multicallOf(provider, ADDRESSES.MULTICALL3),
-              accounts, tokens: stockTokens, batchSize: cfg.multicallBatchSize,
-            })
-          : { holdings: new Map() },
-      ]);
-
-      const priceOf = (sym) => stockPrices.get(sym) ?? null;
+      const own = await readWalletBalances(address);
       worth = valueWallet({
         machines: body.machines.map((m) => ({
           tokenId: m.tokenId,
           weight: m.weight,
           classValue: traits.get(m.tokenId)?.weightClass ?? null,
-          holds: valueHoldings(mine.holdings.get(m.tokenId), priceOf),
+          holds: m.holds,
         })),
         rows: snap?.rows,
         ethUsd: snap?.eth?.usd ?? null,

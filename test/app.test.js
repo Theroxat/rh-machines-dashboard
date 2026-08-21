@@ -1475,11 +1475,21 @@ test("the detail says what a single vote is really worth, without dressing it up
   assert.match(html, /barely moves a\s+ballot/);
 });
 
-test("every machine is listed with its desk, its ticker and what it earns", () => {
-  const html = walletDetailHtml(WALLET);
-  assert.match(html, /#4347/);
-  assert.match(html, /real estate · SPCX/);
-  assert.match(html, /\$27\.72/);
+// Cette page était la seule à parler de machines sans en montrer une.
+test("the wallet shows its machines as pictures, like the market does", () => {
+  const html = walletDetailHtml({ ...WALLET, machines: WALLET.machines.map((m) => ({ ...m, image: `https://img/${m.tokenId}.webp` })) });
+  assert.match(html, /class="chip/);
+  assert.match(html, /src="https:\/\/img\/4347\.webp"/);
+  assert.match(html, /class="tok">#4347</);
+  assert.match(html, /class="cls-badge">real estate</);
+  assert.match(html, /class="earns">\$27\.72</);
+});
+
+// Le prix n'a pas de sens sur une machine qu'on possède : elle n'est pas en vente.
+test("a machine you own carries no price, having none", () => {
+  const html = walletDetailHtml({ ...WALLET, machines: [{ ...WALLET.machines[0], image: "u" }] });
+  assert.doesNotMatch(html, /class="price"/);
+  assert.doesNotMatch(html, /class="usd"/);
 });
 
 test("a wallet holding nothing is told so, rather than shown an empty table", () => {

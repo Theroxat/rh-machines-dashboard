@@ -85,7 +85,7 @@ export function sweepCut(s, { myWeight, myByDesk, potUsd, fleetWeight, sectorWei
 
 /** Le portefeuille : ses machines, son poids, sa part, son conseil. */
 export function analyseWallet({
-  address, tokenIds, weightOf, deskOf, epochUsdOf,
+  address, tokenIds, weightOf, deskOf, epochUsdOf, imageOf, holdsOf,
   tally, potUsd, fleetWeight, sectorWeight, tickers = [],
 }) {
   const machines = tokenIds.map((tokenId) => {
@@ -98,6 +98,10 @@ export function analyseWallet({
       desk: deskName(index),
       ticker: index === null || index === undefined ? null : (tickers[index] ?? null),
       epochUsd: epochUsdOf ? epochUsdOf(weight, tokenId) : null,
+      // De quoi dessiner la machine plutôt que de la nommer : la page du
+      // portefeuille était la seule à parler de machines sans en montrer une.
+      image: imageOf ? imageOf(tokenId) : null,
+      holds: holdsOf ? holdsOf(tokenId) : null,
     };
   }).sort((a, b) => b.weight - a.weight || a.tokenId - b.tokenId);
 

@@ -1179,15 +1179,18 @@ export function walletDetailHtml(w) {
     `<span class="w-small">A floor is what others are asking, not what you would be paid. ` +
     `The Anvil's bid is the part you could take today, and it pays in $PRINTER.</span></div>`;
 
-  const list = w.machines.map((m) => {
-    const desk = m.desk ? `${esc(m.desk)}${m.ticker ? ` · ${esc(m.ticker)}` : ""}` : "no desk read";
-    return `<li><a href="${itemUrl(m.tokenId)}" target="_blank" rel="noopener">#${m.tokenId}</a>` +
-      `<span class="w-w">${(m.weight / 100).toFixed(2)}x</span>` +
-      `<span class="w-desk">${desk}</span>` +
-      `<span class="w-earn">${m.epochUsd === null ? "—" : fmtUsd(m.epochUsd)}</span></li>`;
-  }).join("");
+  // Les machines, en vignettes. Cette page était la seule à parler de machines
+  // sans en montrer une : on y lisait « #4347 · real estate » là où le marché
+  // affiche une image, un poids et ce que la machine contient.
+  const list = w.machines
+    .map((m) => chip(
+      { tokenId: m.tokenId, machine: { image: m.image, headwear: null, desk: m.desk },
+        weight: m.weight, inkMult: null, epochUsd: m.epochUsd, holds: m.holds },
+      { showPrice: false, classLabel: m.desk ?? null },
+    ))
+    .join("");
 
-  return head + why + `<ul class="w-list">${list}</ul>` + worthBlock;
+  return head + why + `<span class="strip w-strip">${list}</span>` + worthBlock;
 }
 
 /**
