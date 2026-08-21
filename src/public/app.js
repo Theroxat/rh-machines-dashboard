@@ -758,6 +758,9 @@ export function machineDetailHtml(d, tokenId) {
     activationUsd: d.ink?.activationTotalUsd ?? null,
   });
   const yieldPct = e.epochUsd && priceUsd ? e.epochUsd / priceUsd : null;
+  const bidUsd = usdOf(e.anvilBidEth, ethUsd);
+  const gainUsd = bidUsd === null || priceUsd === null ? null : bidUsd - priceUsd;
+  const short = (a) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
   const facts =
     factRow("Class", esc(r.classLabel), `${fmtInt(r.chainCount)} machines are born in it`) +
@@ -798,11 +801,23 @@ export function machineDetailHtml(d, tokenId) {
       "of its price is already waiting in the pot") +
     factRow("Per point", perPoint === null ? null : fmtUsd(perPoint),
       `what one x1 point of weight costs here${dormant ? ", activation included" : ""}`) +
-    factRow("Anvil bid", !anvil && e.anvilBidEth ? `${fmtEth(e.anvilBidEth)} ETH` : null,
+    factRow("Anvil bid",
+      !anvil && e.anvilBidEth
+        ? `${fmtEth(e.anvilBidEth)} ETH` + (bidUsd === null ? "" : ` · ${fmtUsd(bidUsd)}`)
+        : null,
       e.anvilBidPrinter
         ? `${fmtInt(e.anvilBidPrinter)} $PRINTER, net of the sell fee` +
-          (e.underBid ? " — more than it is listed for" : "")
+          // La vignette annonçait « +$82 » et la fiche ne le disait pas : elle
+          // donnait l'offre sans l'écart, c'est-à-dire sans l'information.
+          (e.underBid && gainUsd !== null
+            ? ` — ${fmtUsd(gainUsd)} more than it is listed for, but paid in $PRINTER`
+            : e.underBid ? " — more than it is listed for" : "")
         : "") +
+    factRow("Background", m.background ? esc(m.background) : null, "cosmetic") +
+    // De quoi vérifier soi-même plutôt que de nous croire.
+    factRow("Its account", e.account ? esc(short(e.account)) : null,
+      "the machine's own address — this is where the stock lands, and it goes with the sale") +
+    factRow("Held by", e.owner ? esc(short(e.owner)) : null, "the wallet that owns the machine today") +
     factRow("Headwear", m.headwear ? esc(headwearLabel(m.headwear)) : null, "the trait that seals the class") +
     factRow("Body", m.body ? esc(m.body) : null, "cosmetic — the desk is read from the chain") +
     factRow("Eyes", m.eyes ? esc(m.eyes) : null, "cosmetic");

@@ -195,7 +195,7 @@ async function sweepBook() {
     grid, printer, eth, protocol, stats,
     book: { listed: book.listings.size, pages: book.pages, skipped: book.skipped },
     inkMeta, meta, legend, ink, weights, anvil, deskIndex, vote, potUsd, sectorWeight, tickers,
-    holdings: held?.holdings, stockPrices, now: Date.now(),
+    holdings: held?.holdings, stockPrices, ownerOf: owners.byToken, now: Date.now(),
   });
   store.succeed(composed);
 

@@ -1974,3 +1974,39 @@ test("a token amount keeps the digits that tell two machines apart", () => {
   assert.equal(fmtAmount(0.000076247801140718), "0.00007625");
   assert.equal(fmtAmount(9), "9");
 });
+
+// La vignette annonçait « +$82 » et la fiche ne le disait pas : elle donnait
+// l'offre de l'anvil sans l'écart, c'est-à-dire sans l'information.
+test("the panel carries the gap the chip advertises, and what it is paid in", () => {
+  const d = { ...DETAIL, rows: [{ ...DETAIL.rows[0], inked: half({ entries: [{
+    ...DETAIL.rows[0].inked.entries[0], tokenId: 3145, priceEth: 0.3,
+    anvilBidEth: 0.34, anvilBidPrinter: 21073, underBid: true }] }) }] };
+  const html = machineDetailHtml(d, 3145);
+  assert.match(html, /Anvil bid<\/span><span class="d-v">0\.3400 ETH · \$680\.00</);
+  assert.match(html, /\$80\.00 more than it is listed for, but paid in \$PRINTER/);
+});
+
+// De quoi vérifier soi-même plutôt que de nous croire.
+test("the panel names the machine's own account and who holds it", () => {
+  const d = { ...DETAIL, rows: [{ ...DETAIL.rows[0], inked: half({ entries: [{
+    ...DETAIL.rows[0].inked.entries[0], tokenId: 3145,
+    account: "0x7fe0c060547Be83af5947a956F0d4dAcabC647A8",
+    owner: "0xE908ba570259E4bB1e1fDd2EDd9B15E092B13211" }] }) }] };
+  const html = machineDetailHtml(d, 3145);
+  assert.match(html, /Its account<\/span><span class="d-v">0x7fe0…47A8</);
+  assert.match(html, /where the stock lands, and it goes with the sale/);
+  assert.match(html, /Held by<\/span><span class="d-v">0xE908…3211</);
+});
+
+test("a machine whose account or owner we could not read claims neither", () => {
+  const html = machineDetailHtml(DETAIL, 3145);
+  assert.doesNotMatch(html, /Its account/);
+  assert.doesNotMatch(html, /Held by/);
+});
+
+test("the panel shows the background, the one trait it was leaving out", () => {
+  const d = { ...DETAIL, rows: [{ ...DETAIL.rows[0], inked: half({ entries: [{
+    ...DETAIL.rows[0].inked.entries[0], tokenId: 3145,
+    machine: { ...DETAIL.rows[0].inked.entries[0].machine, background: "Acid Lime" } }] }) }] };
+  assert.match(machineDetailHtml(d, 3145), /Background<\/span><span class="d-v">Acid Lime</);
+});

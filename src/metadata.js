@@ -5,7 +5,7 @@ import { OPENSEA, ADDRESSES, TOTAL_MACHINES } from "./config.js";
 /** Le cache est versionné : une version antérieure ne portait pas Eyes, et la
  *  relire telle quelle donnerait un filtre qui ne trouve jamais rien, sans la
  *  moindre erreur. Un changement de forme force la relecture. */
-const CACHE_VERSION = 5;
+const CACHE_VERSION = 6;
 
 /** Background vaut « Acid Lime » sur les 10 000 machines : il ne distingue rien
  *  et n'est donc pas stocké. Les trois autres traits varient. */
@@ -18,6 +18,7 @@ function traitsOf(nft, image) {
     headwear: t.Headwear ?? null,
     body: t.Body ?? null,
     eyes: t.Eyes ?? null,
+    background: t.Background ?? null,
     // Le desk n'a jamais été dans les métadonnées : la page le lit sur la
     // chaîne, où il fait autorité. L'équipe est en train de l'y ajouter, et
     // quand il arrivera ce champ servira à recouper — pas à décider. Deux
@@ -129,6 +130,7 @@ export function readCache(path) {
       headwear: v.headwear ?? null,
       body: v.body ?? null,
       eyes: v.eyes ?? null,
+      background: v.background ?? null,
       desk: v.desk ?? null,
       weight: v.weight ?? null,
       multiplier: v.multiplier ?? null,

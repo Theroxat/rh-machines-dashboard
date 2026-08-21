@@ -9,7 +9,7 @@ import { valueHoldings } from "./holdings.js";
  *  diviserait par une valeur non lue produit null plutôt qu'un zéro confiant. */
 export function composeSnapshot({
   grid, printer, eth, protocol, stats, book, inkMeta, meta, legend, ink, weights, anvil,
-  deskIndex, vote, potUsd, sectorWeight, tickers, holdings, stockPrices, now,
+  deskIndex, vote, potUsd, sectorWeight, tickers, holdings, stockPrices, ownerOf, now,
 }) {
   const activationPrinter = protocol?.activationInk
     ? Number(BigInt(protocol.activationInk) / 10n ** 15n) / 1000
@@ -138,6 +138,10 @@ export function composeSnapshot({
         inkPrinter: i === undefined ? null : Number(i / PRINTER),
         epochUsd: returnOf(e.tokenId, weight),
         holds: heldBy(e.tokenId),
+        // Le compte du NFT et son porteur : de quoi vérifier soi-même ce que
+        // la fiche annonce, sans avoir à nous croire.
+        account: meta?.get(e.tokenId)?.wallet ?? null,
+        owner: ownerOf?.get(e.tokenId) ?? null,
         // Une machine dormante ne pèse rien : un rapport n'aurait aucun sens.
         inkMult: weight ? weight / classValue : null,
         anvilBidPrinter: anvil?.bids?.get(e.tokenId) ?? null,
