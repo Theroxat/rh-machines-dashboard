@@ -265,17 +265,6 @@ function loop(name, fn, intervalMs, { runNow = true } = {}) {
  */
 const ERC20_BAL = new ethers.Interface(["function balanceOf(address) view returns (uint256)"]);
 
-/** Ce que l'anvil paierait, en dollars. La même somme pour n'importe quelle
- *  machine — vérifié sur les 467 annonces — donc un seul chiffre suffit. Le
- *  frais de vente est déduit : encaisser suppose de revendre ce $PRINTER. */
-function anvilBidUsd(snap) {
-  const spot = snap?.anvil?.spotPrinter;
-  const price = snap?.printer?.usd;
-  const fee = snap?.protocol?.sellFeeBps;
-  if (!spot || !price || fee === null || fee === undefined) return null;
-  return spot * price * (1 - fee / 10000);
-}
-
 async function readWalletBalances(address) {
   const bal = async (token, decimals) => {
     try {
@@ -378,7 +367,6 @@ const server = createServer(async (req, res) => {
         })),
         rows: snap?.rows,
         ethUsd: snap?.eth?.usd ?? null,
-        anvilBidUsd: anvilBidUsd(snap),
         printer: { amount: own.printer, usd: snap?.printer?.usd ?? null },
         ownStock: own.stock,
       });

@@ -2027,7 +2027,7 @@ test("the wallet line leads with what the whole thing is worth", () => {
 test("the worth card breaks the total into the four things it counts", () => {
   const html = walletDetailHtml(WORTH);
   assert.match(html, /What it is worth<\/span><span class="w-big">\$1,344</);
-  assert.match(html, /2 machines<\/span><span class="ww-v">\$1,116<\/span><span class="ww-x">at the better of their class floor/);
+  assert.match(html, /2 machines<\/span><span class="ww-v">\$1,116<\/span><span class="ww-x">at their class floor/);
   assert.match(html, /stock inside them.*\$76\.17.*goes with the machine if it sells/s);
   assert.match(html, /stock withdrawn.*\$30\.00.*0\.1434 NVDA/s);
   assert.match(html, /\$PRINTER<\/span><span class="ww-v">\$121\.92<\/span><span class="ww-x">11,104 held/);
@@ -2053,10 +2053,14 @@ test("a gain under a cent is said in words, not rounded to nothing", () => {
 
 // Un floor est un prix demandé, pas un prix obtenu. Le dire vaut mieux que le
 // sous-entendre sous un total qui a l'air d'un solde bancaire.
+// Un floor est un prix demandé, pas un prix obtenu. Le dire vaut mieux que le
+// sous-entendre sous un total qui a l'air d'un solde bancaire.
 test("the panel says a floor is an asking price, not a payout", () => {
   const html = walletDetailHtml(WORTH);
   assert.match(html, /what others are asking, not what you would be paid/);
-  assert.match(html, /pays in \$PRINTER/);
+  assert.match(html, /a thin class can move on one listing/);
+  // Le portefeuille ne se valorise pas sur un marché dont il n'a pas été question.
+  assert.doesNotMatch(html, /Anvil/);
 });
 
 test("a machine nothing can price is left out, and counted out loud", () => {

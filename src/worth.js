@@ -3,11 +3,11 @@
  *
  * Quatre choses s'y trouvent, et elles ne se valorisent pas de la même façon.
  *
- * Les machines : elles n'ont pas de prix, seulement un marché. On retient le
- * plus offrant entre le floor de leur propre case — ce que des machines
- * identiques demandent aujourd'hui — et l'offre de l'anvil, qui a le mérite
- * d'être exécutable à l'instant. Un floor est un prix demandé, pas un prix
- * obtenu ; c'est dit plutôt que sous-entendu.
+ * Les machines : au floor de leur propre case, c'est-à-dire au prix que
+ * demandent aujourd'hui des machines de même classe et de même état. Un floor
+ * est un prix demandé et pas un prix obtenu ; c'est dit plutôt que sous-entendu.
+ * L'offre de l'anvil entrait autrefois dans le calcul, et le portefeuille se
+ * valorisait alors sur un marché dont il n'a pas été question.
  *
  * Les actions dans le compte de chaque machine : elles partent avec elle, donc
  * elles comptent une fois, du côté des machines et pas ailleurs.
@@ -26,19 +26,12 @@ export function floorFor(rows, classValue, side, ethUsd) {
   return eth && ethUsd ? eth * ethUsd : null;
 }
 
-export function valueWallet({ machines, rows, ethUsd, anvilBidUsd, printer, ownStock }) {
-  const lines = (machines ?? []).map((m) => {
-    const floor = floorFor(rows, m.classValue, m.weight ? "inked" : "dormant", ethUsd);
-    // Le plus offrant des deux : on vend là où l'on est le mieux payé, et
-    // l'anvil paie le même prix pour n'importe quelle machine.
-    const best = floor === null ? anvilBidUsd : (anvilBidUsd === null ? floor : Math.max(floor, anvilBidUsd));
-    return {
-      tokenId: m.tokenId,
-      machineUsd: best ?? null,
-      basis: best === null ? null : (best === anvilBidUsd && (floor === null || anvilBidUsd >= floor) ? "anvil" : "floor"),
-      insideUsd: m.holds?.usd ?? 0,
-    };
-  });
+export function valueWallet({ machines, rows, ethUsd, printer, ownStock }) {
+  const lines = (machines ?? []).map((m) => ({
+    tokenId: m.tokenId,
+    machineUsd: floorFor(rows, m.classValue, m.weight ? "inked" : "dormant", ethUsd),
+    insideUsd: m.holds?.usd ?? 0,
+  }));
 
   const priced = lines.filter((l) => l.machineUsd !== null);
   const machinesUsd = priced.length ? sum(priced.map((l) => l.machineUsd)) : null;

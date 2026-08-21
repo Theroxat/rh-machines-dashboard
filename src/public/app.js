@@ -1142,7 +1142,7 @@ export function walletDetailHtml(w) {
     (wo.machinesUsd === null ? "" :
       `<li><span class="ww-k">${fmtInt(w.machines.length)} machines</span>` +
       `<span class="ww-v">${fmtUsdRound(wo.machinesUsd)}</span>` +
-      `<span class="ww-x">at the better of their class floor and the Anvil's standing bid</span></li>`) +
+      `<span class="ww-x">at their class floor — the cheapest asking price for the same class and state</span></li>`) +
     (wo.insideUsd === null ? "" :
       `<li><span class="ww-k">stock inside them</span>` +
       `<span class="ww-v">${fmtUsd(wo.insideUsd)}</span>` +
@@ -1156,9 +1156,9 @@ export function walletDetailHtml(w) {
       `<span class="ww-v">${fmtUsd(wo.printerUsd)}</span>` +
       `<span class="ww-x">${fmtInt(Math.round(wo.printerAmount))} held</span></li>`) +
     `</ul>` +
-    (wo.unpriced ? `<p class="w-small">${fmtInt(wo.unpriced)} machine(s) left out — nothing comparable is on sale and the Anvil would not bid.</p>` : "") +
-    `<p class="w-small">A floor is what others are asking, not what you would be paid. ` +
-    `The Anvil's bid is the part you could take today, and it pays in $PRINTER.</p></div>`;
+    (wo.unpriced ? `<p class="w-small">${fmtInt(wo.unpriced)} machine(s) left out — nothing comparable is on sale, so there is no price to read.</p>` : "") +
+    `<p class="w-small">A floor is what others are asking, not what you would be paid — ` +
+    `nobody is bidding that, and a thin class can move on one listing.</p></div>`;
 
   const best = w.advice?.best;
   const voteCard = `<div class="w-card"><span class="label">What to vote</span>` +

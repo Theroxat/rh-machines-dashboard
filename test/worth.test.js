@@ -9,16 +9,14 @@ const ROWS = [
 const m = (tokenId, classValue, weight, insideUsd = 0) =>
   ({ tokenId, classValue, weight, holds: insideUsd ? { usd: insideUsd } : null });
 
-test("a machine is worth the better of its class floor and the anvil's bid", () => {
-  // floor x1 inkée = $100, l'anvil paie $220 → l'anvil
-  const w = valueWallet({ machines: [m(1, 100, 100)], rows: ROWS, ethUsd: 2000, anvilBidUsd: 220 });
-  assert.equal(w.lines[0].machineUsd, 220);
-  assert.equal(w.lines[0].basis, "anvil");
-
-  // floor x10 inkée = $3000, l'anvil paie toujours $220 → le floor
-  const big = valueWallet({ machines: [m(2, 1000, 1000)], rows: ROWS, ethUsd: 2000, anvilBidUsd: 220 });
+// Le floor de sa propre case, et rien d'autre : l'offre de l'anvil entrait
+// autrefois dans le calcul, et le portefeuille se valorisait alors sur un
+// marché dont il n'a pas été question.
+test("a machine is worth the floor of its own cell", () => {
+  const w = valueWallet({ machines: [m(1, 100, 100)], rows: ROWS, ethUsd: 2000 });
+  assert.equal(w.lines[0].machineUsd, 100);
+  const big = valueWallet({ machines: [m(2, 1000, 1000)], rows: ROWS, ethUsd: 2000 });
   assert.equal(big.lines[0].machineUsd, 3000);
-  assert.equal(big.lines[0].basis, "floor");
 });
 
 test("a dormant machine is valued against dormant listings, not inked ones", () => {
@@ -27,8 +25,8 @@ test("a dormant machine is valued against dormant listings, not inked ones", () 
 });
 
 // On ne devine pas un prix sur un marché vide.
-test("a machine nobody sells and the anvil will not bid on is left out of the total", () => {
-  const w = valueWallet({ machines: [m(1, 1000, 0)], rows: ROWS, ethUsd: 2000, anvilBidUsd: null });
+test("a machine nobody sells a comparable of is left out of the total", () => {
+  const w = valueWallet({ machines: [m(1, 1000, 0)], rows: ROWS, ethUsd: 2000 });
   assert.equal(w.lines[0].machineUsd, null);
   assert.equal(w.unpriced, 1);
   assert.equal(w.machinesUsd, null);
@@ -38,27 +36,27 @@ test("a machine nobody sells and the anvil will not bid on is left out of the to
 test("everything a wallet holds is counted, each in its own place", () => {
   const w = valueWallet({
     machines: [m(1, 100, 100, 12.5), m(2, 100, 100, 7.5)],
-    rows: ROWS, ethUsd: 2000, anvilBidUsd: 220,
+    rows: ROWS, ethUsd: 2000,
     printer: { amount: 11104, usd: 0.011 },
     ownStock: [{ symbol: "NVDA", amount: 0.14, usd: 30 }],
   });
-  assert.equal(w.machinesUsd, 440);
+  assert.equal(w.machinesUsd, 200);
   assert.equal(w.insideUsd, 20);
   assert.equal(w.printerUsd.toFixed(2), "122.14");
   assert.equal(w.stockUsd, 30);
-  assert.equal(w.total.toFixed(2), "612.14");
+  assert.equal(w.total.toFixed(2), "372.14");
 });
 
 test("a wallet holding no token claims no token value", () => {
-  const w = valueWallet({ machines: [m(1, 100, 100)], rows: ROWS, ethUsd: 2000, anvilBidUsd: 220 });
+  const w = valueWallet({ machines: [m(1, 100, 100)], rows: ROWS, ethUsd: 2000 });
   assert.equal(w.printerUsd, null);
   assert.equal(w.stockUsd, null);
   assert.equal(w.insideUsd, null);
-  assert.equal(w.total, 220);
+  assert.equal(w.total, 100);
 });
 
 test("an empty wallet is worth nothing knowable, not zero", () => {
-  const w = valueWallet({ machines: [], rows: ROWS, ethUsd: 2000, anvilBidUsd: 220 });
+  const w = valueWallet({ machines: [], rows: ROWS, ethUsd: 2000 });
   assert.equal(w.total, null);
   assert.equal(w.machinesUsd, null);
 });
