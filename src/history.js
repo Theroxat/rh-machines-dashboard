@@ -62,6 +62,11 @@ const SCHEMA = `
   CREATE TABLE IF NOT EXISTS shelf (t INTEGER, tokenId INTEGER, askPrinter REAL, kind TEXT);
   CREATE INDEX IF NOT EXISTS shelf_token ON shelf(tokenId, t);
 
+  -- Ce qui a déjà sonné. Une annonce qui reste en place des heures ne doit
+  -- réveiller personne deux fois, et le fichier survit aux redémarrages —
+  -- sinon chaque déploiement rejouerait toutes les alertes en cours.
+  CREATE TABLE IF NOT EXISTS alerted (key TEXT PRIMARY KEY, t INTEGER, tokenId INTEGER, kind TEXT);
+
   -- Poids et encre : ils ne bougent que lorsque quelqu'un brûle.
   CREATE TABLE IF NOT EXISTS machine (t INTEGER, tokenId INTEGER, weight INTEGER, ink INTEGER);
   CREATE INDEX IF NOT EXISTS machine_token ON machine(tokenId, t);
@@ -219,6 +224,14 @@ export function openHistory(path) {
         throw e;
       }
       return counts;
+    },
+
+    /** Vrai si l'affaire n'avait jamais sonné — et elle est alors notée. */
+    claimAlert(key, tokenId, kind, t) {
+      const seen = db.prepare("SELECT 1 FROM alerted WHERE key = ?").get(key);
+      if (seen) return false;
+      db.prepare("INSERT INTO alerted VALUES (?,?,?,?)").run(key, t, tokenId, kind);
+      return true;
     },
 
     close() { try { db.close(); } catch {} },

@@ -19,6 +19,7 @@ import { readBallotTickers } from "./ballot.js";
 import { readOwners, tokensOf } from "./owners.js";
 import { openHistory } from "./history.js";
 import { readStockTokens, readHoldings } from "./holdings.js";
+import { findDeals, dealMessage, dealKey, postToDiscord } from "./alert.js";
 import { fetchStockPrices } from "./prices.js";
 import { analyseWallet, isAddress } from "./wallet.js";
 import { SECTORS } from "./desks.js";
@@ -198,6 +199,22 @@ async function sweepBook() {
     holdings: held?.holdings, stockPrices, ownerOf: owners.byToken, now: Date.now(),
   });
   store.succeed(composed);
+
+  // Ce qui mérite de sonner. Les seuils ont été calibrés sur le carnet réel :
+  // ce qui est vrai de trois cents annonces n'est pas une affaire. Sans
+  // historique on ne notifie rien plutôt que de tout rejouer à chaque
+  // redémarrage — une alerte qui se répète cesse d'être lue.
+  if (cfg.discordWebhook && history) {
+    for (const deal of findDeals(composed)) {
+      try {
+        if (!history.claimAlert(dealKey(deal), deal.tokenId, deal.kind, composed.at)) continue;
+        const ok = await postToDiscord(cfg.discordWebhook, dealMessage(deal, ADDRESSES.MACHINES));
+        console.log(`alert: ${deal.kind} on #${deal.tokenId} — ${ok ? "sent" : "webhook refused it"}`);
+      } catch (e) {
+        console.error(`alert: ${e.message}`);
+      }
+    }
+  }
 
   // Après avoir servi, jamais avant. Une écriture qui échoue est comptée et
   // annoncée ; elle ne peut pas emporter le balayage avec elle.

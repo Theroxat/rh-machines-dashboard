@@ -97,6 +97,9 @@ export function loadConfig(env, raw) {
 
   return Object.freeze({
     openseaApiKey: key,
+    // Facultatif : sans lui, le service tourne et ne notifie rien. Une adresse
+    // de webhook est un secret — elle vit dans l'environnement, jamais ici.
+    discordWebhook: (env.DISCORD_WEBHOOK ?? "").trim() || null,
     port:                num("port", 1, 65535),
     bookPollIntervalMs:  num("bookPollIntervalMs", 10000, 3600000),
     inkPollIntervalMs:   num("inkPollIntervalMs", 60000, 86400000),

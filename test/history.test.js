@@ -125,3 +125,21 @@ test("a sweep that throws leaves nothing behind", () => {
   assert.equal(h.db.prepare("SELECT COUNT(*) n FROM tick").get().n, 1);
   h.close();
 });
+
+// Une annonce qui reste en place des heures ne doit réveiller personne deux
+// fois, et la note survit aux redémarrages — sinon chaque déploiement
+// rejouerait toutes les alertes en cours.
+test("a deal sounds once, however many sweeps see it", () => {
+  const h = openHistory(":memory:");
+  assert.equal(h.claimAlert("gap:7:0.05", 7, "gap", 1000), true);
+  assert.equal(h.claimAlert("gap:7:0.05", 7, "gap", 2000), false);
+  assert.equal(h.claimAlert("gap:7:0.05", 7, "gap", 3000), false);
+  h.close();
+});
+
+test("the same machine at another price is another deal", () => {
+  const h = openHistory(":memory:");
+  assert.equal(h.claimAlert("gap:7:0.05", 7, "gap", 1000), true);
+  assert.equal(h.claimAlert("gap:7:0.04", 7, "gap", 2000), true);
+  h.close();
+});
