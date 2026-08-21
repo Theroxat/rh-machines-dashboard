@@ -342,7 +342,7 @@
   /* Aligné sur le milieu, pas sur le bas : ailleurs sur la page l'intitulé est
      au-dessus de sa commande, donc `flex-end` les met à la même base. Ici il
      est à côté, et la même règle le faisait plonger sous la boîte de saisie. */
-  .wallet-line { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 14px; }
+  .wallet-line { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
   .wallet-line .label { flex: none; }
   #wallet-input {
     font-family: inherit; font-size: 13px; color: var(--text);
@@ -834,11 +834,6 @@
   <p class="disclaimer"><span class="tag">Unofficial</span>An independent tool, not built by, affiliated with, or endorsed by the RH MACHINES team.</p>
   <p class="migrated" id="migrated"></p>
 
-  <!-- Le champ vit dans l'en-tête : la question « qu'est-ce que je possède »
-       se pose depuis n'importe quel onglet, et la réponse s'ouvre par-dessus
-       sans faire perdre sa place. -->
-  <div class="wallet-line" id="wallet-card"></div>
-
   <!-- Les onglets. Le choix vit dans l'adresse : un lien partagé rouvre la
        même page, et un rechargement ne renvoie pas au marché. -->
   <nav class="tabs" id="tabs" role="tablist">
@@ -894,6 +889,9 @@
 
 <!-- ═══ PORTEFEUILLE ═══ -->
 <section class="pane" id="pane-wallet">
+  <!-- Le champ est chez lui : cette page ne répond qu'à « qu'est-ce que je
+       possède », et la question comme la réponse y tiennent ensemble. -->
+  <div class="wallet-line" id="wallet-card"></div>
   <div id="wallet-out"></div>
 </section>
 

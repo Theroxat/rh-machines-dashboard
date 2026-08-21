@@ -204,11 +204,13 @@ test("the wallet field asks to read an address, never to connect one", () => {
 // Le portefeuille précède les filtres : on demande d'abord « qui es-tu », on
 // filtre le marché ensuite. L'inverse mettait la question personnelle après
 // quatre menus qui ne la concernent pas.
-test("the wallet field sits between the filters and the table", () => {
-  const field = page.indexOf('id="wallet-card"');
-  assert.ok(field > 0, "le champ doit exister");
-  assert.ok(page.indexOf('class="filter-bar"') < field);
-  assert.ok(field < page.indexOf('class="scroll"'));
+// Le champ est chez lui : cette page ne répond qu'à « qu'est-ce que je
+// possède », et la question comme la réponse y tiennent ensemble.
+test("the wallet field lives on the wallet page, with its answer", () => {
+  const pane = page.slice(page.indexOf('id="pane-wallet"'), page.indexOf('id="pane-vote"'));
+  assert.match(pane, /id="wallet-card"/);
+  assert.match(pane, /id="wallet-out"/);
+  assert.ok(pane.indexOf('id="wallet-card"') < pane.indexOf('id="wallet-out"'));
 });
 
 // Hors du bandeau, rien ne le redessine : une adresse à moitié tapée ne peut
@@ -220,7 +222,9 @@ test("the field lives outside the bar that redraws itself", () => {
   // Le champ est dans l'en-tête, le bandeau dans la page du marché : rien ne
   // peut le redessiner, où qu'il se trouve dans l'ordre du document.
   assert.doesNotMatch(page.slice(bar, bar + 200), /wallet-card/);
-  assert.ok(field < page.indexOf('id="pane-market"'), "le champ précède les pages");
+  // Le bandeau est sur la page du marché, le champ sur celle du portefeuille :
+  // rien ne peut le redessiner.
+  assert.ok(field > page.indexOf('id="pane-market"'));
 });
 
 // Il se fond dans la masse : même intitulé, même champ, même bordure que les
@@ -271,11 +275,12 @@ test("the state written in a cell wears its column's colour", () => {
 
 // Trois couleurs et deux badges portent tout le tableau, et rien ne les
 // présentait : « x2 » à côté de « 4x » se lisait « inkée deux fois ».
-test("a legend introduces the badges and the colours, between wallet and table", () => {
-  const key = page.indexOf('class="key"');
-  assert.ok(key > 0, "la légende doit exister");
-  assert.ok(page.indexOf('id="wallet-card"') < key);
-  assert.ok(key < page.indexOf('class="scroll"'));
+// La légende explique les vignettes : elle vit avec elles, sur la page du
+// marché, entre les filtres et le tableau.
+test("a legend introduces the badges and the colours, just above the table", () => {
+  const market = page.slice(page.indexOf('id="pane-market"'), page.indexOf('id="pane-wallet"'));
+  assert.ok(market.indexOf('id="filters"') < market.indexOf('class="key"'));
+  assert.ok(market.indexOf('class="key"') < market.indexOf('class="scroll"'));
 });
 
 test("the legend explains the journey badge, not just its shape", () => {
