@@ -632,6 +632,13 @@
      Les chiffres de tête. Six, sur une grille qui se replie : à trois cent
      soixante pixels ils se rangent par deux plutôt que de se serrer à six. */
   .p-lede { max-width: 92ch; }
+  /* Onze lignes étalées sur toute la largeur d'un écran : le montant se
+     retrouvait à mille neuf cents pixels de l'action qu'il chiffre, et cinq
+     barres sous les vingt dollars ne montraient plus rien du tout. */
+  .p-bases { max-width: 880px; }
+  .p-bases .b-name { min-width: 90px; }
+  /* Le plancher est posé dans le balisage — un pour cent dès qu'il y a un
+     dollar, zéro sinon — parce que lui seul sait laquelle des deux c'est. */
   .p-figs {
     display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
     gap: 0; margin: 14px 0 4px; border-top: 1px solid var(--rule-2);
@@ -710,65 +717,6 @@
      pas le vert de ce que le protocole verse. */
   .chip .per.est { color: var(--muted); }
   .chip .price.none { color: var(--dim); font-weight: 400; }
-
-  /* ---- PRINTER.FUN ----
-     Les chiffres de tête. Six, sur une grille qui se replie : à trois cent
-     soixante pixels ils se rangent par deux plutôt que de se serrer à six. */
-  .p-lede { max-width: 92ch; }
-  .p-figs {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 0; margin: 14px 0 4px; border-top: 1px solid var(--rule-2);
-  }
-  .p-fig { padding: 11px 18px 12px 0; }
-  .p-fig + .p-fig { padding-left: 18px; border-left: 1px solid var(--rule); }
-  .p-v { display: block; font-size: 26px; font-weight: 700; color: var(--under); line-height: 1.15; }
-  .p-k {
-    display: block; font-size: 9.5px; letter-spacing: 0.12em;
-    text-transform: uppercase; color: var(--text); margin-top: 2px;
-  }
-  .p-x { display: block; font-size: 11px; color: var(--muted); line-height: 1.4; margin-top: 2px; }
-
-  /* Le classement. Deux cent soixante-quatorze lignes : la table défile dans
-     sa propre boîte plutôt que d'allonger la page à perte de vue. */
-  .p-wrap { max-height: 70vh; overflow: auto; border-top: 1px solid var(--rule-2); margin-top: 8px; }
-  .p-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-  .p-table thead th {
-    position: sticky; top: 0; background: var(--paper); text-align: left;
-    font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase;
-    color: var(--muted); font-weight: 400; padding: 7px 10px 6px 0;
-    border-bottom: 1px solid var(--rule-2);
-  }
-  .p-table td { padding: 5px 10px 5px 0; border-bottom: 1px solid var(--rule); vertical-align: middle; }
-  .p-n { color: var(--dim); font-size: 11px; width: 34px; }
-  .p-sym { font-weight: 700; color: var(--ink); white-space: nowrap; }
-  .p-sym a { color: inherit; text-decoration: none; }
-  .p-sym a:hover .p-go, .p-sym a:focus-visible .p-go { color: var(--paper); background: var(--ink); }
-  /* Le graphique d'une graduée, chez DexTools : c'est ce qu'on vient chercher
-     dès qu'une pièce s'échange pour de bon. */
-  .p-go {
-    margin-left: 7px; font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;
-    font-weight: 700; color: var(--ink); border: 1px solid var(--ink); padding: 1px 4px;
-  }
-  .p-name { display: block; font-weight: 400; color: var(--muted); font-size: 11px; max-width: 26ch;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .p-base { color: var(--text); font-size: 11.5px; white-space: nowrap; }
-  .p-table .p-num { text-align: right; font-weight: 600; color: var(--text); white-space: nowrap; }
-  .p-table .p-dim { font-weight: 400; color: var(--muted); }
-  .p-prog { display: flex; align-items: center; gap: 9px; min-width: 190px; }
-  .p-pct { min-width: 86px; font-size: 11px; color: var(--muted); }
-  /* Courbe pleine, pool pas encore déployée : c'est un état, pas un palier. */
-  .p-pct.p-full { color: var(--ink); font-weight: 600; min-width: 156px; }
-  /* Une pièce graduée a quitté la courbe : la mention vaut mieux qu'une barre
-     pleine, qu'on lirait comme « sur le point de ». */
-  .p-tag {
-    margin-left: 6px; font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;
-    color: var(--paper); background: var(--under); padding: 1px 4px; font-weight: 700;
-  }
-  /* Jamais échangée : lancée et laissée là. La moitié du pad, et l'éteindre
-     vaut mieux que la cacher — le compte de tête l'annonce, la ligne le montre. */
-  .p-cold .p-sym { color: var(--dim); font-weight: 400; }
-  .p-cold .p-num, .p-cold .p-name { color: var(--dim); }
-  .p-cold .b-bar { visibility: hidden; }
 
   /* Le badge porte l'écart ; la phrase au-dessus de la bande dit ce qu'il veut
      dire. Deux mots de jargon ne portaient pas l'idée. */

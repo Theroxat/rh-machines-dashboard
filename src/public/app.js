@@ -1306,12 +1306,17 @@ export function padHtml(pad) {
     `Read from the two factories, not from the pad's own board.</p>`;
 
   const top = Math.max(1, ...pad.bases.map((b) => b.lockedUsd));
-  const bases = `<span class="label">By base stock</span><ul class="ballot">` +
+  const bases = `<span class="label">By base stock</span><ul class="ballot p-bases">` +
     pad.bases.map((b) =>
       `<li><span class="b-name">${esc(b.symbol)}</span>` +
       `<span class="b-sector">${fmtInt(b.coins)} coin${b.coins === 1 ? "" : "s"}` +
       `${b.graduated ? ` · ${fmtInt(b.graduated)} graduated` : ""}</span>` +
-      `<span class="b-bar"><span style="width:${Math.round((b.lockedUsd / top) * 100)}%"></span></span>` +
+      // $14 sur $5 718 arrondit à 0% et devenait indiscernable d'une base
+      // réellement vide. Un dollar vaut au moins un pour cent de barre ; zéro
+      // dollar n'en vaut aucun, et c'est cette différence-là qui se lit.
+      `<span class="b-bar"><span style="width:${
+        b.lockedUsd > 0 ? Math.max(1, Math.round((b.lockedUsd / top) * 100)) : 0
+      }%"></span></span>` +
       `<span class="b-pct">${fmtUsdRound(b.lockedUsd)}</span></li>`).join("") + `</ul>`;
 
   // Les graduées, à part et en tête.
@@ -1359,7 +1364,11 @@ export function padHtml(pad) {
     const pct = Math.round(c.progress * 100);
     return `<tr class="${c.traded ? "" : "p-cold"}${c.graduated ? " p-grad" : ""}">` +
       `<td class="p-n">${i + 1}</td>` +
-      `<td class="p-sym">${esc(c.symbol)}${c.graduated ? `<span class="p-tag">grad</span>` : ""}` +
+      // Une pièce encore sur sa courbe ne s'échange que sur printer.fun : c'est
+      // là qu'on l'achète, et le tableau serait une impasse sans le chemin.
+      `<td class="p-sym">` +
+      `<a href="https://www.printer.fun/coin/${esc(c.token)}" target="_blank" rel="noopener">` +
+      `${esc(c.symbol)}<span class="p-go">buy</span></a>` +
       `<span class="p-name">${esc(c.name)}</span></td>` +
       `<td class="p-base">${esc(c.baseSymbol)}</td>` +
       `<td class="p-num">${c.lockedUsd === null ? "—" : fmtUsdRound(c.lockedUsd)}</td>` +

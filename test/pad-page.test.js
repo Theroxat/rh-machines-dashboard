@@ -97,7 +97,7 @@ test("the curve board is ranked by how close a coin is, not by how rich it is", 
     coin({ symbol: "CLOSE", lockedUsd: 300, progress: 0.92 }),
     coin({ symbol: "MID", lockedUsd: 900, progress: 0.40 }),
   ] });
-  const order = [...html.matchAll(/class="p-sym">([A-Z]+)/g)].map((m) => m[1]);
+  const order = [...html.matchAll(/class="p-sym">(?:<a [^>]*>)?([A-Z]+)/g)].map((m) => m[1]);
   assert.deepEqual(order, ["CLOSE", "MID", "RICH"]);
 });
 
@@ -109,7 +109,7 @@ test("coins tied at nothing are still ordered by the money in them", () => {
     coin({ symbol: "BBB", lockedUsd: 40, progress: 0 }),
     coin({ symbol: "CCC", lockedUsd: 12, progress: 0 }),
   ] });
-  assert.deepEqual([...html.matchAll(/class="p-sym">([A-Z]+)/g)].map((m) => m[1]), ["BBB", "CCC", "AAA"]);
+  assert.deepEqual([...html.matchAll(/class="p-sym">(?:<a [^>]*>)?([A-Z]+)/g)].map((m) => m[1]), ["BBB", "CCC", "AAA"]);
 });
 
 // Une graduée a vidé sa courbe. Triée par argent immobilisé elle tombait au
@@ -143,6 +143,50 @@ test("a full curve whose pool is not deployed yet says which of the two it is", 
     coins: [coin({ symbol: "PRINTSY", progress: 1, graduated: false, lockedUsd: 4067 })] });
   assert.match(html, /full — pool not deployed yet/);
   assert.doesNotMatch(html, /class="p-pct[^"]*">100%/);
+});
+
+// Une pièce encore sur sa courbe ne s'échange que sur printer.fun. Sans le
+// chemin, le tableau la nomme et n'en dit pas plus : c'est une impasse.
+test("a coin still on its curve links to where it can be bought", () => {
+  const html = padHtml(PAD);
+  const board = html.slice(html.indexOf("Still on the curve"));
+  assert.match(board, /href="https:\/\/www\.printer\.fun\/coin\/0xT" target="_blank" rel="noopener">BSNOB/);
+  // Même la morte : on peut vouloir aller voir pourquoi elle l'est.
+  assert.match(board, />DEAD<span class="p-go">buy<\/span>/);
+});
+
+// Les onze bases s'étalaient sur toute la largeur : le montant finissait à
+// mille neuf cents pixels de l'action qu'il chiffre.
+test("the base list is held to a width where a figure stays near its name", () => {
+  assert.match(padHtml(PAD), /<ul class="ballot p-bases">/);
+  const css = readFileSync(new URL("../src/public/index.html", import.meta.url), "utf8");
+  assert.match(css, /\.p-bases \{[^}]*max-width/);
+});
+
+// $14 sur $5 718 arrondit à zéro pour cent. Une base à quatorze dollars et une
+// base réellement vide affichaient alors la même barre — c'est-à-dire aucune.
+test("a base holding a few dollars is not drawn like one holding none", () => {
+  const html = padHtml({ ...PAD, bases: [
+    { symbol: "NVDA", coins: 2, lockedUsd: 5718, graduated: 1 },
+    { symbol: "TSLA", coins: 10, lockedUsd: 14, graduated: 0 },
+    { symbol: "AMZN", coins: 4, lockedUsd: 0, graduated: 0 },
+  ] });
+  // Le classement porte lui aussi des barres : on ne relève que celles des bases.
+  const list = html.slice(html.indexOf("p-bases"), html.indexOf("</ul>"));
+  const widths = [...list.matchAll(/b-bar"><span style="width:(\d+)%/g)].map((m) => Number(m[1]));
+  assert.deepEqual(widths, [100, 1, 0]);
+});
+
+// Un bloc de style inséré deux fois ne se voit pas — les règles sont
+// identiques — et double pourtant le poids de la feuille à chaque copie.
+test("the pad's stylesheet is declared once", () => {
+  const css = readFileSync(new URL("../src/public/index.html", import.meta.url), "utf8");
+  assert.equal((css.match(/---- PRINTER\.FUN ----/g) ?? []).length, 1);
+  // Des sélecteurs qui n'apparaissent qu'une fois dans le bloc : `.p-go {` en
+  // compterait deux, la règle de survol le contenant dans son propre texte.
+  for (const rule of [/^  \.p-figs \{/gm, /^  \.p-wrap \{/gm, /^  \.p-table \{/gm, /^  \.p-lede \{/gm]) {
+    assert.equal((css.match(rule) ?? []).length, 1, `règle en double : ${rule}`);
+  }
 });
 
 // Une pièce jamais échangée n'est pas à 0% de sa graduation : elle n'a jamais
