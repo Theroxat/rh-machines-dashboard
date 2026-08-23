@@ -38,6 +38,27 @@ export const ADDRESSES = Object.freeze({
 export const TOTAL_MACHINES = 10000;
 
 /**
+ * PRINTER.FUN — le memepad du même écosystème, lancé le 2026-08-23.
+ *
+ * Deux factories tournent en parallèle et partagent la même trésorerie ; la
+ * seconde n'a pas remplacé la première, elles reçoivent des lancements toutes
+ * les deux. Aucune n'est référencée par un contrat public : les adresses
+ * viennent des bundles du site, et chacune a été vérifiée sur la chaîne par un
+ * appel à `coinsCount()`.
+ *
+ * La trésorerie est gardée pour référence — c'est elle qui encaisse le frais de
+ * 1% avant qu'il ne rachète et ne brûle du $PRINTER.
+ */
+export const PAD = Object.freeze({
+  factories: Object.freeze([
+    "0x0C8c78ab91b87a03659c8AD4A11e6d23d5Ab869b",
+    "0x285c1778a6714480aa0fCC468317E621096F1cec",
+  ]),
+  treasury: "0x81c63D977aA9C2e6Ed5d51abE3fbfF2d2C23BC20",
+  site: "https://www.printer.fun/",
+});
+
+/**
  * Activer une machine coûte 5 000 $PRINTER : 4 250 partent en ink — la chaîne
  * expose ce montant sous `ACTIVATION_INK`, et c'est le dénominateur de
  * `√(ink/4250)` — et 750 en charge d'exploitation, qui ne brûlent pas.
@@ -107,5 +128,6 @@ export function loadConfig(env, raw) {
     multicallBatchSize:  num("multicallBatchSize", 50, 1000),
     maxBookPages:        num("maxBookPages", 1, 5000),
     maxMetadataPages:    num("maxMetadataPages", 1, 1000),
+    padPollIntervalMs:   num("padPollIntervalMs", 60000, 86400000),
   });
 }

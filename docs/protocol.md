@@ -386,3 +386,79 @@ Access, et l'énumération DNS retrouve chaque sous-domaine en quelques secondes
   avec un ETag — une revalidation coûte 0 octet.
 - Le script est servi sous `/app.<hash>.js`, immuable. La page est en
   `no-cache`. Sans ça Cloudflare servait un `app.js` vieux de quatre heures.
+
+---
+
+## PRINTER.FUN — le memepad de l'écosystème
+
+Ajouté à l'écosystème le 2026-08-23. On y lance une pièce adossée à une action
+Robinhood tokenisée, échangée sur une courbe de liaison libellée dans cette
+action. **1% de chaque échange rachète et brûle du $PRINTER** ; un dixième de ce
+frais revient à qui a lancé la pièce (`creatorShareBps = 1000`).
+
+### Les contrats
+
+| rôle | adresse | vérification |
+|---|---|---|
+| factory A | `0x0C8c78ab91b87a03659c8AD4A11e6d23d5Ab869b` | `coinsCount()` répond |
+| factory B | `0x285c1778a6714480aa0fCC468317E621096F1cec` | `coinsCount()` répond |
+| trésorerie | `0x81c63D977aA9C2e6Ed5d51abE3fbfF2d2C23BC20` | `treasury()` sur les deux |
+| propriétaire | `0xFa382a4009327B8BC868c9fdBCa49d35834E19dF` | `owner()` sur les deux |
+
+Aucun contrat public ne les référence : les adresses viennent des bundles du
+site, chacune recoupée par un appel on-chain — même méthode que pour `VOTE`,
+`SWAPPER` et `DISTRIBUTOR`.
+
+**Les deux factories tournent en parallèle.** La seconde n'a pas remplacé la
+première : elles partagent la trésorerie et reçoivent toutes les deux des
+lancements. N'en lire qu'une manque 121 pièces sur 274. Un test l'exige.
+
+### Pourquoi la chaîne et pas leur API
+
+`https://www.printer.fun/api/coins` se contredit dans un seul payload :
+
+- 28 pièces au tableau, alors que les factories en comptent 274 ;
+- `vol1hUsd: 0` et `buys1h + sells1h: 0` sur toutes les pièces, dans le même
+  document que 25 échanges horodatés des 58 dernières minutes ;
+- un échange à `$1 545 709` sur un pad qui n'immobilise pas $13 000.
+
+Les deux factories, elles, tiennent le compte exact. Le tableau de bord ne lit
+que `coinsCount()`, `allCoins(i)` et `coins(token)`, et les prix des actions de
+base par la même route DexScreener que le reste du service.
+
+### Les deux montants, et pourquoi les deux
+
+**Argent immobilisé** (`realBase × prix de l'action) : ce que des acheteurs ont
+réellement versé et qui se trouve encore dans la courbe.
+
+**Capitalisation nominale** (prix marginal × jeton émis) : sur une courbe à
+réserves virtuelles, elle porte en très grande partie sur des jetons que personne
+n'a achetés. Au 2026-08-23 elle vaut **70×** l'argent réellement présent.
+
+Les deux sont affichés côte à côte, jamais l'un à la place de l'autre. Un test
+refuse que le second paraisse seul.
+
+### État au 2026-08-23
+
+274 pièces lancées · 3 graduées · **149 jamais échangées (54%)** · 134 créateurs
+· $12 529 immobilisés · 11 actions de base, dont le $PRINTER lui-même
+(69 pièces, $4 855 immobilisés).
+
+### Cadence et transport
+
+Le pad est relu toutes les 10 minutes (`padPollIntervalMs`) et servi sur
+`/api/pad`, pas dans le snapshot : 16 Ko gzippés qui ne bougent qu'aux dix
+minutes n'ont rien à faire dans un document qui repart toutes les 15 secondes.
+La page le charge à l'ouverture de l'onglet, avec ETag et 304.
+
+### Ce qui n'est pas mesuré
+
+Le **$PRINTER brûlé par le pad** ne l'est pas. La brûlure réduit l'offre totale
+— aucun solde ne s'accumule sur une adresse morte — et les machines brûlent de
+l'encre dans la même offre. Les séparer demanderait les journaux d'événements,
+qui sortent de la fenêtre du RPC. Rien n'est donc avancé là-dessus.
+
+La **date de lancement** d'une pièce ne l'est pas non plus. `allCoins(i)` donne
+l'ordre de création au sein d'une factory, mais les deux tournent en parallèle :
+il n'existe pas d'ordre global sans horodatage de bloc. Le classement est donc
+par argent immobilisé, et aucune section « lancements récents » n'est affichée.

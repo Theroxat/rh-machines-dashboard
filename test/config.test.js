@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { loadConfig, CLASSES, CLASS_BY_VALUE } from "../src/config.js";
+import { readFileSync } from "node:fs";
+import { loadConfig, CLASSES, CLASS_BY_VALUE, PAD } from "../src/config.js";
 
 const RAW = {
   port: 3050,
@@ -10,6 +11,7 @@ const RAW = {
   multicallBatchSize: 500,
   maxBookPages: 200,
   maxMetadataPages: 80,
+  padPollIntervalMs: 600000,
 };
 
 test("the seven sealed classes are declared in ascending order", () => {
@@ -35,4 +37,24 @@ test("an out-of-range tunable is refused", () => {
   assert.throws(() => loadConfig({ OPENSEA_API_KEY: "k" }, { ...RAW, pelotonSize: 1 }), /pelotonSize/);
   assert.throws(() => loadConfig({ OPENSEA_API_KEY: "k" }, { ...RAW, port: 0 }), /port/);
   assert.throws(() => loadConfig({ OPENSEA_API_KEY: "k" }, { ...RAW, bookPollIntervalMs: "60000" }), /bookPollIntervalMs/);
+});
+
+// Une clé ajoutée au chargeur et oubliée dans config.json ne se voit qu'au
+// démarrage suivant, et le service refuse alors de démarrer. Le fichier livré
+// passe par le chargeur, ici, avant d'atteindre un conteneur.
+test("the config.json we ship satisfies the loader that reads it", () => {
+  const raw = JSON.parse(readFileSync(new URL("../config.json", import.meta.url), "utf8"));
+  const cfg = loadConfig({ OPENSEA_API_KEY: "k" }, raw);
+  assert.ok(Object.isFrozen(cfg));
+  assert.equal(cfg.padPollIntervalMs, raw.padPollIntervalMs);
+});
+
+// Les deux factories du pad tournent en parallèle et partagent une trésorerie ;
+// la seconde n'a pas remplacé la première. Les lire toutes les deux n'est pas
+// un détail : une seule manque cent vingt et une pièces.
+test("both pad factories are declared, and they are not the same one twice", () => {
+  assert.equal(PAD.factories.length, 2);
+  assert.equal(new Set(PAD.factories.map((a) => a.toLowerCase())).size, 2);
+  for (const a of PAD.factories) assert.match(a, /^0x[0-9a-fA-F]{40}$/);
+  assert.match(PAD.treasury, /^0x[0-9a-fA-F]{40}$/);
 });

@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { ethers } from "ethers";
 
-import { loadConfig, RPC_URL, CHAIN_ID, ADDRESSES, TOTAL_MACHINES } from "./config.js";
+import { loadConfig, RPC_URL, CHAIN_ID, ADDRESSES, TOTAL_MACHINES, PAD } from "./config.js";
 import { fetchListings, fetchCollectionStats } from "./opensea.js";
 import { loadTraits } from "./traits.js";
 import { loadMetadata } from "./metadata.js";
@@ -30,6 +30,7 @@ import { composeSnapshot } from "./snapshot.js";
 import { createStore } from "./store.js";
 import { assetHash, assetPath, stampPage, cacheHeaders, securityHeaders, etagOf } from "./http.js";
 import { multicallOf } from "./multicall.js";
+import { readPad, priceCoin, padStats } from "./pad.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const cfg = loadConfig(process.env, JSON.parse(readFileSync(join(here, "..", "config.json"), "utf8")));
@@ -104,6 +105,10 @@ let tally = new Array(16).fill(0);
 // Les actions que le protocole a déjà achetées, et ce qu'elles valent.
 let stockTokens = [];
 let stockPrices = new Map();
+// PRINTER.FUN, l'autre produit de l'écosystème. Il vit sur sa propre cadence :
+// deux cent soixante-quatorze pièces ne bougent pas à la minute, et les relire
+// à chaque balayage du carnet coûterait mille appels pour rien.
+let pad = null;
 
 async function sweepOwners() {
   owners = await readOwners({
@@ -122,6 +127,37 @@ async function sweepInk() {
   inkMeta = { readAt: Date.now(), failures };
   const reinked = [...fresh].filter(([, v]) => v > 4250n * 10n ** 18n).length;
   console.log(`ink: ${fresh.size} machines read, ${reinked} re-inked past activation, ${failures} failures`);
+}
+
+async function sweepPad() {
+  const coins = await readPad({
+    provider,
+    aggregate3: multicallOf(provider, ADDRESSES.MULTICALL3),
+    factories: PAD.factories,
+    batchSize: cfg.multicallBatchSize,
+  });
+
+  // Le prix des actions qui servent de base. Ce sont les mêmes jetons que ceux
+  // que le protocole achète pour les machines, lus par la même route ; celles
+  // que le pad utilise et que le protocole n'a jamais achetées s'y ajoutent.
+  const bases = [...new Map(coins.map((c) => [c.baseSymbol, { symbol: c.baseSymbol, address: c.base }])).values()];
+  const prices = await fetchStockPrices(bases).catch(() => new Map());
+  const priced = coins.map((c) => priceCoin(c, prices.get(c.baseSymbol) ?? null));
+
+  // Le snapshot part en JSON : les réserves sont des BigInt et ne s'y sérialisent
+  // pas. Seuls partent les champs que la page affiche, ce qui divise aussi par
+  // six le poids d'un tableau de deux cent soixante-quatorze lignes.
+  const wire = priced.map((c) => ({
+    token: c.token, symbol: c.symbol, name: c.name,
+    baseSymbol: c.baseSymbol, base: c.base,
+    lockedUsd: c.lockedUsd, nominalUsd: c.nominalUsd,
+    progress: c.progress, graduated: c.graduated,
+    traded: Boolean(Number(c.realBase)),
+  }));
+
+  pad = { ...padStats(priced), coins: wire, readAt: Date.now(), site: PAD.site };
+  console.log(`pad: ${pad.launched} coins, ${pad.graduated} graduated, ${pad.untouched} never bought` +
+    (pad.lockedUsd === null ? ", none priced" : `, $${Math.round(pad.lockedUsd)} locked`));
 }
 
 async function sweepBook() {
@@ -301,6 +337,27 @@ const server = createServer(async (req, res) => {
     }
     res.writeHead(p.has ? 200 : 503, headers);
     res.end(p.body);
+    return;
+  }
+  // PRINTER.FUN, sur sa propre route et non dans le snapshot.
+  //
+  // Le tableau pèse soixante-douze kilo-octets et ne bouge qu'aux dix minutes,
+  // quand le snapshot repart toutes les quinze secondes : embarqué, il aurait
+  // voyagé trente-neuf fois sur quarante pour rien.
+  if (req.url === "/api/pad") {
+    const body = JSON.stringify(pad ?? null);
+    const etag = etagOf(body);
+    const headers = {
+      "content-type": "application/json", etag,
+      ...cacheHeaders("api"), ...securityHeaders(),
+    };
+    if (pad && req.headers["if-none-match"] === etag) {
+      res.writeHead(304, headers);
+      res.end();
+      return;
+    }
+    res.writeHead(200, headers);
+    res.end(body);
     return;
   }
   // Le portefeuille d'un visiteur. Tout est déjà en mémoire : l'index des
@@ -483,6 +540,7 @@ const started = async () => {
   loop("book", sweepBook, cfg.bookPollIntervalMs);
   loop("ink", sweepInk, cfg.inkPollIntervalMs, { runNow: false });
   loop("owners", sweepOwners, cfg.inkPollIntervalMs);
+  loop("pad", sweepPad, cfg.padPollIntervalMs);
 
   server.listen(cfg.port, () => console.log(`dashboard on :${cfg.port}, serving ${appPath}`));
 };

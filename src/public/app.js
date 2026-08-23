@@ -1250,6 +1250,92 @@ export function ballotHtml(vote, epoch) {
     (vote.finalized ? `<p class="w-small">This ballot has closed and been finalised.</p>` : "");
 }
 
+/**
+ * PRINTER.FUN, l'autre produit de l'écosystème.
+ *
+ * On y lance une pièce adossée à une action Robinhood tokenisée et on l'échange
+ * sur une courbe libellée dans cette action. La page est un tableau de bord du
+ * pad pour lui-même : ce qui a été lancé, ce qui a réellement reçu de l'argent,
+ * et ce qui en est sorti.
+ *
+ * Deux montants s'y tiennent côte à côte et ne se remplacent jamais. L'argent
+ * immobilisé est ce que des gens ont versé et qui s'y trouve encore. La
+ * capitalisation est le prix marginal de la courbe multiplié par tout le jeton
+ * émis — sur une courbe à réserves virtuelles, elle porte en très grande partie
+ * sur des jetons que personne n'a achetés. Afficher la seconde seule ferait
+ * passer douze mille dollars pour huit cent mille.
+ */
+export function padHtml(pad) {
+  if (!pad) {
+    return `<p class="w-small">The pad has not been read yet. It is polled on its own ` +
+      `slower cadence — two hundred and seventy-four coins do not move by the minute.</p>`;
+  }
+
+  const fig = (v, k, x) =>
+    `<div class="p-fig"><span class="p-v">${v}</span><span class="p-k">${k}</span>` +
+    (x ? `<span class="p-x">${x}</span>` : "") + `</div>`;
+
+  const traded = pad.launched - pad.untouched;
+  const head = `<div class="p-figs">` +
+    fig(fmtInt(pad.launched), "coins launched", "across two factories") +
+    fig(fmtInt(pad.graduated), "graduated", "left the curve") +
+    fig(fmtInt(pad.untouched), "never bought", `${fmtRatio(pad.launched ? pad.untouched / pad.launched : 0)} of them`) +
+    fig(pad.lockedUsd === null ? "—" : fmtUsdRound(pad.lockedUsd), "money locked", "really paid in, still there") +
+    fig(pad.nominalUsd === null ? "—" : fmtUsdRound(pad.nominalUsd), "nominal cap", "what the curves imply") +
+    fig(fmtInt(pad.creators), "creators", `${fmtInt(traded)} coins ever traded`) +
+    `</div>`;
+
+  // Le rapport entre les deux dit tout du pad, et il ne se devine pas : il faut
+  // diviser deux nombres qui ne sont pas côte à côte dans une phrase.
+  // « 74.26× » donne deux décimales à un rapport qui n'en supporte pas une :
+  // il bouge de plusieurs unités à chaque échange.
+  const times = pad.lockedUsd ? pad.nominalUsd / pad.lockedUsd : 0;
+  const ratio = pad.lockedUsd && pad.nominalUsd
+    ? ` Here the curves imply <b>${times >= 10 ? fmtInt(Math.round(times)) : fmtExact(times)}×</b> ` +
+      `the money actually in them.`
+    : "";
+  const caveat = `<p class="w-small">A coin trades on a bonding curve against a tokenised stock, ` +
+    `and <b>1% of every trade</b> buys back and burns $PRINTER — a tenth of that fee goes to whoever ` +
+    `launched the coin. <b>Money locked</b> is what buyers paid in and has not been sold back out. ` +
+    `<b>Nominal cap</b> is the curve's marginal price times every token issued, most of which nobody ` +
+    `has bought.${ratio} Read from the two factories, not from the pad's own board.</p>`;
+
+  const top = Math.max(1, ...pad.bases.map((b) => b.lockedUsd));
+  const bases = `<span class="label">By base stock</span><ul class="ballot">` +
+    pad.bases.map((b) =>
+      `<li><span class="b-name">${esc(b.symbol)}</span>` +
+      `<span class="b-sector">${fmtInt(b.coins)} coin${b.coins === 1 ? "" : "s"}` +
+      `${b.graduated ? ` · ${fmtInt(b.graduated)} graduated` : ""}</span>` +
+      `<span class="b-bar"><span style="width:${Math.round((b.lockedUsd / top) * 100)}%"></span></span>` +
+      `<span class="b-pct">${fmtUsdRound(b.lockedUsd)}</span></li>`).join("") + `</ul>`;
+
+  // Toutes les pièces, les mortes comprises : les compter sans les montrer
+  // donnerait un classement où la moitié du pad est invisible. Elles tombent
+  // au bas du tri toutes seules, et se distinguent d'une ligne éteinte.
+  const coins = [...pad.coins].sort((a, b) => (b.lockedUsd ?? -1) - (a.lockedUsd ?? -1));
+  const rows = coins.map((c, i) => {
+    const pct = Math.round(c.progress * 100);
+    return `<tr class="${c.traded ? "" : "p-cold"}${c.graduated ? " p-grad" : ""}">` +
+      `<td class="p-n">${i + 1}</td>` +
+      `<td class="p-sym">${esc(c.symbol)}${c.graduated ? `<span class="p-tag">grad</span>` : ""}` +
+      `<span class="p-name">${esc(c.name)}</span></td>` +
+      `<td class="p-base">${esc(c.baseSymbol)}</td>` +
+      `<td class="p-num">${c.lockedUsd === null ? "—" : fmtUsdRound(c.lockedUsd)}</td>` +
+      `<td class="p-num p-dim">${c.nominalUsd === null ? "—" : fmtUsdRound(c.nominalUsd)}</td>` +
+      `<td class="p-prog"><span class="b-bar"><span style="width:${pct}%"></span></span>` +
+      `<span class="p-pct">${c.traded ? `${pct}%` : "never traded"}</span></td></tr>`;
+  }).join("");
+
+  const board = `<span class="label">The board</span>` +
+    `<p class="w-small">All ${fmtInt(pad.launched)}, by money locked. ` +
+    `The bar is how far a coin has come toward graduating off its curve.</p>` +
+    `<div class="p-wrap"><table class="p-table"><thead><tr>` +
+    `<th></th><th>Coin</th><th>Base</th><th class="p-num">Locked</th>` +
+    `<th class="p-num">Nominal</th><th>To graduate</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+
+  return head + caveat + bases + board;
+}
+
 /** Ce que le filtre laisse passer, sur l'ensemble du carnet. Silencieux tant
  *  qu'aucun filtre n'est posé : un compteur permanent serait du bruit. */
 export function filterSummary(d, filter) {
@@ -1423,7 +1509,7 @@ if (typeof document !== "undefined") {
   // la même page, un rechargement ne renvoie pas au marché, et le bouton retour
   // du navigateur fait ce qu'on attend de lui. Sans script, aucun onglet n'est
   // marqué et les quatre pages restent visibles — dégradé, mais entier.
-  const TABS = ["market", "wallet", "vote", "how"];
+  const TABS = ["market", "wallet", "vote", "pad", "how"];
   const tabsEl = $("tabs");
 
   const showTab = (name) => {
@@ -1437,11 +1523,29 @@ if (typeof document !== "undefined") {
     return wanted;
   };
 
+  // PRINTER.FUN a sa propre route et sa propre cadence : le pad ne bouge qu'aux
+  // dix minutes, et le charger avec le bandeau toutes les quinze secondes ferait
+  // voyager soixante-douze kilo-octets pour rien. Il se charge à l'ouverture de
+  // l'onglet, et se rafraîchit tant qu'on y reste.
+  let padAt = 0;
+  const loadPad = async (force = false) => {
+    if (!force && Date.now() - padAt < 300000) return;
+    padAt = Date.now();
+    try {
+      const res = await fetch("/api/pad");
+      $("pad").innerHTML = padHtml(res.ok ? await res.json() : null);
+    } catch {
+      padAt = 0;
+    }
+  };
+
   let tab = showTab((location.hash || "").slice(1));
+  if (tab === "pad") loadPad(true);
   addEventListener("hashchange", () => {
     tab = showTab((location.hash || "").slice(1));
     // La bande de tête se mesure sur une page visible : cachée, elle rend zéro.
     if (tab === "market" && measureBest()) { painted = ""; paint(); }
+    if (tab === "pad") loadPad();
   });
 
   // Le portefeuille du visiteur.
