@@ -1422,11 +1422,13 @@ export function padHtml(pad) {
         ? `<a href="https://www.dextools.io/app/en/robinhood/pair-explorer/${esc(c.pool.pairAddress)}"` +
           ` target="_blank" rel="noopener">${esc(c.symbol)}<span class="p-go">chart</span></a>`
         : esc(c.symbol)}<span class="p-name">${esc(c.name)}</span></td>` +
-      `<td class="p-base">${esc(c.baseSymbol)}</td>` +
-      `<td class="p-num">${c.pool ? fmtUsdRound(c.pool.poolUsd) : "—"}</td>` +
-      `<td class="p-num p-dim">${c.pool?.capUsd ? fmtUsdRound(c.pool.capUsd) : "—"}</td>` +
-      `<td class="p-num">${c.pool ? fmtUsdRound(c.pool.vol24hUsd) : "—"}</td>` +
-      `<td class="p-num p-dim">${c.pool ? fmtInt(c.pool.trades24h) : "—"}</td></tr>`).join("") +
+      // Sur téléphone la table se déplie en blocs et l'entête disparaît : sans
+      // ce nom porté par la cellule, la fiche est quatre montants nus.
+      `<td class="p-base" data-k="Base">${esc(c.baseSymbol)}</td>` +
+      `<td class="p-num" data-k="Pool">${c.pool ? fmtUsdRound(c.pool.poolUsd) : "—"}</td>` +
+      `<td class="p-num p-dim" data-k="Cap">${c.pool?.capUsd ? fmtUsdRound(c.pool.capUsd) : "—"}</td>` +
+      `<td class="p-num" data-k="24h volume">${c.pool ? fmtUsdRound(c.pool.vol24hUsd) : "—"}</td>` +
+      `<td class="p-num p-dim" data-k="24h trades">${c.pool ? fmtInt(c.pool.trades24h) : "—"}</td></tr>`).join("") +
     `</tbody></table></div>`;
 
   // Le classement porte sur les courbes, donc sur celles qui y sont encore, et
@@ -1448,10 +1450,10 @@ export function padHtml(pad) {
       // Qui l'a lancée. Sans cette ligne, dix-sept ZEUB sont dix-sept lignes
       // identiques dont une seule est celle qu'on cherche.
       `<span class="p-name">${esc(c.name)}${c.creator ? ` &middot; ${shortAddr(c.creator)}` : ""}</span></td>` +
-      `<td class="p-base">${esc(c.baseSymbol)}</td>` +
-      `<td class="p-num">${c.lockedUsd === null ? "—" : fmtUsdRound(c.lockedUsd)}</td>` +
-      `<td class="p-num p-dim">${c.nominalUsd === null ? "—" : fmtUsdRound(c.nominalUsd)}</td>` +
-      `<td class="p-prog"><span class="b-bar"><span style="width:${pct}%"></span></span>` +
+      `<td class="p-base" data-k="Base">${esc(c.baseSymbol)}</td>` +
+      `<td class="p-num" data-k="Locked">${c.lockedUsd === null ? "—" : fmtUsdRound(c.lockedUsd)}</td>` +
+      `<td class="p-num p-dim" data-k="Nominal">${c.nominalUsd === null ? "—" : fmtUsdRound(c.nominalUsd)}</td>` +
+      `<td class="p-prog" data-k="To graduate"><span class="b-bar"><span style="width:${pct}%"></span></span>` +
       // Pleine sans avoir gradué : déployer la pool est un appel séparé, et
       // « 100% » tout court laisse croire que rien ne s'est passé au bout.
       `<span class="p-pct${pct >= 100 ? " p-full" : ""}">${

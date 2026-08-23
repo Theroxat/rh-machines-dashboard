@@ -405,3 +405,34 @@ test("an address is shortened to the ends one actually recognises", () => {
 test("a pad with no shared names says nothing about them", () => {
   assert.doesNotMatch(padHtml({ ...PAD, namesakes: 0 }), /share a name with another/);
 });
+
+// Sur téléphone la table se déplie en blocs et `thead` est masqué. Sans un nom
+// porté par la cellule elle-même, une fiche est quatre montants nus : $27,664,
+// $72,683, $90,545, 1,211 — et rien ne dit lequel est la pool.
+test("every figure carries its own label, for when the header is gone", () => {
+  const html = padHtml({ ...PAD, movement: null });
+  for (const k of ["Base", "Pool", "Cap", "24h volume", "24h trades"]) {
+    assert.match(html, new RegExp(`data-k="${k}"`), `la colonne ${k} ne se nomme pas`);
+  }
+  for (const k of ["Locked", "Nominal", "To graduate"]) {
+    assert.match(html, new RegExp(`data-k="${k}"`), `la colonne ${k} ne se nomme pas`);
+  }
+  // Chaque entête de la table doit avoir sa cellule nommée du même mot.
+  for (const table of html.split("<thead>").slice(1)) {
+    const heads = [...table.split("</thead>")[0].matchAll(/<th[^>]*>([^<]+)<\/th>/g)].map((m) => m[1]);
+    const body = table.split("</thead>")[1];
+    for (const h of heads) {
+      if (h === "Coin") continue;   // le nom se lit tout seul
+      assert.ok(body.includes(`data-k="${h}"`), `« ${h} » a un entête et aucune cellule qui le porte`);
+    }
+  }
+});
+
+// Et le style qui s'en sert, sans quoi l'attribut ne s'affiche nulle part.
+test("the mobile layout actually prints those labels", () => {
+  const css = readFileSync(new URL("../src/public/index.html", import.meta.url), "utf8");
+  const mobile = css.slice(css.indexOf("@media (max-width: 760px)"));
+  assert.match(mobile, /\.p-table td\[data-k\]::before \{[^}]*content: attr\(data-k\)/);
+  // Un défilement dans un défilement sur un écran de téléphone.
+  assert.match(mobile, /\.p-wrap \{[^}]*max-height: none/);
+});
