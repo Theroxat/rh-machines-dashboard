@@ -50,6 +50,9 @@ export function priceCoin(coin, basePrice) {
   const grad = n18(coin.gradBase);
   return {
     ...coin,
+    // Le montant en unités de l'action, à côté de sa conversion : un écart se
+    // mesure là-dessus, sinon un cours qui monte se lit comme de l'argent entré.
+    realBaseUnits: n18(coin.realBase),
     basePrice: basePrice ?? null,
     lockedUsd: basePrice == null ? null : n18(coin.realBase) * basePrice,
     nominalUsd: basePrice == null ? null : perToken * n18(coin.supply) * basePrice,
@@ -128,6 +131,90 @@ export function padStats(coins) {
     bases: [...byBase.values()].sort((a, b) => b.lockedUsd - a.lockedUsd),
   };
 }
+
+/**
+ * Ce qui a bougé.
+ *
+ * La page disait ce qui existe et non ce qui se passe : tout y aurait été
+ * identique si le pad avait été gelé huit jours, et il ne l'est pas — cinq
+ * pièces sont apparues en une heure pendant qu'on la regardait.
+ *
+ * L'écart se mesure en unités de l'action de base, jamais en dollars. Une
+ * courbe adossée à NVDA « gagne » quinze pour cent le jour où NVDA les gagne,
+ * sans que personne n'y ait mis un centime ; convertir à la fin, au cours du
+ * moment, isole l'argent qui est réellement entré.
+ *
+ * `oldest` est le premier enregistrement, pas la naissance du pad. Tant qu'il
+ * est plus récent que la fenêtre demandée, la fenêtre réelle est plus courte et
+ * la page l'annonce — sans quoi « 7 lancées aujourd'hui » voudrait dire
+ * « 7 depuis qu'on regarde », ce qui n'est pas la même affirmation.
+ */
+export function padMovement({ coins, baseline, now, windowMs }) {
+  if (!baseline?.at?.size) return null;
+  const cutoff = now - windowMs;
+  const since = baseline.oldest === null ? cutoff : Math.max(cutoff, baseline.oldest);
+  const partial = since > cutoff;
+
+  let inUsd = 0, outUsd = 0, touched = 0, launched = 0, launchedTraded = 0, graduatedIn = 0;
+  const moved = [];
+  const graduated = [];
+
+  for (const c of coins) {
+    const born = baseline.firstSeen?.get(c.token);
+    // Née après la coupure — et après le tout premier relevé.
+    //
+    // Sans cette seconde condition, les deux cent quatre-vingts pièces déjà
+    // lancées comptent comme des lancements le jour où l'on commence à
+    // enregistrer : « +281 launched » alors qu'aucune n'est née. Rencontrer une
+    // pièce n'est pas la voir naître, et la page ne peut pas confondre les deux.
+    const isNew = born !== undefined && born > cutoff && born > (baseline.oldest ?? -Infinity);
+    if (isNew) {
+      launched++;
+      if (Number(c.realBaseUnits)) launchedTraded++;
+    }
+    const was = baseline.at.get(c.token) ?? (isNew ? 0 : null);
+    if (was === null) continue;
+
+    // Graduer vide la courbe. Ce n'est ni une vente ni une fuite : l'argent
+    // passe dans une vraie pool. Compté comme un flux sortant, TONER prenait la
+    // tête du classement des courbes qui refroidissent le jour même où elle
+    // réussissait — à −$6 760, soit le plus gros « départ » de la fenêtre.
+    const wasGraduated = baseline.gradAt?.has(c.token) ?? false;
+    if (c.graduated && !wasGraduated) {
+      graduatedIn++;
+      graduated.push({ token: c.token, symbol: c.symbol, baseSymbol: c.baseSymbol });
+      continue;
+    }
+
+    const delta = Number(c.realBaseUnits) - was;
+    if (!delta) continue;
+    touched++;
+    const usd = c.basePrice == null ? null : delta * c.basePrice;
+    if (usd !== null) (usd > 0 ? (inUsd += usd) : (outUsd -= usd));
+    moved.push({
+      token: c.token, symbol: c.symbol, baseSymbol: c.baseSymbol,
+      deltaUsd: usd, wasProgress: progressOf(c, was), progress: c.progress,
+    });
+  }
+
+  const by = (dir) => moved
+    .filter((m) => (dir > 0 ? m.deltaUsd > 0 : m.deltaUsd < 0))
+    .sort((a, b) => dir * (b.deltaUsd - a.deltaUsd))
+    .slice(0, 6);
+
+  return {
+    since, windowMs, partial,
+    launched, launchedTraded, graduatedIn, graduated,
+    inUsd, outUsd, touched,
+    climbing: by(1), cooling: by(-1),
+  };
+}
+
+/** La progression qu'affichait une courbe à un montant donné. */
+const progressOf = (coin, units) => {
+  const grad = Number(ethers.formatUnits(coin.gradBase ?? 0n, 18));
+  return coin.graduated ? 1 : grad ? Math.min(1, units / grad) : 0;
+};
 
 /**
  * Les deux factories, lues d'un bout à l'autre. `allCoins(i)` rend l'ordre de

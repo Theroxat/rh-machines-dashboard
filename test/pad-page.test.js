@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { padHtml } from "../src/public/app.js";
+import { padHtml, sinceWords } from "../src/public/app.js";
 
 const coin = (over = {}) => ({
   token: "0xT", symbol: "MEME", name: "Meme Coin", baseSymbol: "NVDA", base: "0xB",
@@ -204,6 +204,87 @@ test("a longer label cannot push its own bar out of line with the others", () =>
   assert.match(css, /\.p-bases \.b-name \{[^}]*flex: none/);
 });
 
+// --- ce qui bouge ---------------------------------------------------------
+
+const MOVE = {
+  since: 1000, windowMs: 86400000, partial: false,
+  launched: 7, launchedTraded: 3, graduatedIn: 1,
+  graduated: [{ token: "0xT", symbol: "TONER", baseSymbol: "PRINTER" }],
+  inUsd: 1240, outUsd: 380, touched: 14,
+  climbing: [{ token: "0xZ", symbol: "ZBIT", baseSymbol: "GME", deltaUsd: 29, wasProgress: 0.45, progress: 0.61 }],
+  cooling: [{ token: "0xP", symbol: "PAPO", baseSymbol: "NVDA", deltaUsd: -54, wasProgress: 0.31, progress: 0.28 }],
+};
+
+test("the page opens on what moved, before what merely exists", () => {
+  const html = padHtml({ ...PAD, movement: MOVE });
+  assert.ok(html.indexOf("What is moving") < html.indexOf("coins launched"),
+    "le mouvement doit précéder le recensement");
+  assert.match(html, /class="p-v">\+7<\/span><span class="p-k">launched<\/span><span class="p-x">3 already traded/);
+  assert.match(html, /class="p-v">\+\$1,240<\/span><span class="p-k">money in<\/span><span class="p-x">across 14 curves/);
+});
+
+// Entré et sorti ne se compensent pas en un seul chiffre : « +$860 net » cache
+// que quatorze courbes ont bougé, et dans les deux sens.
+test("money in and money out are shown apart, never netted", () => {
+  const html = padHtml({ ...PAD, movement: MOVE });
+  assert.match(html, /money in/);
+  assert.match(html, /money out/);
+  assert.doesNotMatch(html, /\bnet\b/);
+});
+
+// D'où elle vient compte autant que où elle est.
+test("a mover shows the arc it travelled, not only where it stands", () => {
+  const html = padHtml({ ...PAD, movement: MOVE });
+  assert.match(html, /ZBIT.*45<i>&#8594;<\/i>61%/s);
+  assert.match(html, /class="p-delta p-up">\+\$29/);
+  assert.match(html, /PAPO.*31<i>&#8594;<\/i>28%/s);
+  assert.match(html, /class="p-delta p-down">\u2212\$54/);
+});
+
+// « 100% → 100% » se lit comme une panne. Sur quatorze minutes l'arrondi ne
+// bouge pas, alors que le montant, lui, a bougé — et c'est lui l'information.
+test("a mover whose percentage did not budge states it once, not twice", () => {
+  const html = padHtml({ ...PAD, movement: { ...MOVE,
+    climbing: [{ token: "0xT", symbol: "TONER", baseSymbol: "PRINTER", deltaUsd: 36,
+      wasProgress: 0.999, progress: 1 }], cooling: [] } });
+  assert.match(html, /class="p-arc">at 100%</);
+  assert.doesNotMatch(html, /100<i>/);
+});
+
+// « 7 lancées ces 24 h » et « 7 depuis qu'on regarde » ne sont pas la même
+// affirmation, et la seconde est la seule vraie au premier jour.
+test("a window shorter than a day says so instead of claiming a full day", () => {
+  const html = padHtml({ ...PAD, movement: { ...MOVE, partial: true, since: Date.now() - 3600000 } });
+  const when = html.match(/class="p-when">([^<]*)/)[1];
+  assert.equal(when, "since 1 hour ago — all we have watched");
+  // « last 24 hours » vit aussi dans la section des graduées, où il est vrai :
+  // c'est l'étiquette de la fenêtre qui ne doit pas le prétendre.
+  assert.doesNotMatch(when, /last 24 hours/);
+});
+
+test("with a full day behind it the window is simply named", () => {
+  assert.equal(padHtml({ ...PAD, movement: MOVE }).match(/class="p-when">([^<]*)/)[1], "last 24 hours");
+});
+
+// Rien enregistré n'est pas un mouvement nul : la page n'a pas encore regardé.
+// Laquelle a gradué vaut mieux que « 1 » : c'est le seul évènement du pad qui
+// se raconte, et il porte un nom.
+test("the coin that graduated is named, not merely counted", () => {
+  assert.match(padHtml({ ...PAD, movement: MOVE }), /graduated<\/span><span class="p-x">TONER</);
+});
+
+test("with nothing recorded the moving block is absent, not shown at zero", () => {
+  const html = padHtml({ ...PAD, movement: null });
+  assert.doesNotMatch(html, /What is moving/);
+  assert.match(html, /coins launched/);
+});
+
+test("a window in which nothing moved says exactly that", () => {
+  const still = { ...MOVE, launched: 0, launchedTraded: 0, inUsd: 0, outUsd: 0, touched: 0,
+    graduatedIn: 0, graduated: [], climbing: [], cooling: [] };
+  assert.match(padHtml({ ...PAD, movement: still }), /Not one curve moved in that time/);
+});
+
 // Une pièce jamais échangée n'est pas à 0% de sa graduation : elle n'a jamais
 // commencé. Une barre vide sous un pourcentage se lit comme un échec de départ.
 test("a coin nobody ever bought says so instead of showing nothing at zero", () => {
@@ -272,4 +353,17 @@ test("the board travels on its own route, not on every snapshot", () => {
   assert.doesNotMatch(snapshot, /\bpad\b/);
   const app = readFileSync(new URL("../src/public/app.js", import.meta.url), "utf8");
   assert.match(app, /fetch\("\/api\/pad"\)/);
+});
+
+// « since 1755948000000 » ne se lit pas.
+test("how long ago is said in words, at the scale that reads", () => {
+  const now = 100 * 3600000;
+  assert.equal(sinceWords(now - 60000, now), "1 minute ago");
+  assert.equal(sinceWords(now - 40 * 60000, now), "40 minutes ago");
+  // « 60 minutes ago » se lirait comme une panne de conversion.
+  assert.equal(sinceWords(now - 60 * 60000, now), "1 hour ago");
+  assert.equal(sinceWords(now - 5 * 3600000, now), "5 hours ago");
+  assert.equal(sinceWords(now - 50 * 3600000, now), "2 days ago");
+  // Jamais « 0 minute ago » : on vient de regarder, c'est une minute.
+  assert.equal(sinceWords(now, now), "1 minute ago");
 });

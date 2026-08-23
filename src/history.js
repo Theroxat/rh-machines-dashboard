@@ -70,6 +70,13 @@ const SCHEMA = `
   -- Poids et encre : ils ne bougent que lorsque quelqu'un brûle.
   CREATE TABLE IF NOT EXISTS machine (t INTEGER, tokenId INTEGER, weight INTEGER, ink INTEGER);
   CREATE INDEX IF NOT EXISTS machine_token ON machine(tokenId, t);
+
+  -- PRINTER.FUN, courbe par courbe. Le montant est en unités de l'action qui
+  -- sert de base, pas en dollars : un écart entre deux relevés est alors de
+  -- l'argent qui est entré ou sorti, et non le cours de l'action qui a bougé.
+  CREATE TABLE IF NOT EXISTS pad (t INTEGER, token TEXT, realBase REAL, graduated INTEGER);
+  CREATE INDEX IF NOT EXISTS pad_token ON pad(token, t);
+  CREATE INDEX IF NOT EXISTS pad_time ON pad(t);
 `;
 
 const num = (v) => (v === null || v === undefined ? null : Number(v));
@@ -87,12 +94,13 @@ export function openHistory(path) {
     listing: db.prepare("INSERT INTO listing VALUES (?,?,?,?)"),
     shelf: db.prepare("INSERT INTO shelf VALUES (?,?,?,?)"),
     machine: db.prepare("INSERT INTO machine VALUES (?,?,?,?)"),
+    pad: db.prepare("INSERT INTO pad VALUES (?,?,?,?)"),
   };
 
   // Le dernier état connu, pour ne coucher que les différences. Reconstruit
   // depuis la base au démarrage : sans ça, un redémarrage réécrirait tout le
   // carnet comme s'il venait d'apparaître.
-  const last = { floor: new Map(), tally: new Map(), ballot: new Map(), listing: new Map(), shelf: new Map(), machine: new Map() };
+  const last = { floor: new Map(), tally: new Map(), ballot: new Map(), listing: new Map(), shelf: new Map(), machine: new Map(), pad: new Map() };
 
   /** Une annonce dont la dernière trace est « partie » n'est plus une annonce :
    *  elle ne doit pas se voir reprocher d'être partie une seconde fois. */
@@ -124,6 +132,7 @@ export function openHistory(path) {
     seed("shelf", ["tokenId"], ["askPrinter"], last.shelf);
     seedGone("shelf", last.shelf);
     seed("machine", ["tokenId"], ["weight", "ink"], last.machine);
+    seed("pad", ["token"], ["realBase", "graduated"], last.pad);
 
   } catch {
     // Une base neuve n'a rien à relire, et une base illisible se réécrira.
@@ -257,6 +266,65 @@ export function openHistory(path) {
       }
       db.prepare("INSERT INTO alerted VALUES (?,?,?,?)").run(key, t, tokenId, kind);
       return true;
+    },
+
+    /**
+     * Le pad, courbe par courbe. Il tourne sur sa propre cadence, donc il a sa
+     * propre écriture : l'accrocher au balayage du carnet le ferait relire
+     * toutes les quinze secondes pour une information qui bouge au trade.
+     */
+    recordPad(coins, t) {
+      let written = 0;
+      db.exec("BEGIN");
+      try {
+        for (const c of coins ?? []) {
+          const base = Number(c.realBaseUnits ?? 0);
+          written += onChange(last.pad, c.token, `${base}:${c.graduated ? 1 : 0}`, () =>
+            stmt.pad.run(t, c.token, base, c.graduated ? 1 : 0));
+        }
+        db.exec("COMMIT");
+      } catch (e) {
+        db.exec("ROLLBACK");
+        throw e;
+      }
+      return written;
+    },
+
+    /**
+     * De quoi mesurer ce qui a bougé : la valeur de chaque courbe telle qu'elle
+     * était au moment demandé, et la première fois qu'on a vu chaque pièce.
+     *
+     * `firstSeen` ne remonte pas plus loin que le premier enregistrement : une
+     * pièce lancée avant qu'on ne regarde n'a pas de date de naissance ici, et
+     * la page doit le dire plutôt que de la présenter comme neuve.
+     */
+    padBaseline(cutoff) {
+      const at = new Map();
+      // Déjà graduée à la coupure ? Sans quoi une graduation survenue dans la
+      // fenêtre se lit comme une courbe qui se vide — l'inverse de ce qu'elle est.
+      const gradAt = new Set();
+      const firstSeen = new Map();
+      try {
+        for (const r of db.prepare(
+          // Rien avant la coupure ne veut pas dire rien du tout : au premier
+          // jour, tout ce qu'on a est plus récent qu'elle. On retombe alors sur
+          // le plus ancien relevé de la pièce, et `partial` dit que la fenêtre
+          // mesurée est plus courte que celle demandée.
+          `SELECT token, realBase, graduated FROM pad w
+           WHERE t = COALESCE(
+             (SELECT MAX(t) FROM pad WHERE token = w.token AND t <= ?),
+             (SELECT MIN(t) FROM pad WHERE token = w.token))`).all(cutoff)) {
+          at.set(r.token, r.realBase);
+          if (r.graduated) gradAt.add(r.token);
+        }
+        for (const r of db.prepare("SELECT token, MIN(t) AS first FROM pad GROUP BY token").all()) {
+          firstSeen.set(r.token, r.first);
+        }
+      } catch {
+        // Base neuve : rien à comparer, et la page dira qu'elle vient d'ouvrir.
+      }
+      const o = (() => { try { return db.prepare("SELECT MIN(t) AS t FROM pad").get()?.t ?? null; } catch { return null; } })();
+      return { at, gradAt, firstSeen, oldest: o };
     },
 
     close() { try { db.close(); } catch {} },

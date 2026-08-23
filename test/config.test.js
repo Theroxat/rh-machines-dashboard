@@ -11,7 +11,7 @@ const RAW = {
   multicallBatchSize: 500,
   maxBookPages: 200,
   maxMetadataPages: 80,
-  padPollIntervalMs: 600000,
+  padPollIntervalMs: 120000,
 };
 
 test("the seven sealed classes are declared in ascending order", () => {

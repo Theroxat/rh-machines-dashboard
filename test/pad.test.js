@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ethers } from "ethers";
-import { priceCoin, padStats, readPad, readPools, FACTORY_ABI } from "../src/pad.js";
+import { priceCoin, padStats, readPad, readPools, padMovement, FACTORY_ABI } from "../src/pad.js";
 
 const e18 = (x) => ethers.parseUnits(String(x), 18);
 const coin = (over = {}) => ({
@@ -208,4 +208,159 @@ test("a pool answer with no usable pair yields nothing rather than a zero price"
   const pools = await readPools([{ token: "0xT" }],
     async () => ({ ok: true, json: async () => ({ pairs: [{ priceUsd: "0", liquidity: { usd: 900 } }] }) }));
   assert.equal(pools.size, 0);
+});
+
+// --- ce qui a bougé ---------------------------------------------------------
+
+const H = 3600000;
+const withUnits = (c, basePrice) => priceCoin(c, basePrice);
+const base = (over = {}) => ({ at: new Map(), gradAt: new Set(), firstSeen: new Map(), oldest: null, ...over });
+
+test("money in and money out are counted apart, never netted into one figure", () => {
+  const coins = [
+    withUnits(coin({ token: "0xA", realBase: e18(30) }), 200),   // était à 10 → +20
+    withUnits(coin({ token: "0xB", realBase: e18(4) }), 200),    // était à 10 → -6
+  ];
+  const m = padMovement({
+    coins, now: 100 * H, windowMs: 24 * H,
+    baseline: base({ at: new Map([["0xA", 10], ["0xB", 10]]), oldest: 10 * H }),
+  });
+  assert.equal(m.inUsd, 4000);
+  assert.equal(m.outUsd, 1200);
+  assert.equal(m.touched, 2);
+});
+
+// Une courbe adossée à NVDA « gagne » quinze pour cent le jour où NVDA les
+// gagne, sans que personne n'y ait mis un centime. L'écart se mesure donc en
+// unités de l'action, et se convertit au cours du moment.
+test("a stock that rallies is not counted as money coming in", () => {
+  const coins = [withUnits(coin({ token: "0xA", realBase: e18(10) }), 400)]; // le cours a doublé
+  const m = padMovement({
+    coins, now: 100 * H, windowMs: 24 * H,
+    baseline: base({ at: new Map([["0xA", 10]]), oldest: 10 * H }),
+  });
+  assert.equal(m.inUsd, 0);
+  assert.equal(m.touched, 0);
+});
+
+test("a coin born inside the window is a launch, and what it took is money in", () => {
+  const coins = [withUnits(coin({ token: "0xNEW", realBase: e18(5) }), 200)];
+  const m = padMovement({
+    coins, now: 100 * H, windowMs: 24 * H,
+    baseline: base({ at: new Map([["0xOLD", 1]]), firstSeen: new Map([["0xNEW", 99 * H]]), oldest: 10 * H }),
+  });
+  assert.equal(m.launched, 1);
+  assert.equal(m.launchedTraded, 1);
+  assert.equal(m.inUsd, 1000);
+});
+
+// Rencontrer une pièce n'est pas la voir naître. Le jour où l'on commence à
+// enregistrer, les deux cent quatre-vingts déjà là ont toutes leur première
+// trace à cet instant : les compter comme des lancements annonce « +281 » un
+// matin où pas une seule n'est née.
+test("the coins already there when we started watching are not counted as born", () => {
+  const start = 90 * H;
+  const m = padMovement({
+    coins: [withUnits(coin({ token: "0xOLD" }), 200), withUnits(coin({ token: "0xNEW" }), 200)],
+    now: 100 * H, windowMs: 24 * H,
+    baseline: base({
+      at: new Map([["0xOLD", 10], ["0xNEW", 10]]),
+      firstSeen: new Map([["0xOLD", start], ["0xNEW", 95 * H]]),
+      oldest: start,
+    }),
+  });
+  assert.equal(m.launched, 1);
+});
+
+test("a coin launched and never bought counts as launched, not as traded", () => {
+  const m = padMovement({
+    coins: [withUnits(coin({ token: "0xNEW", realBase: 0n }), 200)],
+    now: 100 * H, windowMs: 24 * H,
+    baseline: base({ at: new Map([["0xOLD", 1]]), firstSeen: new Map([["0xNEW", 99 * H]]), oldest: 10 * H }),
+  });
+  assert.equal(m.launched, 1);
+  assert.equal(m.launchedTraded, 0);
+});
+
+// « 7 lancées aujourd'hui » et « 7 depuis qu'on regarde » ne sont pas la même
+// affirmation. Tant que l'enregistrement est plus jeune que la fenêtre, la
+// fenêtre réelle est plus courte et il faut le dire.
+test("a window longer than the record is announced as the shorter one it is", () => {
+  const m = padMovement({
+    coins: [withUnits(coin({ token: "0xA" }), 200)],
+    now: 100 * H, windowMs: 24 * H,
+    baseline: base({ at: new Map([["0xA", 10]]), oldest: 98 * H }),
+  });
+  assert.equal(m.partial, true);
+  assert.equal(m.since, 98 * H);
+});
+
+test("a record older than the window is the window itself, and says nothing is missing", () => {
+  const m = padMovement({
+    coins: [withUnits(coin({ token: "0xA" }), 200)],
+    now: 100 * H, windowMs: 24 * H,
+    baseline: base({ at: new Map([["0xA", 10]]), oldest: 10 * H }),
+  });
+  assert.equal(m.partial, false);
+  assert.equal(m.since, 76 * H);
+});
+
+// Sans rien d'enregistré, il n'y a pas un mouvement nul : il n'y a pas de
+// mesure, et la page doit dire qu'elle vient d'ouvrir les yeux.
+test("with nothing recorded there is no movement, rather than a movement of zero", () => {
+  assert.equal(padMovement({ coins: [], baseline: base(), now: 1, windowMs: H }), null);
+});
+
+test("the biggest movers are ranked each way, and a coin appears on one side only", () => {
+  const coins = [
+    withUnits(coin({ token: "0xA", symbol: "UP1", realBase: e18(40) }), 200),
+    withUnits(coin({ token: "0xB", symbol: "UP2", realBase: e18(20) }), 200),
+    withUnits(coin({ token: "0xC", symbol: "DOWN", realBase: e18(1) }), 200),
+  ];
+  const m = padMovement({
+    coins, now: 100 * H, windowMs: 24 * H,
+    baseline: base({ at: new Map([["0xA", 10], ["0xB", 10], ["0xC", 10]]), oldest: 10 * H }),
+  });
+  assert.deepEqual(m.climbing.map((x) => x.symbol), ["UP1", "UP2"]);
+  assert.deepEqual(m.cooling.map((x) => x.symbol), ["DOWN"]);
+});
+
+// D'où elle vient compte autant que où elle est : 45% depuis deux jours et 45%
+// atteints ce matin ne se ressemblent que sur une page qui ne sait pas compter
+// le temps.
+test("a mover carries where it came from, not only where it stands", () => {
+  const m = padMovement({
+    coins: [withUnits(coin({ token: "0xA", realBase: e18(61), gradBase: e18(100) }), 200)],
+    now: 100 * H, windowMs: 24 * H,
+    baseline: base({ at: new Map([["0xA", 45]]), oldest: 10 * H }),
+  });
+  assert.equal(m.climbing[0].wasProgress, 0.45);
+  assert.equal(m.climbing[0].progress, 0.61);
+});
+
+// Graduer vide la courbe dans une vraie pool. Compté comme un flux sortant,
+// TONER prenait la tête des courbes qui refroidissent le jour même où elle
+// réussissait, à −$6 760 — le plus gros « départ » de la fenêtre.
+test("a graduation is not counted as money leaving the pad", () => {
+  const m = padMovement({
+    coins: [withUnits(coin({ token: "0xT", symbol: "TONER", realBase: 0n, graduated: true }), 200)],
+    now: 100 * H, windowMs: 24 * H,
+    baseline: base({ at: new Map([["0xT", 34]]), oldest: 10 * H }),
+  });
+  assert.equal(m.outUsd, 0);
+  assert.equal(m.cooling.length, 0);
+  assert.equal(m.graduatedIn, 1);
+  assert.deepEqual(m.graduated.map((g) => g.symbol), ["TONER"]);
+});
+
+// Une pièce graduée avant la fenêtre n'a pas gradué pendant : elle ne compte
+// pas une seconde fois à chaque relevé.
+test("a coin already graduated before the window is not counted as graduating in it", () => {
+  const m = padMovement({
+    coins: [withUnits(coin({ token: "0xJ", realBase: 0n, graduated: true }), 200)],
+    now: 100 * H, windowMs: 24 * H,
+    baseline: base({ at: new Map([["0xJ", 0]]), gradAt: new Set(["0xJ"]), oldest: 10 * H }),
+  });
+  assert.equal(m.graduatedIn, 0);
+  assert.equal(m.graduated.length, 0);
 });

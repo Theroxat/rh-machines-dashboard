@@ -6,5 +6,5 @@
   "multicallBatchSize": 500,
   "maxBookPages": 200,
   "maxMetadataPages": 80,
-  "padPollIntervalMs": 600000
+  "padPollIntervalMs": 120000
 }

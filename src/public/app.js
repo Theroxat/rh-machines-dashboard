@@ -1265,6 +1265,18 @@ export function ballotHtml(vote, epoch) {
  * sur des jetons que personne n'a achetés. Afficher la seconde seule ferait
  * passer douze mille dollars pour huit cent mille.
  */
+/** Depuis quand, en toutes lettres. « since 1755948000000 » ne se lit pas. */
+export function sinceWords(t, now = Date.now()) {
+  const mins = Math.max(1, Math.round((now - t) / 60000));
+  // Le passage à l'heure se fait à soixante minutes, pas à quatre-vingt-dix :
+  // « 60 minutes ago » se lit comme une panne de conversion.
+  if (mins < 60) return `${mins} minute${mins === 1 ? "" : "s"} ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 36) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.round(hours / 24);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
+}
+
 export function padHtml(pad) {
   if (!pad) {
     return `<p class="w-small">The pad has not been read yet. It is polled on its own ` +
@@ -1304,6 +1316,49 @@ export function padHtml(pad) {
     `<b>${pad.nominalUsd === null ? "—" : fmtUsdRound(pad.nominalUsd)}</b>, but that is the marginal ` +
     `price times every token issued, most of which nobody has bought.${ratio} ` +
     `Read from the two factories, not from the pad's own board.</p>`;
+
+  // Ce qui a bougé, en tête. Le reste de la page dit ce qui existe ; ceci dit
+  // ce qui se passe, et c'est la seule partie qui serait différente demain.
+  const mv = pad.movement;
+  const window = mv ? `<span class="p-when">${
+    mv.partial ? `since ${sinceWords(mv.since)} — all we have watched` : "last 24 hours"
+  }</span>` : "";
+
+  const mover = (m) => {
+    const pct = (x) => Math.round(x * 100);
+    const [was, at] = [pct(m.wasProgress), pct(m.progress)];
+    // D'où elle vient compte autant que où elle est : 45% depuis deux jours et
+    // 45% atteints ce matin ne se ressemblent que sur une page sans mémoire.
+    // Mais « 100% → 100% » se lit comme une panne : sur quatorze minutes
+    // l'arrondi ne bouge pas, alors que le montant, lui, a bougé.
+    const arc = was === at ? `at ${at}%` : `${was}<i>&#8594;</i>${at}%`;
+    return `<li><span class="b-name">${esc(m.symbol)}</span>` +
+      `<span class="b-sector">${esc(m.baseSymbol)}</span>` +
+      `<span class="p-arc">${arc}</span>` +
+      `<span class="p-delta ${m.deltaUsd > 0 ? "p-up" : "p-down"}">` +
+      `${m.deltaUsd > 0 ? "+" : "\u2212"}${fmtUsdRound(Math.abs(m.deltaUsd))}</span></li>`;
+  };
+
+  const moving = !mv ? "" :
+    `<span class="label">What is moving</span>${window}` +
+    `<div class="p-figs p-move">` +
+    fig(mv.launched ? `+${fmtInt(mv.launched)}` : "0", "launched",
+      mv.launched ? `${fmtInt(mv.launchedTraded)} already traded` : "nothing new") +
+    fig(mv.inUsd ? `+${fmtUsdRound(mv.inUsd)}` : "—", "money in", `across ${fmtInt(mv.touched)} curves`) +
+    fig(mv.outUsd ? `\u2212${fmtUsdRound(mv.outUsd)}` : "—", "money out", "sold back off the curve") +
+    fig(mv.graduatedIn ? fmtInt(mv.graduatedIn) : "0", "graduated",
+      mv.graduated?.length
+        ? esc(mv.graduated.map((g) => g.symbol).join(", "))
+        : "none this window") +
+    `</div>` +
+    (mv.climbing.length || mv.cooling.length
+      ? `<div class="p-cols">` +
+        (mv.climbing.length ? `<div><span class="label">Climbing</span>` +
+          `<ul class="ballot p-movers">${mv.climbing.map(mover).join("")}</ul></div>` : "") +
+        (mv.cooling.length ? `<div><span class="label">Cooling</span>` +
+          `<ul class="ballot p-movers">${mv.cooling.map(mover).join("")}</ul></div>` : "") +
+        `</div>`
+      : `<p class="w-small">Not one curve moved in that time.</p>`);
 
   const top = Math.max(1, ...pad.bases.map((b) => b.lockedUsd));
   const bases = `<span class="label">By base stock</span><ul class="ballot p-bases">` +
@@ -1388,7 +1443,7 @@ export function padHtml(pad) {
     `<th></th><th>Coin</th><th>Base</th><th class="p-num">Locked</th>` +
     `<th class="p-num">Nominal</th><th>To graduate</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 
-  return head + caveat + gradBlock + bases + board;
+  return moving + head + caveat + gradBlock + bases + board;
 }
 
 /** Ce que le filtre laisse passer, sur l'ensemble du carnet. Silencieux tant

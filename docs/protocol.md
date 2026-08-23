@@ -467,11 +467,42 @@ ligne le dit au lieu d'afficher « 100% ».
 échangés en 24 h sur 2 122 trades · 11 actions de base, dont le $PRINTER lui-même
 (69 pièces).
 
+### Ce qui bouge
+
+La page disait ce qui existe, pas ce qui se passe : tout y aurait été identique
+si le pad avait été gelé huit jours. Il ne l'est pas — vingt pièces sont nées
+pendant les vingt-quatre minutes qui ont suivi la mise en service.
+
+Le pad est enregistré dans la base d'historique (`pad`), une ligne par courbe et
+seulement quand elle bouge, et relu **toutes les 2 minutes** (un balayage complet
+prend 1,7 s ; les 10 minutes d'origine étaient de la prudence inutile).
+
+Trois pièges, tous rencontrés et tous corrigés :
+
+**L'écart se mesure en unités de l'action, jamais en dollars.** Une courbe
+adossée à NVDA « gagne » 15% le jour où NVDA les gagne, sans que personne n'y
+ait mis un centime. La conversion se fait à la fin, au cours du moment.
+
+**Rencontrer une pièce n'est pas la voir naître.** Au premier enregistrement,
+les 280 pièces déjà lancées reçoivent toutes leur première trace au même
+instant. Les compter comme des lancements affichait **« +281 launched »** un
+matin où pas une seule n'était née. Une pièce n'est neuve que si sa première
+trace est postérieure au tout premier relevé.
+
+**Graduer n'est pas une fuite d'argent.** La courbe se vide dans une pool.
+Compté comme flux sortant, TONER prenait la tête des courbes qui refroidissent
+— à **−$6 760**, le plus gros « départ » de la fenêtre — le jour même où elle
+réussissait. Une graduation sort du flux et se nomme.
+
+Tant que l'enregistrement est plus jeune que la fenêtre demandée, la page
+annonce la fenêtre réelle (« since 24 minutes ago — all we have watched »)
+plutôt que de prétendre couvrir 24 h.
+
 ### Cadence et transport
 
-Le pad est relu toutes les 10 minutes (`padPollIntervalMs`) et servi sur
-`/api/pad`, pas dans le snapshot : 16 Ko gzippés qui ne bougent qu'aux dix
-minutes n'ont rien à faire dans un document qui repart toutes les 15 secondes.
+Le pad est relu toutes les 2 minutes (`padPollIntervalMs`) et servi sur
+`/api/pad`, pas dans le snapshot : 16 Ko gzippés n'ont rien à faire dans un
+document qui repart toutes les 15 secondes.
 La page le charge à l'ouverture de l'onglet, avec ETag et 304.
 
 ### Ce qui n'est pas mesuré

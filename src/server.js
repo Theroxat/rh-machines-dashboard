@@ -30,7 +30,7 @@ import { composeSnapshot } from "./snapshot.js";
 import { createStore } from "./store.js";
 import { assetHash, assetPath, stampPage, cacheHeaders, securityHeaders, etagOf } from "./http.js";
 import { multicallOf } from "./multicall.js";
-import { readPad, readPools, priceCoin, padStats } from "./pad.js";
+import { readPad, readPools, priceCoin, padStats, padMovement } from "./pad.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const cfg = loadConfig(process.env, JSON.parse(readFileSync(join(here, "..", "config.json"), "utf8")));
@@ -129,6 +129,10 @@ async function sweepInk() {
   console.log(`ink: ${fresh.size} machines read, ${reinked} re-inked past activation, ${failures} failures`);
 }
 
+// Vingt-quatre heures : assez pour qu'un lancement compte, assez court pour que
+// « ce qui monte » désigne quelque chose qui monte encore.
+const PAD_WINDOW_MS = 24 * 60 * 60 * 1000;
+
 async function sweepPad() {
   const coins = await readPad({
     provider,
@@ -164,10 +168,23 @@ async function sweepPad() {
     pool: c.pool,
   }));
 
-  pad = { ...padStats(priced), coins: wire, readAt: Date.now(), site: PAD.site };
+  // Ce qui a bougé depuis hier. La ligne de base est relevée avant l'écriture :
+  // après, la valeur d'il y a une minute serait celle de maintenant.
+  const now = Date.now();
+  const movement = history
+    ? padMovement({ coins: priced, baseline: history.padBaseline(now - PAD_WINDOW_MS), now, windowMs: PAD_WINDOW_MS })
+    : null;
+  if (history) {
+    try { history.recordPad(priced, now); }
+    catch (e) { console.error(`pad history: ${e.message}`); }
+  }
+
+  pad = { ...padStats(priced), coins: wire, movement, readAt: now, site: PAD.site };
   console.log(`pad: ${pad.launched} coins, ${pad.graduated} graduated, ${pad.untouched} never bought` +
     (pad.lockedUsd === null ? ", none priced" : `, $${Math.round(pad.lockedUsd)} in curves`) +
-    (pad.poolUsd === null ? "" : `, $${Math.round(pad.poolUsd)} in pools, $${Math.round(pad.vol24hUsd)} traded in 24h`));
+    (pad.poolUsd === null ? "" : `, $${Math.round(pad.poolUsd)} in pools, $${Math.round(pad.vol24hUsd)} traded in 24h`) +
+    (movement ? `; since ${new Date(movement.since).toISOString().slice(11, 16)}: ` +
+      `+${movement.launched} launched, $${Math.round(movement.inUsd)} in, $${Math.round(movement.outUsd)} out` : ""));
 }
 
 async function sweepBook() {

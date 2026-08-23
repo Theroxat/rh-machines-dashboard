@@ -198,3 +198,44 @@ test("a restart re-reads what it already knows, and writes none of it again", ()
   assert.equal(db.prepare("SELECT COUNT(*) c FROM machine").get().c, 3);
   db.close();
 });
+
+// Le pad tourne sur sa propre cadence, donc il a sa propre écriture. Ce qui n'a
+// pas bougé ne s'écrit pas, ici comme ailleurs.
+test("the pad records only the curves that moved", () => {
+  const h = openHistory(":memory:");
+  const coins = [
+    { token: "0xA", realBaseUnits: 10, graduated: false },
+    { token: "0xB", realBaseUnits: 0, graduated: false },
+  ];
+  assert.equal(h.recordPad(coins, 1000), 2);
+  assert.equal(h.recordPad(coins, 2000), 0);
+  assert.equal(h.recordPad([{ ...coins[0], realBaseUnits: 12 }, coins[1]], 3000), 1);
+  h.close();
+});
+
+// Au premier jour, tout ce qu'on a est plus récent que la fenêtre demandée.
+// Sans repli, la ligne de base est vide et la page n'affiche aucun mouvement
+// alors qu'elle en a mesuré un.
+test("a baseline older than the record falls back to the oldest reading there is", () => {
+  const h = openHistory(":memory:");
+  h.recordPad([{ token: "0xA", realBaseUnits: 10, graduated: false }], 100000);
+  h.recordPad([{ token: "0xA", realBaseUnits: 30, graduated: false }], 200000);
+
+  // Une coupure antérieure à tout ce qu'on a.
+  const b = h.padBaseline(1);
+  assert.equal(b.at.get("0xA"), 10);
+  assert.equal(b.oldest, 100000);
+  assert.equal(b.firstSeen.get("0xA"), 100000);
+
+  // Et une coupure qui tombe entre les deux relevés rend bien le premier.
+  assert.equal(h.padBaseline(150000).at.get("0xA"), 10);
+  h.close();
+});
+
+test("a pad never recorded yields an empty baseline rather than throwing", () => {
+  const h = openHistory(":memory:");
+  const b = h.padBaseline(Date.now());
+  assert.equal(b.at.size, 0);
+  assert.equal(b.oldest, null);
+  h.close();
+});
