@@ -101,15 +101,19 @@ export function openHistory(path) {
       `SELECT tokenId FROM ${table} w WHERE kind = 'gone'
        AND t = (SELECT MAX(t) FROM ${table} WHERE tokenId = w.tokenId)`,
     ).all();
-    for (const r of rows) into.delete(String(r.tokenId));
+    for (const r of rows) into.delete(key(r.tokenId));
   };
+
+  /** La forme unique d'une clé de Map. SQLite rend 463, la chaîne rend 463, et
+   *  `join(":")` rend "463" : sans elle, ce sont trois entrées pour une. */
+  const key = (x) => String(x);
 
   const seed = (table, keyCols, valCols, into) => {
     const rows = db.prepare(
       `SELECT ${keyCols.join(",")}, ${valCols.join(",")} FROM ${table} w
        WHERE t = (SELECT MAX(t) FROM ${table} WHERE ${keyCols.map((c) => `${c} IS w.${c}`).join(" AND ")})`,
     ).all();
-    for (const r of rows) into.set(keyCols.map((c) => r[c]).join(":"), valCols.map((c) => r[c]).join(":"));
+    for (const r of rows) into.set(keyCols.map((c) => key(r[c])).join(":"), valCols.map((c) => r[c]).join(":"));
   };
   try {
     seed("floor", ["classValue", "side"], ["floorEth", "listed", "pelotonEth"], last.floor);
@@ -125,10 +129,20 @@ export function openHistory(path) {
     // Une base neuve n'a rien à relire, et une base illisible se réécrira.
   }
 
-  /** N'écrit que si la valeur a changé. Rend 1 si elle a été couchée. */
-  const onChange = (bag, key, value, write) => {
-    if (bag.get(key) === value) return 0;
-    bag.set(key, value);
+  /**
+   * N'écrit que si la valeur a changé. Rend 1 si elle a été couchée.
+   *
+   * La clé est normalisée ici et nulle part ailleurs. `seed()` la reconstruit
+   * depuis SQLite avec un `join(":")`, qui rend une chaîne ; les appelants à
+   * clé unique passent le tokenId tel que la chaîne le donne, un nombre.
+   * `Map.get(463)` ne trouvait donc pas `Map.set("463")` : à chaque
+   * redémarrage, la reprise ne servait à rien et les dix mille machines se
+   * réécrivaient à l'identique. 98% de la table venait de là.
+   */
+  const onChange = (bag, rawKey, value, write) => {
+    const k = key(rawKey);
+    if (bag.get(k) === value) return 0;
+    bag.set(k, value);
     write();
     return 1;
   };
@@ -175,22 +189,27 @@ export function openHistory(path) {
         }
 
         // Le carnet : ce qui est apparu, ce qui a changé de prix, ce qui est parti.
+        //
+        // Tout ce qui est indexé par tokenId l'est par `key()`. SQLite rend des
+        // nombres, la chaîne aussi, et `seed()` en faisait des chaînes : trois
+        // sources pour une même clé de Map, où 463 et "463" sont deux entrées
+        // différentes. Une seule forme, posée ici, et les trois s'accordent.
         const seen = new Set();
         const shelfSeen = new Set();
         for (const r of d.rows ?? []) {
           for (const cell of [r.inked, r.dormant]) {
             for (const e of cell.entries ?? []) {
-              seen.add(e.tokenId);
+              seen.add(key(e.tokenId));
               // Le genre se déduit de la présence, il n'entre pas dans l'état
               // comparé : sinon la valeur passe de « prix:new » à « prix:price »
               // au second passage et chaque balayage réécrit tout le carnet.
-              const kind = last.listing.has(e.tokenId) ? "price" : "new";
+              const kind = last.listing.has(key(e.tokenId)) ? "price" : "new";
               counts.listing += onChange(last.listing, e.tokenId, String(e.priceEth), () =>
                 stmt.listing.run(t, e.tokenId, e.priceEth, kind));
             }
             for (const e of cell.anvilEntries ?? []) {
-              shelfSeen.add(e.tokenId);
-              const kind = last.shelf.has(e.tokenId) ? "price" : "new";
+              shelfSeen.add(key(e.tokenId));
+              const kind = last.shelf.has(key(e.tokenId)) ? "price" : "new";
               counts.shelf += onChange(last.shelf, e.tokenId, String(e.askPrinter), () =>
                 stmt.shelf.run(t, e.tokenId, e.askPrinter, kind));
             }
@@ -199,13 +218,13 @@ export function openHistory(path) {
         for (const id of [...last.listing.keys()]) {
           if (seen.has(id)) continue;
           last.listing.delete(id);
-          stmt.listing.run(t, id, null, "gone");
+          stmt.listing.run(t, Number(id), null, "gone");
           counts.listing++;
         }
         for (const id of [...last.shelf.keys()]) {
           if (shelfSeen.has(id)) continue;
           last.shelf.delete(id);
-          stmt.shelf.run(t, id, null, "gone");
+          stmt.shelf.run(t, Number(id), null, "gone");
           counts.shelf++;
         }
 

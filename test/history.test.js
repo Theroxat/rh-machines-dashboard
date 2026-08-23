@@ -1,6 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { DatabaseSync } from "node:sqlite";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { openHistory } from "../src/history.js";
+
+// Une base sur disque : la reprise après redémarrage ne se teste pas en mémoire,
+// puisque c'est précisément la relecture d'un fichier qui est en cause.
+const tmp = () => join(mkdtempSync(join(tmpdir(), "rh-hist-")), "h.db");
 
 const snap = (over = {}) => ({
   at: 1000,
@@ -160,4 +168,33 @@ test("without a cooldown only the exact same deal is refused", () => {
   assert.equal(h.claimAlert("margin:7:0.052", 7, "margin", 1000), true);
   assert.equal(h.claimAlert("margin:7:0.051", 7, "margin", 2000), true);
   h.close();
+});
+
+// La reprise après redémarrage ne servait à rien : `seed()` reconstruit ses
+// clés depuis SQLite avec un join(":") — donc des chaînes — pendant que les
+// tables à clé unique écrivent avec le tokenId tel que la chaîne le donne, un
+// nombre. Map.get(463) ne trouve pas Map.set("463"), et les dix mille machines
+// se réécrivaient à l'identique à chaque démarrage : 98% de la table.
+test("a restart re-reads what it already knows, and writes none of it again", () => {
+  const path = tmp();
+  const weights = new Map([[463, 100n], [464, 200n]]);
+  const ink = new Map([[463, 4250n * 10n ** 18n], [464, 8500n * 10n ** 18n]]);
+
+  const first = openHistory(path);
+  first.record(snap({ at: 1000 }), { ink, weights });
+  first.close();
+
+  // Un second processus, sur la même base, avec un état inchangé.
+  const second = openHistory(path);
+  const counts = second.record(snap({ at: 2000 }), { ink, weights });
+  assert.equal(counts.machine, 0, "un redémarrage ne doit rien réécrire d'inchangé");
+
+  // Et une vraie brûlure passe toujours.
+  const burned = new Map([[463, 17000n * 10n ** 18n], [464, 8500n * 10n ** 18n]]);
+  assert.equal(second.record(snap({ at: 3000 }), { ink: burned, weights }).machine, 1);
+  second.close();
+
+  const db = new DatabaseSync(path, { readOnly: true });
+  assert.equal(db.prepare("SELECT COUNT(*) c FROM machine").get().c, 3);
+  db.close();
 });
