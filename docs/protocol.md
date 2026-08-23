@@ -498,6 +498,26 @@ Tant que l'enregistrement est plus jeune que la fenêtre demandée, la page
 annonce la fenêtre réelle (« since 24 minutes ago — all we have watched »)
 plutôt que de prétendre couvrir 24 h.
 
+### Les homonymes
+
+Rien n'empêche deux pièces de porter le même nom, et le pad en est plein :
+**126 jetons sur 300** partagent leur symbole avec un autre. Un lancement est
+copié dans les créneaux qui le suivent — dix-sept ZEUB aux indices 129 à 145,
+seize wallets différents, tous dans la même factory.
+
+Le tableau montrait dix-sept lignes identiques avec un lien d'achat sur chacune.
+Qui clique sur la mauvaise paie un imposteur. Chaque ligne porte maintenant
+l'adresse de qui l'a lancée, et un repère :
+
+- `first` — le premier à porter ce nom ;
+- `copy n/m` — les suivants ;
+- `shared name` — quand le groupe est à cheval sur les deux factories.
+
+`allCoins(i)` rend l'ordre de création : **au sein d'une même factory**, l'indice
+le plus bas est l'original, et c'est démontrable. Les deux factories tournant en
+parallèle, un groupe qui les enjambe (11 cas : JDOG, BRRR, PAPO, INK…) n'a pas
+d'ordre, et aucun rang n'est alors avancé plutôt qu'un rang inventé.
+
 ### Cadence et transport
 
 Le pad est relu toutes les 2 minutes (`padPollIntervalMs`) et servi sur

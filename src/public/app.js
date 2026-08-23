@@ -1265,6 +1265,27 @@ export function ballotHtml(vote, epoch) {
  * sur des jetons que personne n'a achetés. Afficher la seconde seule ferait
  * passer douze mille dollars pour huit cent mille.
  */
+/** Une adresse, réduite à ce qu'on en reconnaît. */
+export const shortAddr = (a) =>
+  typeof a === "string" && a.length > 12 ? `${esc(a.slice(0, 6))}…${esc(a.slice(-4))}` : esc(a ?? "");
+
+/**
+ * Le repère d'un homonyme.
+ *
+ * Rien n'empêche deux pièces de porter le même nom, et le pad en est plein. Au
+ * sein d'une factory, `allCoins(i)` donne l'ordre de création : le premier est
+ * l'original, et c'est démontrable. Un groupe à cheval sur les deux factories
+ * n'a pas d'ordre, et l'on dit alors que le nom est partagé sans prétendre
+ * savoir par qui il l'a été d'abord.
+ */
+export function namesake(c) {
+  if (!c.sharing || c.sharing < 2) return "";
+  if (c.rank === 1) return `<span class="p-first" title="First coin launched under this name">first</span>`;
+  if (c.rank) return `<span class="p-dupe" title="${fmtInt(c.sharing)} coins carry this name — this is not the first">` +
+    `copy ${fmtInt(c.rank - 1)}/${fmtInt(c.sharing - 1)}</span>`;
+  return `<span class="p-dupe" title="${fmtInt(c.sharing)} coins carry this name">shared name</span>`;
+}
+
 /** Depuis quand, en toutes lettres. « since 1755948000000 » ne se lit pas. */
 export function sinceWords(t, now = Date.now()) {
   const mins = Math.max(1, Math.round((now - t) / 60000));
@@ -1423,8 +1444,10 @@ export function padHtml(pad) {
       // là qu'on l'achète, et le tableau serait une impasse sans le chemin.
       `<td class="p-sym">` +
       `<a href="https://www.printer.fun/coin/${esc(c.token)}" target="_blank" rel="noopener">` +
-      `${esc(c.symbol)}<span class="p-go">buy</span></a>` +
-      `<span class="p-name">${esc(c.name)}</span></td>` +
+      `${esc(c.symbol)}<span class="p-go">buy</span></a>${namesake(c)}` +
+      // Qui l'a lancée. Sans cette ligne, dix-sept ZEUB sont dix-sept lignes
+      // identiques dont une seule est celle qu'on cherche.
+      `<span class="p-name">${esc(c.name)}${c.creator ? ` &middot; ${shortAddr(c.creator)}` : ""}</span></td>` +
       `<td class="p-base">${esc(c.baseSymbol)}</td>` +
       `<td class="p-num">${c.lockedUsd === null ? "—" : fmtUsdRound(c.lockedUsd)}</td>` +
       `<td class="p-num p-dim">${c.nominalUsd === null ? "—" : fmtUsdRound(c.nominalUsd)}</td>` +
@@ -1436,9 +1459,14 @@ export function padHtml(pad) {
       }</span></td></tr>`;
   }).join("");
 
+  const dupeNote = pad.namesakes
+    ? ` <b>${fmtInt(pad.namesakes)}</b> of them share a name with another coin — anyone can launch under ` +
+      `a name already taken, and a launch tends to be copied in the slots right after it. The address of ` +
+      `whoever launched each one is under its name, and the first to use a name is marked.`
+    : "";
   const board = `<span class="label">Still on the curve</span>` +
     `<p class="w-small">The other ${fmtInt(coins.length)}, by how close they are to graduating. ` +
-    `The bar is how far along its curve a coin has come.</p>` +
+    `The bar is how far along its curve a coin has come.${dupeNote}</p>` +
     `<div class="p-wrap"><table class="p-table"><thead><tr>` +
     `<th></th><th>Coin</th><th>Base</th><th class="p-num">Locked</th>` +
     `<th class="p-num">Nominal</th><th>To graduate</th></tr></thead><tbody>${rows}</tbody></table></div>`;

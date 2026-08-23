@@ -30,7 +30,7 @@ import { composeSnapshot } from "./snapshot.js";
 import { createStore } from "./store.js";
 import { assetHash, assetPath, stampPage, cacheHeaders, securityHeaders, etagOf } from "./http.js";
 import { multicallOf } from "./multicall.js";
-import { readPad, readPools, priceCoin, padStats, padMovement } from "./pad.js";
+import { readPad, readPools, priceCoin, padStats, padMovement, markNamesakes } from "./pad.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const cfg = loadConfig(process.env, JSON.parse(readFileSync(join(here, "..", "config.json"), "utf8")));
@@ -146,7 +146,7 @@ async function sweepPad() {
   // que le pad utilise et que le protocole n'a jamais achetées s'y ajoutent.
   const bases = [...new Map(coins.map((c) => [c.baseSymbol, { symbol: c.baseSymbol, address: c.base }])).values()];
   const prices = await fetchStockPrices(bases).catch(() => new Map());
-  const priced = coins.map((c) => priceCoin(c, prices.get(c.baseSymbol) ?? null));
+  const priced = markNamesakes(coins.map((c) => priceCoin(c, prices.get(c.baseSymbol) ?? null)));
 
   // Graduer vide la courbe dans une vraie pool : les trois graduées lisent zéro
   // partout tant qu'on ne va pas chercher la pool où elles s'échangent
@@ -165,6 +165,9 @@ async function sweepPad() {
     // Une graduée a échangé — c'est la condition pour graduer. Son `realBase`
     // est nul parce que la courbe s'est vidée, pas parce que rien ne s'est passé.
     traded: c.graduated || Boolean(Number(c.realBase)),
+    // Qui l'a lancée, et si elle est seule à porter son nom : dix-sept lignes
+    // « ZEUB » sans rien pour les départager sont un piège, pas un tableau.
+    creator: c.creator, sharing: c.sharing, rank: c.rank,
     pool: c.pool,
   }));
 

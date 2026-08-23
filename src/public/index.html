@@ -699,6 +699,14 @@
   .p-sym a:hover .p-go, .p-sym a:focus-visible .p-go { color: var(--paper); background: var(--ink); }
   /* Le graphique d'une graduée, chez DexTools : c'est ce qu'on vient chercher
      dès qu'une pièce s'échange pour de bon. */
+  /* Le premier à porter un nom, et ceux qui le reprennent. Dix-sept lignes
+     « ZEUB » avec un bouton d'achat chacune sont un piège, pas un tableau. */
+  .p-first, .p-dupe {
+    margin-left: 7px; font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase;
+    font-weight: 700; padding: 1px 4px; white-space: nowrap;
+  }
+  .p-first { color: var(--paper); background: var(--under); }
+  .p-dupe { color: var(--reink); border: 1px solid var(--reink); }
   .p-go {
     margin-left: 7px; font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;
     font-weight: 700; color: var(--ink); border: 1px solid var(--ink); padding: 1px 4px;

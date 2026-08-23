@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { padHtml, sinceWords } from "../src/public/app.js";
+import { padHtml, sinceWords, namesake, shortAddr } from "../src/public/app.js";
 
 const coin = (over = {}) => ({
   token: "0xT", symbol: "MEME", name: "Meme Coin", baseSymbol: "NVDA", base: "0xB",
@@ -366,4 +366,42 @@ test("how long ago is said in words, at the scale that reads", () => {
   assert.equal(sinceWords(now - 50 * 3600000, now), "2 days ago");
   // Jamais « 0 minute ago » : on vient de regarder, c'est une minute.
   assert.equal(sinceWords(now, now), "1 minute ago");
+});
+
+// --- les homonymes, sur la page --------------------------------------------
+
+// Dix-sept lignes « ZEUB » avec un bouton d'achat chacune sont un piège : qui
+// clique sur la mauvaise paie un imposteur.
+test("a copy is marked as one, and the original is marked as the original", () => {
+  assert.match(namesake({ sharing: 17, rank: 1 }), /class="p-first"[^>]*>first</);
+  assert.match(namesake({ sharing: 17, rank: 4 }), /copy 3\/16</);
+  // Deux factories en parallèle : pas d'ordre, donc pas de rang avancé.
+  assert.match(namesake({ sharing: 2, rank: null }), /shared name</);
+  assert.equal(namesake({ sharing: 1, rank: 1 }), "");
+  assert.equal(namesake({}), "");
+});
+
+test("each coin says who launched it, so two rows of one name can be told apart", () => {
+  const html = padHtml({ ...PAD, namesakes: 2, coins: [
+    coin({ symbol: "ZEUB", creator: "0xE908ba570259E4bB1e1fDd2EDd9B15E092B13211", sharing: 17, rank: 1 }),
+    coin({ symbol: "ZEUB", token: "0xB", creator: "0x46E6c0e5000000000000000000000000000000aa", sharing: 17, rank: 2 }),
+  ] });
+  assert.match(html, /ZEUB.*0xE908…3211/s);
+  assert.match(html, /ZEUB.*0x46E6…00aa/s);
+  assert.match(html, /class="p-first"[^>]*>first</);
+  assert.match(html, /copy 1\/16</);
+  assert.match(html, /<b>2<\/b> of them share a name with another coin/);
+});
+
+// Une adresse entière dans une cellule de tableau la fait déborder ; tronquée
+// trop court, elle ne distingue plus rien.
+test("an address is shortened to the ends one actually recognises", () => {
+  assert.equal(shortAddr("0xE908ba570259E4bB1e1fDd2EDd9B15E092B13211"), "0xE908…3211");
+  assert.equal(shortAddr(null), "");
+  // Elle vient d'un inconnu et entre dans du balisage.
+  assert.match(shortAddr('0x"><img src=x onerror=alert(1)>aaaa'), /&lt;|&quot;|&#/);
+});
+
+test("a pad with no shared names says nothing about them", () => {
+  assert.doesNotMatch(padHtml({ ...PAD, namesakes: 0 }), /share a name with another/);
 });

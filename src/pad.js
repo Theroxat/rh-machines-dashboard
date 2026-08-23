@@ -101,6 +101,37 @@ export async function readPools(coins, fetchImpl = fetch) {
   return out;
 }
 
+/**
+ * Les homonymes.
+ *
+ * Rien n'empêche deux pièces de porter le même nom, et le pad en est plein :
+ * cent vingt-six jetons sur trois cents partagent leur symbole avec un autre.
+ * Un lancement est copié dans les créneaux qui le suivent — dix-sept ZEUB, aux
+ * indices 129 à 145, seize wallets différents.
+ *
+ * Le tableau montrait dix-sept lignes identiques, chacune avec un lien d'achat.
+ * Qui clique sur la mauvaise paie un imposteur.
+ *
+ * `allCoins(i)` rend l'ordre de création : au sein d'une même factory, l'indice
+ * le plus bas est l'original, et c'est démontrable. Un groupe à cheval sur les
+ * deux factories n'a pas d'ordre — elles tournent en parallèle — et aucun rang
+ * n'est alors avancé, plutôt qu'un rang inventé.
+ */
+export function markNamesakes(coins) {
+  const groups = new Map();
+  for (const c of coins) groups.set(c.symbol, [...(groups.get(c.symbol) ?? []), c]);
+
+  for (const group of groups.values()) {
+    const orderable = new Set(group.map((c) => c.factory)).size === 1;
+    const ranked = orderable ? [...group].sort((a, b) => a.index - b.index) : null;
+    for (const c of group) {
+      c.sharing = group.length;
+      c.rank = ranked ? ranked.indexOf(c) + 1 : null;
+    }
+  }
+  return coins;
+}
+
 /** Les totaux du pad. Une pièce qu'on n'a pas su valoriser ne compte pas pour
  *  zéro dans les dollars : elle est comptée à part, et le total le dit. */
 export function padStats(coins) {
@@ -128,6 +159,8 @@ export function padStats(coins) {
     lockedUsd: priced.length ? priced.reduce((a, c) => a + c.lockedUsd, 0) : null,
     nominalUsd: priced.length ? priced.reduce((a, c) => a + c.nominalUsd, 0) : null,
     unpriced: coins.length - priced.length,
+    // Combien de jetons ne sont pas seuls à porter leur nom.
+    namesakes: coins.filter((c) => (c.sharing ?? 1) > 1).length,
     bases: [...byBase.values()].sort((a, b) => b.lockedUsd - a.lockedUsd),
   };
 }

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ethers } from "ethers";
-import { priceCoin, padStats, readPad, readPools, padMovement, FACTORY_ABI } from "../src/pad.js";
+import { priceCoin, padStats, readPad, readPools, padMovement, markNamesakes, FACTORY_ABI } from "../src/pad.js";
 
 const e18 = (x) => ethers.parseUnits(String(x), 18);
 const coin = (over = {}) => ({
@@ -363,4 +363,47 @@ test("a coin already graduated before the window is not counted as graduating in
   });
   assert.equal(m.graduatedIn, 0);
   assert.equal(m.graduated.length, 0);
+});
+
+// --- les homonymes ----------------------------------------------------------
+
+// Rien n'empêche deux pièces de porter le même nom, et le pad en est plein :
+// dix-sept ZEUB, indices 129 à 145, seize wallets différents. Le tableau
+// montrait dix-sept lignes identiques avec un lien d'achat sur chacune.
+test("coins sharing a name are counted, and the first of them is named", () => {
+  const g = markNamesakes([
+    coin({ token: "0x1", symbol: "ZEUB", factory: "0xF", index: 145 }),
+    coin({ token: "0x2", symbol: "ZEUB", factory: "0xF", index: 129 }),
+    coin({ token: "0x3", symbol: "ZEUB", factory: "0xF", index: 130 }),
+    coin({ token: "0x4", symbol: "ALONE", factory: "0xF", index: 12 }),
+  ]);
+  const at = (t) => g.find((c) => c.token === t);
+  assert.equal(at("0x2").rank, 1, "l'indice le plus bas est l'original");
+  assert.equal(at("0x3").rank, 2);
+  assert.equal(at("0x1").rank, 3);
+  for (const t of ["0x1", "0x2", "0x3"]) assert.equal(at(t).sharing, 3);
+  assert.equal(at("0x4").sharing, 1);
+  assert.equal(at("0x4").rank, 1);
+});
+
+// Les deux factories tournent en parallèle : entre elles, les indices ne se
+// comparent pas. Aucun rang n'est alors avancé, plutôt qu'un rang inventé.
+test("a name spread across both factories claims no first, since there is no order", () => {
+  const g = markNamesakes([
+    coin({ token: "0x1", symbol: "JDOG", factory: "0xFA", index: 0 }),
+    coin({ token: "0x2", symbol: "JDOG", factory: "0xFB", index: 3 }),
+  ]);
+  for (const c of g) {
+    assert.equal(c.sharing, 2);
+    assert.equal(c.rank, null);
+  }
+});
+
+test("how many coins are not alone under their name is counted", () => {
+  const g = markNamesakes([
+    coin({ token: "0x1", symbol: "ZEUB", factory: "0xF", index: 1 }),
+    coin({ token: "0x2", symbol: "ZEUB", factory: "0xF", index: 2 }),
+    coin({ token: "0x3", symbol: "ALONE", factory: "0xF", index: 3 }),
+  ]).map((c) => priceCoin(c, 200));
+  assert.equal(padStats(g).namesakes, 2);
 });
