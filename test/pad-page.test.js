@@ -189,6 +189,21 @@ test("the pad's stylesheet is declared once", () => {
   }
 });
 
+// Les barres doivent partir de la même abscisse. Avec `min-width`, la colonne
+// du milieu grandit avec son texte : « 116 coins · 2 graduated » poussait la
+// barre de NVDA trente pixels plus loin que celle de PRINTER, et les deux
+// seules lignes décalées étaient les deux qui portent une graduation.
+test("a longer label cannot push its own bar out of line with the others", () => {
+  const css = readFileSync(new URL("../src/public/index.html", import.meta.url), "utf8");
+  const rule = css.match(/\n  \.b-sector \{[^}]*\}/)[0];
+  assert.match(rule, /flex: none/);
+  assert.match(rule, /width: \d+px/);
+  assert.doesNotMatch(rule, /min-width/);
+  // Et rien ne déborde : ce qui ne tient pas se coupe plutôt que d'élargir.
+  assert.match(rule, /text-overflow: ellipsis/);
+  assert.match(css, /\.p-bases \.b-name \{[^}]*flex: none/);
+});
+
 // Une pièce jamais échangée n'est pas à 0% de sa graduation : elle n'a jamais
 // commencé. Une barre vide sous un pourcentage se lit comme un échec de départ.
 test("a coin nobody ever bought says so instead of showing nothing at zero", () => {
