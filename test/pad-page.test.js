@@ -28,10 +28,28 @@ const PAD = {
   readAt: 1, site: "https://www.printer.fun/",
 };
 
+// « graduated » apparaissait deux fois sur la page, à deux grilles d'écart :
+// une fois pour la fenêtre, une fois depuis toujours, sans rien qui les sépare.
+test("the two graduation counts do not answer to the same name", () => {
+  const html = padHtml({ ...PAD, movement: MOVE });
+  assert.match(html, /class="p-k">graduated<\/span><span class="p-x">TONER/);
+  assert.match(html, /class="p-k">graduated to date<\/span>/);
+  assert.equal((html.match(/class="p-k">graduated<\/span>/g) ?? []).length, 1);
+});
+
+// Chaque vignette qualifie son propre chiffre. Celle des créateurs annonçait
+// « 152 coins ever traded », une statistique sans rapport avec un compte de
+// créateurs — et qui appartient à « never bought », dont elle est le complément.
+test("each figure's small print describes that figure and no other", () => {
+  const html = padHtml({ ...PAD, movement: null });
+  assert.match(html, /class="p-k">creators<\/span><span class="p-x">1\.5 coins each on average/);
+  assert.match(html, /class="p-k">never bought<\/span><span class="p-x">33\.3% of them — 2 have traded/);
+});
+
 test("the head states what was launched, what graduated and what nobody touched", () => {
   const html = padHtml(PAD);
   assert.match(html, /class="p-v">3<\/span><span class="p-k">coins launched/);
-  assert.match(html, /class="p-v">1<\/span><span class="p-k">graduated/);
+  assert.match(html, /class="p-v">1<\/span><span class="p-k">graduated to date/);
   assert.match(html, /class="p-v">1<\/span><span class="p-k">never bought/);
   assert.match(html, /class="p-v">\$11,737<\/span><span class="p-k">in the curves/);
   assert.match(html, /class="p-v">\$34,398<\/span><span class="p-k">in the pools/);

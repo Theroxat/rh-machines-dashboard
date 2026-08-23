@@ -1311,13 +1311,20 @@ export function padHtml(pad) {
   const traded = pad.launched - pad.untouched;
   const head = `<div class="p-figs">` +
     fig(fmtInt(pad.launched), "coins launched", "across two factories") +
-    fig(fmtInt(pad.graduated), "graduated", "left the curve for a pool") +
-    fig(fmtInt(pad.untouched), "never bought", `${fmtRatio(pad.launched ? pad.untouched / pad.launched : 0)} of them`) +
+    // « graduated » deux fois sur la même page, à deux grilles d'écart : celui
+    // du mouvement compte la fenêtre, celui-ci compte depuis toujours.
+    fig(fmtInt(pad.graduated), "graduated to date", "left the curve for a pool") +
+    fig(fmtInt(pad.untouched), "never bought",
+      `${fmtRatio(pad.launched ? pad.untouched / pad.launched : 0)} of them — ${fmtInt(traded)} have traded`) +
     fig(pad.lockedUsd === null ? "—" : fmtUsdRound(pad.lockedUsd), "in the curves", `across ${fmtInt(pad.launched - pad.graduated)} coins`) +
     // La pool des graduées pèse plusieurs fois toutes les courbes réunies :
     // la ranger dans le même total effacerait justement ce qui les sépare.
     fig(pad.poolUsd === null ? "—" : fmtUsdRound(pad.poolUsd), "in the pools", `the ${fmtInt(pad.graduated)} that graduated`) +
-    fig(fmtInt(pad.creators), "creators", `${fmtInt(traded)} coins ever traded`) +
+    // Chaque vignette qualifie son propre chiffre. Celle-ci annonçait « 152
+    // coins ever traded » sous un compte de créateurs — une statistique sans
+    // rapport, et qui appartient à « never bought », dont elle est le complément.
+    fig(fmtInt(pad.creators), "creators",
+      pad.creators ? `${fmtExact(pad.launched / pad.creators)} coins each on average` : "") +
     `</div>`;
 
   // Le rapport entre les deux dit tout du pad, et il ne se devine pas : il faut
