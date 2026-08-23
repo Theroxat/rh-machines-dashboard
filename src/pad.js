@@ -35,6 +35,10 @@ const TOKEN_ABI = new ethers.Interface([
 
 const n18 = (v) => Number(ethers.formatUnits(v ?? 0n, 18));
 
+/** Le graphique d'une pièce graduée, chez DexTools. */
+export const dextoolsUrl = (pairAddress) =>
+  pairAddress ? `https://www.dextools.io/app/en/robinhood/pair-explorer/${pairAddress}` : null;
+
 /**
  * Ce qu'une pièce vaut, une fois connu le prix de l'action qui lui sert de base.
  * Sans ce prix, les deux montants se taisent — la progression, elle, est un
@@ -82,7 +86,10 @@ export async function readPools(coins, fetchImpl = fetch) {
         capUsd: Number(best.marketCap ?? best.fdv) || null,
         vol24hUsd: Number(best.volume?.h24) || 0,
         trades24h: (Number(best.txns?.h24?.buys) || 0) + (Number(best.txns?.h24?.sells) || 0),
-        pairUrl: best.url ?? null,
+        // L'adresse de la paire, pour le lien DexTools : c'est le graphique que
+        // les visiteurs vont chercher, et il ne se déduit pas de l'adresse du
+        // jeton. Format relevé dans les bundles de printer.fun.
+        pairAddress: best.pairAddress ?? null,
       });
     } catch {
       // Sans pool lisible, la pièce garde sa ligne et ses montants se taisent.

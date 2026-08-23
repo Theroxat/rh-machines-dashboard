@@ -20,7 +20,8 @@ const PAD = {
     // tout ce qu'elle vaut est dans sa pool.
     coin({ symbol: "JDOG", name: "Jensen's Dog", lockedUsd: 0, nominalUsd: 0, progress: 1,
       graduated: true, traded: true,
-      pool: { poolUsd: 33024, capUsd: 106850, vol24hUsd: 164995, trades24h: 2038 } }),
+      pool: { poolUsd: 33024, capUsd: 106850, vol24hUsd: 164995, trades24h: 2038,
+        pairAddress: "0x3e8eb60b000802e22f832a412f5491dc2d092449350ffb917455429642224963" } }),
     coin({ symbol: "BSNOB", baseSymbol: "PRINTER", lockedUsd: 2043, nominalUsd: 10359, progress: 0.789 }),
     coin({ symbol: "DEAD", lockedUsd: 0, nominalUsd: 0, progress: 0, traded: false }),
   ],
@@ -60,11 +61,55 @@ test("the page states the fee that drives the whole thing", () => {
 
 // Les graduées ne sont pas sur la courbe : elles ont leur table, en tête, et le
 // classement porte sur celles qui y sont encore — les mortes comprises.
+// Une pièce graduée s'échange pour de bon : le graphique est ce que le visiteur
+// vient chercher, et l'adresse de la paire ne se déduit pas de celle du jeton.
+test("a graduated coin links to its chart", () => {
+  const html = padHtml(PAD);
+  assert.match(html, /href="https:\/\/www\.dextools\.io\/app\/en\/robinhood\/pair-explorer\/0x3e8eb60b000802e22f832a412f5491dc2d092449350ffb917455429642224963"/);
+  assert.match(html, /target="_blank" rel="noopener">JDOG<span class="p-go">chart<\/span>/);
+});
+
+// Sans paire lisible il n'y a pas de graphique à promettre : le nom reste nu
+// plutôt que de mener à une page vide.
+test("with no pair read the name carries no link to nowhere", () => {
+  const html = padHtml({ ...PAD, coins: [
+    coin({ symbol: "JDOG", graduated: true, traded: true,
+      pool: { poolUsd: 1, capUsd: 1, vol24hUsd: 0, trades24h: 0, pairAddress: null } }),
+  ] });
+  assert.doesNotMatch(html, /dextools/);
+  assert.doesNotMatch(html, /p-go/);
+});
+
 test("every coin is listed, the graduated apart from those still on a curve", () => {
   const html = padHtml(PAD);
-  const order = [...html.matchAll(/class="p-sym">([A-Z]+)/g)].map((m) => m[1]);
+  // Le nom d'une graduée porte le lien vers son graphique : il est dans une
+  // ancre, et le relever demande de la traverser.
+  const order = [...html.matchAll(/class="p-sym">(?:<a [^>]*>)?([A-Z]+)/g)].map((m) => m[1]);
   assert.deepEqual(order, ["JDOG", "BSNOB", "DEAD"]);
-  assert.match(html, /The other 2, by money locked/);
+  assert.match(html, /The other 2, by how close they are to graduating/);
+});
+
+// C'est la course à la graduation qu'on regarde. Trié par argent, une pièce
+// chère à graduer passe devant celle qui est sur le point d'y arriver.
+test("the curve board is ranked by how close a coin is, not by how rich it is", () => {
+  const html = padHtml({ ...PAD, coins: [
+    coin({ symbol: "RICH", lockedUsd: 5000, progress: 0.10 }),
+    coin({ symbol: "CLOSE", lockedUsd: 300, progress: 0.92 }),
+    coin({ symbol: "MID", lockedUsd: 900, progress: 0.40 }),
+  ] });
+  const order = [...html.matchAll(/class="p-sym">([A-Z]+)/g)].map((m) => m[1]);
+  assert.deepEqual(order, ["CLOSE", "MID", "RICH"]);
+});
+
+// Les cent quarante-sept mortes sont toutes à zéro pour cent : à égalité, c'est
+// l'argent qui départage, sinon leur ordre est celui du hasard.
+test("coins tied at nothing are still ordered by the money in them", () => {
+  const html = padHtml({ ...PAD, coins: [
+    coin({ symbol: "AAA", lockedUsd: 1, progress: 0 }),
+    coin({ symbol: "BBB", lockedUsd: 40, progress: 0 }),
+    coin({ symbol: "CCC", lockedUsd: 12, progress: 0 }),
+  ] });
+  assert.deepEqual([...html.matchAll(/class="p-sym">([A-Z]+)/g)].map((m) => m[1]), ["BBB", "CCC", "AAA"]);
 });
 
 // Une graduée a vidé sa courbe. Triée par argent immobilisé elle tombait au

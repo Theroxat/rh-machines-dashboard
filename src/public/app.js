@@ -1334,7 +1334,13 @@ export function padHtml(pad) {
     `<th>Coin</th><th>Base</th><th class="p-num">Pool</th><th class="p-num">Cap</th>` +
     `<th class="p-num">24h volume</th><th class="p-num">24h trades</th></tr></thead><tbody>` +
     grads.map((c) => `<tr class="p-grad">` +
-      `<td class="p-sym">${esc(c.symbol)}<span class="p-name">${esc(c.name)}</span></td>` +
+      // Le graphique est ce que le visiteur vient chercher dès qu'une pièce
+      // s'échange vraiment. Le nom porte le lien, comme partout ailleurs sur
+      // le tableau de bord où une ligne mène à ce qu'elle décrit.
+      `<td class="p-sym">${c.pool?.pairAddress
+        ? `<a href="https://www.dextools.io/app/en/robinhood/pair-explorer/${esc(c.pool.pairAddress)}"` +
+          ` target="_blank" rel="noopener">${esc(c.symbol)}<span class="p-go">chart</span></a>`
+        : esc(c.symbol)}<span class="p-name">${esc(c.name)}</span></td>` +
       `<td class="p-base">${esc(c.baseSymbol)}</td>` +
       `<td class="p-num">${c.pool ? fmtUsdRound(c.pool.poolUsd) : "—"}</td>` +
       `<td class="p-num p-dim">${c.pool?.capUsd ? fmtUsdRound(c.pool.capUsd) : "—"}</td>` +
@@ -1342,11 +1348,13 @@ export function padHtml(pad) {
       `<td class="p-num p-dim">${c.pool ? fmtInt(c.pool.trades24h) : "—"}</td></tr>`).join("") +
     `</tbody></table></div>`;
 
-  // Le classement porte sur les courbes, donc sur celles qui y sont encore.
-  // Les mortes y restent : les compter sans les montrer donnerait un tableau
-  // où la moitié du pad est invisible, et elles tombent au bas du tri seules.
+  // Le classement porte sur les courbes, donc sur celles qui y sont encore, et
+  // il se trie par progression : c'est la course à la graduation qu'on regarde,
+  // et l'argent seul mettait devant une pièce chère à graduer plutôt que la
+  // plus proche d'y arriver. À progression égale — les mortes sont toutes à
+  // zéro — l'argent immobilisé départage.
   const coins = pad.coins.filter((c) => !c.graduated)
-    .sort((a, b) => (b.lockedUsd ?? -1) - (a.lockedUsd ?? -1));
+    .sort((a, b) => (b.progress - a.progress) || ((b.lockedUsd ?? -1) - (a.lockedUsd ?? -1)));
   const rows = coins.map((c, i) => {
     const pct = Math.round(c.progress * 100);
     return `<tr class="${c.traded ? "" : "p-cold"}${c.graduated ? " p-grad" : ""}">` +
@@ -1365,8 +1373,8 @@ export function padHtml(pad) {
   }).join("");
 
   const board = `<span class="label">Still on the curve</span>` +
-    `<p class="w-small">The other ${fmtInt(coins.length)}, by money locked. ` +
-    `The bar is how far a coin has come toward graduating off its curve.</p>` +
+    `<p class="w-small">The other ${fmtInt(coins.length)}, by how close they are to graduating. ` +
+    `The bar is how far along its curve a coin has come.</p>` +
     `<div class="p-wrap"><table class="p-table"><thead><tr>` +
     `<th></th><th>Coin</th><th>Base</th><th class="p-num">Locked</th>` +
     `<th class="p-num">Nominal</th><th>To graduate</th></tr></thead><tbody>${rows}</tbody></table></div>`;

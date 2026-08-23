@@ -658,6 +658,14 @@
   .p-table td { padding: 5px 10px 5px 0; border-bottom: 1px solid var(--rule); vertical-align: middle; }
   .p-n { color: var(--dim); font-size: 11px; width: 34px; }
   .p-sym { font-weight: 700; color: var(--ink); white-space: nowrap; }
+  .p-sym a { color: inherit; text-decoration: none; }
+  .p-sym a:hover .p-go, .p-sym a:focus-visible .p-go { color: var(--paper); background: var(--ink); }
+  /* Le graphique d'une graduée, chez DexTools : c'est ce qu'on vient chercher
+     dès qu'une pièce s'échange pour de bon. */
+  .p-go {
+    margin-left: 7px; font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;
+    font-weight: 700; color: var(--ink); border: 1px solid var(--ink); padding: 1px 4px;
+  }
   .p-name { display: block; font-weight: 400; color: var(--muted); font-size: 11px; max-width: 26ch;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .p-base { color: var(--text); font-size: 11.5px; white-space: nowrap; }
@@ -733,6 +741,14 @@
   .p-table td { padding: 5px 10px 5px 0; border-bottom: 1px solid var(--rule); vertical-align: middle; }
   .p-n { color: var(--dim); font-size: 11px; width: 34px; }
   .p-sym { font-weight: 700; color: var(--ink); white-space: nowrap; }
+  .p-sym a { color: inherit; text-decoration: none; }
+  .p-sym a:hover .p-go, .p-sym a:focus-visible .p-go { color: var(--paper); background: var(--ink); }
+  /* Le graphique d'une graduée, chez DexTools : c'est ce qu'on vient chercher
+     dès qu'une pièce s'échange pour de bon. */
+  .p-go {
+    margin-left: 7px; font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;
+    font-weight: 700; color: var(--ink); border: 1px solid var(--ink); padding: 1px 4px;
+  }
   .p-name { display: block; font-weight: 400; color: var(--muted); font-size: 11px; max-width: 26ch;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .p-base { color: var(--text); font-size: 11.5px; white-space: nowrap; }
