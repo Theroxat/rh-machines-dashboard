@@ -30,7 +30,7 @@ import { composeSnapshot } from "./snapshot.js";
 import { createStore } from "./store.js";
 import { assetHash, assetPath, stampPage, cacheHeaders, securityHeaders, etagOf } from "./http.js";
 import { multicallOf } from "./multicall.js";
-import { readPad, priceCoin, padStats } from "./pad.js";
+import { readPad, readPools, priceCoin, padStats } from "./pad.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const cfg = loadConfig(process.env, JSON.parse(readFileSync(join(here, "..", "config.json"), "utf8")));
@@ -144,6 +144,12 @@ async function sweepPad() {
   const prices = await fetchStockPrices(bases).catch(() => new Map());
   const priced = coins.map((c) => priceCoin(c, prices.get(c.baseSymbol) ?? null));
 
+  // Graduer vide la courbe dans une vraie pool : les trois graduées lisent zéro
+  // partout tant qu'on ne va pas chercher la pool où elles s'échangent
+  // réellement. C'est là qu'est l'essentiel de l'activité du pad.
+  const pools = await readPools(priced.filter((c) => c.graduated)).catch(() => new Map());
+  for (const c of priced) c.pool = pools.get(c.token) ?? null;
+
   // Le snapshot part en JSON : les réserves sont des BigInt et ne s'y sérialisent
   // pas. Seuls partent les champs que la page affiche, ce qui divise aussi par
   // six le poids d'un tableau de deux cent soixante-quatorze lignes.
@@ -152,12 +158,16 @@ async function sweepPad() {
     baseSymbol: c.baseSymbol, base: c.base,
     lockedUsd: c.lockedUsd, nominalUsd: c.nominalUsd,
     progress: c.progress, graduated: c.graduated,
-    traded: Boolean(Number(c.realBase)),
+    // Une graduée a échangé — c'est la condition pour graduer. Son `realBase`
+    // est nul parce que la courbe s'est vidée, pas parce que rien ne s'est passé.
+    traded: c.graduated || Boolean(Number(c.realBase)),
+    pool: c.pool,
   }));
 
   pad = { ...padStats(priced), coins: wire, readAt: Date.now(), site: PAD.site };
   console.log(`pad: ${pad.launched} coins, ${pad.graduated} graduated, ${pad.untouched} never bought` +
-    (pad.lockedUsd === null ? ", none priced" : `, $${Math.round(pad.lockedUsd)} locked`));
+    (pad.lockedUsd === null ? ", none priced" : `, $${Math.round(pad.lockedUsd)} in curves`) +
+    (pad.poolUsd === null ? "" : `, $${Math.round(pad.poolUsd)} in pools, $${Math.round(pad.vol24hUsd)} traded in 24h`));
 }
 
 async function sweepBook() {

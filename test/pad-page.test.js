@@ -14,8 +14,13 @@ const PAD = {
     { symbol: "NVDA", coins: 2, lockedUsd: 5697, graduated: 1 },
     { symbol: "PRINTER", coins: 1, lockedUsd: 4852, graduated: 0 },
   ],
+  poolUsd: 34398, vol24hUsd: 166403, trades24h: 2117,
   coins: [
-    coin({ symbol: "PRINTSY", lockedUsd: 3469, nominalUsd: 18311, progress: 1, graduated: true }),
+    // Graduer vide la courbe : une graduée lit zéro partout côté courbe, et
+    // tout ce qu'elle vaut est dans sa pool.
+    coin({ symbol: "JDOG", name: "Jensen's Dog", lockedUsd: 0, nominalUsd: 0, progress: 1,
+      graduated: true, traded: true,
+      pool: { poolUsd: 33024, capUsd: 106850, vol24hUsd: 164995, trades24h: 2038 } }),
     coin({ symbol: "BSNOB", baseSymbol: "PRINTER", lockedUsd: 2043, nominalUsd: 10359, progress: 0.789 }),
     coin({ symbol: "DEAD", lockedUsd: 0, nominalUsd: 0, progress: 0, traded: false }),
   ],
@@ -27,7 +32,8 @@ test("the head states what was launched, what graduated and what nobody touched"
   assert.match(html, /class="p-v">3<\/span><span class="p-k">coins launched/);
   assert.match(html, /class="p-v">1<\/span><span class="p-k">graduated/);
   assert.match(html, /class="p-v">1<\/span><span class="p-k">never bought/);
-  assert.match(html, /class="p-v">\$11,737<\/span><span class="p-k">money locked/);
+  assert.match(html, /class="p-v">\$11,737<\/span><span class="p-k">in the curves/);
+  assert.match(html, /class="p-v">\$34,398<\/span><span class="p-k">in the pools/);
   assert.match(html, /class="p-v">2<\/span><span class="p-k">creators/);
 });
 
@@ -36,8 +42,9 @@ test("the head states what was launched, what graduated and what nobody touched"
 // seconde seule ferait passer douze mille dollars pour huit cent mille.
 test("the nominal cap never stands in for the money actually paid in", () => {
   const html = padHtml(PAD);
-  assert.match(html, /money locked<\/span><span class="p-x">really paid in, still there/);
-  assert.match(html, /nominal cap<\/span><span class="p-x">what the curves imply/);
+  // La capitalisation vit dans la phrase qui l'explique, pas en chiffre de tête
+  // à côté de l'argent réel : côte à côte, on lit la plus grosse.
+  assert.match(html, /combined cap of <b>\$871,579<\/b>/);
   assert.match(html, /most of which nobody has bought/);
   // 871579 / 11737 = 74.26 — deux décimales sur un rapport qui bouge de
   // plusieurs unités à chaque échange seraient une précision inventée.
@@ -51,11 +58,46 @@ test("the page states the fee that drives the whole thing", () => {
   assert.match(padHtml(PAD), /a tenth of that fee goes to whoever launched/);
 });
 
-test("every coin is listed, ranked by the money in it", () => {
+// Les graduées ne sont pas sur la courbe : elles ont leur table, en tête, et le
+// classement porte sur celles qui y sont encore — les mortes comprises.
+test("every coin is listed, the graduated apart from those still on a curve", () => {
   const html = padHtml(PAD);
   const order = [...html.matchAll(/class="p-sym">([A-Z]+)/g)].map((m) => m[1]);
-  assert.deepEqual(order, ["PRINTSY", "BSNOB", "DEAD"]);
-  assert.match(html, /All 3, by money locked/);
+  assert.deepEqual(order, ["JDOG", "BSNOB", "DEAD"]);
+  assert.match(html, /The other 2, by money locked/);
+});
+
+// Une graduée a vidé sa courbe. Triée par argent immobilisé elle tombait au
+// rang 126 sur 274, en gris, sous la mention « never traded » — l'exact
+// contraire de ce qui lui est arrivé.
+test("a graduated coin is never counted among those nobody ever bought", () => {
+  const html = padHtml(PAD);
+  const grad = html.slice(html.indexOf("Graduated"), html.indexOf("By base stock"));
+  assert.match(grad, /1 of 3 filled their curve and moved to a real pool/);
+  assert.match(grad, /JDOG/);
+  assert.match(grad, /\$33,024/);      // sa pool
+  assert.match(grad, /\$106,850/);     // sa capitalisation réelle
+  assert.match(grad, /\$164,995/);     // son volume 24 h
+  assert.match(grad, /2,038/);         // ses échanges
+  // Elle ne reparaît pas éteinte dans le classement des courbes.
+  const board = html.slice(html.indexOf("Still on the curve"));
+  assert.doesNotMatch(board, /JDOG/);
+});
+
+// Ce que les graduées échangent en un jour pèse plus que tout ce que les
+// courbes retiennent : le taire donnerait un pad qui a l'air mort.
+test("what the graduated pools trade in a day is stated, not left aggregated away", () => {
+  assert.match(padHtml(PAD), /traded <b>\$166,403<\/b> in the last 24 hours, over 2,117 trades/);
+});
+
+// Déployer la pool est un appel séparé : une courbe peut être pleine sans que
+// la pièce ait gradué, et « 100% » tout court laisse croire que rien n'est
+// arrivé au bout de la barre.
+test("a full curve whose pool is not deployed yet says which of the two it is", () => {
+  const html = padHtml({ ...PAD, graduated: 0, poolUsd: null, vol24hUsd: null,
+    coins: [coin({ symbol: "PRINTSY", progress: 1, graduated: false, lockedUsd: 4067 })] });
+  assert.match(html, /full — pool not deployed yet/);
+  assert.doesNotMatch(html, /class="p-pct[^"]*">100%/);
 });
 
 // Une pièce jamais échangée n'est pas à 0% de sa graduation : elle n'a jamais
@@ -70,8 +112,11 @@ test("a coin nobody ever bought says so instead of showing nothing at zero", () 
 
 // Une pièce graduée a quitté la courbe. Une barre pleine se lirait « sur le
 // point de graduer », ce qui est le contraire.
-test("a graduated coin is marked, not just shown at a full bar", () => {
-  assert.match(padHtml(PAD), /PRINTSY<span class="p-tag">grad<\/span>/);
+test("a coin at a full curve that has not graduated is not dressed as one", () => {
+  const ready = padHtml({ ...PAD, graduated: 0, poolUsd: null, vol24hUsd: null,
+    coins: [coin({ symbol: "PRINTSY", progress: 1, graduated: false, lockedUsd: 3469 })] });
+  assert.doesNotMatch(ready, /p-tag/);
+  assert.doesNotMatch(ready, /class="label">Graduated/);
 });
 
 // Sans lecture, la page dit qu'elle n'a pas lu — elle n'annonce pas un pad vide.
@@ -86,7 +131,7 @@ test("with no price for any base the counts hold and the dollars keep quiet", ()
   const html = padHtml({ ...PAD, lockedUsd: null, nominalUsd: null, unpriced: 3,
     coins: PAD.coins.map((c) => ({ ...c, lockedUsd: null, nominalUsd: null })) });
   assert.match(html, /class="p-v">3<\/span><span class="p-k">coins launched/);
-  assert.match(html, /class="p-v">—<\/span><span class="p-k">money locked/);
+  assert.match(html, /class="p-v">—<\/span><span class="p-k">in the curves/);
   assert.doesNotMatch(html, /Here the curves imply/);
 });
 

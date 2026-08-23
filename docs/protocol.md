@@ -438,11 +438,34 @@ n'a achetés. Au 2026-08-23 elle vaut **70×** l'argent réellement présent.
 Les deux sont affichés côte à côte, jamais l'un à la place de l'autre. Un test
 refuse que le second paraisse seul.
 
+### Graduer vide la courbe
+
+Remplir sa courbe fait **graduer** la pièce : les réserves partent dans une
+vraie pool et la pièce s'y échange. Son `realBase` retombe donc à zéro — par
+construction, pas par abandon.
+
+La première version de cet onglet triait tout par argent immobilisé et dérivait
+« jamais échangée » de `realBase`. Les trois seules réussites du pad
+s'affichaient donc **en gris, au rang 126 sur 274, sous la mention « never
+traded »** — l'exact contraire de ce qui leur était arrivé. Deux corrections :
+`untouched` exclut les graduées, et le classement ne porte que sur celles encore
+sur leur courbe.
+
+Les graduées ont leur propre section, lue sur DexScreener par adresse de jeton :
+pool, capitalisation, volume 24 h, nombre d'échanges. C'est là qu'est
+l'essentiel de l'activité — JDOG seul échange en un jour plus de dix fois ce que
+les 272 courbes retiennent en tout.
+
+**Courbe pleine n'est pas graduée.** Déployer la pool est un appel séparé
+(`deployPool(token)`) : une pièce peut rester à 100 % sans avoir gradué, et la
+ligne le dit au lieu d'afficher « 100% ».
+
 ### État au 2026-08-23
 
-274 pièces lancées · 3 graduées · **149 jamais échangées (54%)** · 134 créateurs
-· $12 529 immobilisés · 11 actions de base, dont le $PRINTER lui-même
-(69 pièces, $4 855 immobilisés).
+275 pièces lancées · 3 graduées · **147 jamais échangées (53%)** · 134 créateurs
+· $12 487 dans les courbes · $33 322 dans les pools des graduées · $167 147
+échangés en 24 h sur 2 122 trades · 11 actions de base, dont le $PRINTER lui-même
+(69 pièces).
 
 ### Cadence et transport
 

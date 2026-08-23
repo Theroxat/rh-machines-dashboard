@@ -1278,10 +1278,12 @@ export function padHtml(pad) {
   const traded = pad.launched - pad.untouched;
   const head = `<div class="p-figs">` +
     fig(fmtInt(pad.launched), "coins launched", "across two factories") +
-    fig(fmtInt(pad.graduated), "graduated", "left the curve") +
+    fig(fmtInt(pad.graduated), "graduated", "left the curve for a pool") +
     fig(fmtInt(pad.untouched), "never bought", `${fmtRatio(pad.launched ? pad.untouched / pad.launched : 0)} of them`) +
-    fig(pad.lockedUsd === null ? "—" : fmtUsdRound(pad.lockedUsd), "money locked", "really paid in, still there") +
-    fig(pad.nominalUsd === null ? "—" : fmtUsdRound(pad.nominalUsd), "nominal cap", "what the curves imply") +
+    fig(pad.lockedUsd === null ? "—" : fmtUsdRound(pad.lockedUsd), "in the curves", `across ${fmtInt(pad.launched - pad.graduated)} coins`) +
+    // La pool des graduées pèse plusieurs fois toutes les courbes réunies :
+    // la ranger dans le même total effacerait justement ce qui les sépare.
+    fig(pad.poolUsd === null ? "—" : fmtUsdRound(pad.poolUsd), "in the pools", `the ${fmtInt(pad.graduated)} that graduated`) +
     fig(fmtInt(pad.creators), "creators", `${fmtInt(traded)} coins ever traded`) +
     `</div>`;
 
@@ -1296,9 +1298,12 @@ export function padHtml(pad) {
     : "";
   const caveat = `<p class="w-small">A coin trades on a bonding curve against a tokenised stock, ` +
     `and <b>1% of every trade</b> buys back and burns $PRINTER — a tenth of that fee goes to whoever ` +
-    `launched the coin. <b>Money locked</b> is what buyers paid in and has not been sold back out. ` +
-    `<b>Nominal cap</b> is the curve's marginal price times every token issued, most of which nobody ` +
-    `has bought.${ratio} Read from the two factories, not from the pad's own board.</p>`;
+    `launched the coin. Fill the curve and the coin <b>graduates</b>: the curve empties into a real ` +
+    `pool and it trades there instead. <b>In the curves</b> is what buyers paid in and has not been ` +
+    `sold back out. The curves also imply a combined cap of ` +
+    `<b>${pad.nominalUsd === null ? "—" : fmtUsdRound(pad.nominalUsd)}</b>, but that is the marginal ` +
+    `price times every token issued, most of which nobody has bought.${ratio} ` +
+    `Read from the two factories, not from the pad's own board.</p>`;
 
   const top = Math.max(1, ...pad.bases.map((b) => b.lockedUsd));
   const bases = `<span class="label">By base stock</span><ul class="ballot">` +
@@ -1309,10 +1314,39 @@ export function padHtml(pad) {
       `<span class="b-bar"><span style="width:${Math.round((b.lockedUsd / top) * 100)}%"></span></span>` +
       `<span class="b-pct">${fmtUsdRound(b.lockedUsd)}</span></li>`).join("") + `</ul>`;
 
-  // Toutes les pièces, les mortes comprises : les compter sans les montrer
-  // donnerait un classement où la moitié du pad est invisible. Elles tombent
-  // au bas du tri toutes seules, et se distinguent d'une ligne éteinte.
-  const coins = [...pad.coins].sort((a, b) => (b.lockedUsd ?? -1) - (a.lockedUsd ?? -1));
+  // Les graduées, à part et en tête.
+  //
+  // Elles n'ont plus rien dans leur courbe — graduer la vide — donc triées par
+  // argent immobilisé elles tombaient au rang 126 sur 274, en gris, sous la
+  // mention « never traded ». C'était l'exact contraire de ce qui leur est
+  // arrivé : ce sont les seules à être allées au bout, et c'est dans leur pool
+  // que se fait l'essentiel des échanges du pad.
+  const grads = pad.coins.filter((c) => c.graduated)
+    .sort((a, b) => (b.pool?.poolUsd ?? -1) - (a.pool?.poolUsd ?? -1));
+  const gradBlock = !grads.length ? "" :
+    `<span class="label">Graduated</span>` +
+    `<p class="w-small">${fmtInt(grads.length)} of ${fmtInt(pad.launched)} filled their curve and moved ` +
+    `to a real pool. They hold nothing on the board below, by design — their curve is empty because ` +
+    `it emptied into the pool.` +
+    (pad.vol24hUsd ? ` Between them they traded <b>${fmtUsdRound(pad.vol24hUsd)}</b> in the last 24 hours, ` +
+      `over ${fmtInt(pad.trades24h)} trades.` : "") + `</p>` +
+    `<div class="p-wrap"><table class="p-table"><thead><tr>` +
+    `<th>Coin</th><th>Base</th><th class="p-num">Pool</th><th class="p-num">Cap</th>` +
+    `<th class="p-num">24h volume</th><th class="p-num">24h trades</th></tr></thead><tbody>` +
+    grads.map((c) => `<tr class="p-grad">` +
+      `<td class="p-sym">${esc(c.symbol)}<span class="p-name">${esc(c.name)}</span></td>` +
+      `<td class="p-base">${esc(c.baseSymbol)}</td>` +
+      `<td class="p-num">${c.pool ? fmtUsdRound(c.pool.poolUsd) : "—"}</td>` +
+      `<td class="p-num p-dim">${c.pool?.capUsd ? fmtUsdRound(c.pool.capUsd) : "—"}</td>` +
+      `<td class="p-num">${c.pool ? fmtUsdRound(c.pool.vol24hUsd) : "—"}</td>` +
+      `<td class="p-num p-dim">${c.pool ? fmtInt(c.pool.trades24h) : "—"}</td></tr>`).join("") +
+    `</tbody></table></div>`;
+
+  // Le classement porte sur les courbes, donc sur celles qui y sont encore.
+  // Les mortes y restent : les compter sans les montrer donnerait un tableau
+  // où la moitié du pad est invisible, et elles tombent au bas du tri seules.
+  const coins = pad.coins.filter((c) => !c.graduated)
+    .sort((a, b) => (b.lockedUsd ?? -1) - (a.lockedUsd ?? -1));
   const rows = coins.map((c, i) => {
     const pct = Math.round(c.progress * 100);
     return `<tr class="${c.traded ? "" : "p-cold"}${c.graduated ? " p-grad" : ""}">` +
@@ -1323,17 +1357,21 @@ export function padHtml(pad) {
       `<td class="p-num">${c.lockedUsd === null ? "—" : fmtUsdRound(c.lockedUsd)}</td>` +
       `<td class="p-num p-dim">${c.nominalUsd === null ? "—" : fmtUsdRound(c.nominalUsd)}</td>` +
       `<td class="p-prog"><span class="b-bar"><span style="width:${pct}%"></span></span>` +
-      `<span class="p-pct">${c.traded ? `${pct}%` : "never traded"}</span></td></tr>`;
+      // Pleine sans avoir gradué : déployer la pool est un appel séparé, et
+      // « 100% » tout court laisse croire que rien ne s'est passé au bout.
+      `<span class="p-pct${pct >= 100 ? " p-full" : ""}">${
+        c.traded ? (pct >= 100 ? "full — pool not deployed yet" : `${pct}%`) : "never traded"
+      }</span></td></tr>`;
   }).join("");
 
-  const board = `<span class="label">The board</span>` +
-    `<p class="w-small">All ${fmtInt(pad.launched)}, by money locked. ` +
+  const board = `<span class="label">Still on the curve</span>` +
+    `<p class="w-small">The other ${fmtInt(coins.length)}, by money locked. ` +
     `The bar is how far a coin has come toward graduating off its curve.</p>` +
     `<div class="p-wrap"><table class="p-table"><thead><tr>` +
     `<th></th><th>Coin</th><th>Base</th><th class="p-num">Locked</th>` +
     `<th class="p-num">Nominal</th><th>To graduate</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 
-  return head + caveat + bases + board;
+  return head + caveat + gradBlock + bases + board;
 }
 
 /** Ce que le filtre laisse passer, sur l'ensemble du carnet. Silencieux tant

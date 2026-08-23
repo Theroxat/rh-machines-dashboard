@@ -55,6 +55,42 @@ export function priceCoin(coin, basePrice) {
   };
 }
 
+/**
+ * La pool d'une pièce graduée.
+ *
+ * Graduer vide la courbe : les réserves partent dans une vraie pool et la pièce
+ * s'y échange. Une graduée affiche donc zéro dans la courbe — par construction,
+ * pas par abandon — et c'est dans la pool qu'il faut la lire. Sans cette
+ * lecture, les trois seules réussites du pad se rangent au milieu des mortes.
+ */
+export async function readPools(coins, fetchImpl = fetch) {
+  const out = new Map();
+  await Promise.all(coins.map(async (c) => {
+    try {
+      const res = await fetchImpl(`https://api.dexscreener.com/latest/dex/tokens/${c.token}`);
+      if (!res.ok) return;
+      const pairs = (await res.json())?.pairs ?? [];
+      // La plus profonde : une pièce cotée à plusieurs endroits donnerait
+      // sinon un prix que personne ne pourrait obtenir.
+      const best = pairs
+        .filter((x) => Number(x?.liquidity?.usd) >= 0 && Number(x?.priceUsd) > 0)
+        .sort((a, b) => (Number(b?.liquidity?.usd) || 0) - (Number(a?.liquidity?.usd) || 0))[0];
+      if (!best) return;
+      out.set(c.token, {
+        poolUsd: Number(best.liquidity?.usd) || 0,
+        priceUsd: Number(best.priceUsd) || null,
+        capUsd: Number(best.marketCap ?? best.fdv) || null,
+        vol24hUsd: Number(best.volume?.h24) || 0,
+        trades24h: (Number(best.txns?.h24?.buys) || 0) + (Number(best.txns?.h24?.sells) || 0),
+        pairUrl: best.url ?? null,
+      });
+    } catch {
+      // Sans pool lisible, la pièce garde sa ligne et ses montants se taisent.
+    }
+  }));
+  return out;
+}
+
 /** Les totaux du pad. Une pièce qu'on n'a pas su valoriser ne compte pas pour
  *  zéro dans les dollars : elle est comptée à part, et le total le dit. */
 export function padStats(coins) {
@@ -67,12 +103,17 @@ export function padStats(coins) {
     b.graduated += c.graduated ? 1 : 0;
     byBase.set(c.baseSymbol, b);
   }
+  const grads = coins.filter((c) => c.graduated);
   return {
     launched: coins.length,
-    graduated: coins.filter((c) => c.graduated).length,
-    // Une pièce que personne n'a jamais achetée : lancée, jamais échangée.
-    // C'est la moitié du pad, et le taire donnerait un tableau trompeur.
-    untouched: coins.filter((c) => !Number(c.realBase)).length,
+    graduated: grads.length,
+    // Une graduée a vidé sa courbe dans une pool : son `realBase` est nul par
+    // construction. La compter parmi celles que personne n'a achetées rangeait
+    // les trois seules réussites du pad au milieu des cent quarante-neuf mortes.
+    untouched: coins.filter((c) => !c.graduated && !Number(c.realBase)).length,
+    poolUsd: grads.some((c) => c.pool) ? grads.reduce((a, c) => a + (c.pool?.poolUsd ?? 0), 0) : null,
+    vol24hUsd: grads.some((c) => c.pool) ? grads.reduce((a, c) => a + (c.pool?.vol24hUsd ?? 0), 0) : null,
+    trades24h: grads.reduce((a, c) => a + (c.pool?.trades24h ?? 0), 0),
     creators: new Set(coins.map((c) => c.creator.toLowerCase())).size,
     lockedUsd: priced.length ? priced.reduce((a, c) => a + c.lockedUsd, 0) : null,
     nominalUsd: priced.length ? priced.reduce((a, c) => a + c.nominalUsd, 0) : null,
