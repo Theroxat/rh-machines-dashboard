@@ -3,3 +3,6 @@ data/
 .env
 *.log
 data/history-*.db*
+
+# Captures pour les tweets : des livrables, pas du code.
+tweet-*.png
