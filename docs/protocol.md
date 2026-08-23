@@ -518,6 +518,35 @@ le plus bas est l'original, et c'est démontrable. Les deux factories tournant e
 parallèle, un groupe qui les enjambe (11 cas : JDOG, BRRR, PAPO, INK…) n'a pas
 d'ordre, et aucun rang n'est alors avancé plutôt qu'un rang inventé.
 
+### La course et le cimetière
+
+Le pad prend **~140 pièces par jour** (mesuré sur 7,5 h d'enregistrement) et
+plus de la moitié n'est jamais achetée. Le classement les portait toutes : 174
+lignes rigoureusement identiques — $0, $0, « never traded » — sur 322, et des
+milliers d'ici un mois. Ce n'est plus de l'exhaustivité, c'est du bruit.
+
+Deux sections désormais :
+
+- **Racing to graduate** — les courbes qui tiennent de l'argent et n'ont pas
+  gradué, par proximité de la graduation. Une pièce à zéro n'est pas dernière de
+  la course : elle n'y est pas.
+- **Launched and never traded** — les autres, en pastilles : un nom, un lien,
+  et le repère d'homonyme. Chacune reste trouvable (c'est peut-être la sienne
+  qu'on cherche) sans occuper une ligne de tableau pour dire zéro.
+
+### Les niveaux portent leur sens
+
+`$8,886 in the curves` sortait de `$16,435` le matin même, et rien ne le laissait
+voir. L'écart affiché vient du flux mesuré — entré moins sorti — donc il ne
+compte pas les graduations, qui vident une courbe sans que personne n'ait vendu.
+
+### Deux sources, dites
+
+Pool, capitalisation, volume 24 h et nombre d'échanges des graduées viennent des
+données de marché des pools, sur une fenêtre de 24 h. Tout le reste est lu sur la
+chaîne toutes les deux minutes. La page le dit : sans quoi un lecteur croit lire
+un seul instrument.
+
 ### Cadence et transport
 
 Le pad est relu toutes les 2 minutes (`padPollIntervalMs`) et servi sur

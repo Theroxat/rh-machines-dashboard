@@ -1298,6 +1298,15 @@ export function sinceWords(t, now = Date.now()) {
   return `${days} day${days === 1 ? "" : "s"} ago`;
 }
 
+/** Ce que le flux a fait au niveau, en un membre de phrase — ou rien. */
+export function netWords(mv) {
+  if (!mv) return "";
+  const net = (mv.inUsd ?? 0) - (mv.outUsd ?? 0);
+  if (!Math.round(net)) return "";
+  const when = mv.partial ? "since we began watching" : "in 24h";
+  return ` &middot; ${net > 0 ? "+" : "\u2212"}${fmtUsdRound(Math.abs(net))} ${when}`;
+}
+
 export function padHtml(pad) {
   if (!pad) {
     return `<p class="w-small">The pad has not been read yet. It is polled on its own ` +
@@ -1316,10 +1325,16 @@ export function padHtml(pad) {
     fig(fmtInt(pad.graduated), "graduated to date", "left the curve for a pool") +
     fig(fmtInt(pad.untouched), "never bought",
       `${fmtRatio(pad.launched ? pad.untouched / pad.launched : 0)} of them — ${fmtInt(traded)} have traded`) +
-    fig(pad.lockedUsd === null ? "—" : fmtUsdRound(pad.lockedUsd), "in the curves", `across ${fmtInt(pad.launched - pad.graduated)} coins`) +
+    // Un niveau seul ne dit pas s'il monte. $8,812 sortait de $16,435 le matin
+    // même, et rien ne le laissait voir. L'écart vient du flux mesuré — entré
+    // moins sorti — donc il ne compte pas les graduations, qui vident une
+    // courbe sans que personne n'ait vendu.
+    fig(pad.lockedUsd === null ? "—" : fmtUsdRound(pad.lockedUsd), "in the curves",
+      `across ${fmtInt(pad.launched - pad.graduated)} coins` + netWords(pad.movement)) +
     // La pool des graduées pèse plusieurs fois toutes les courbes réunies :
     // la ranger dans le même total effacerait justement ce qui les sépare.
-    fig(pad.poolUsd === null ? "—" : fmtUsdRound(pad.poolUsd), "in the pools", `the ${fmtInt(pad.graduated)} that graduated`) +
+    fig(pad.poolUsd === null ? "—" : fmtUsdRound(pad.poolUsd), "in the pools",
+      `the ${fmtInt(pad.graduated)} that graduated`) +
     // Chaque vignette qualifie son propre chiffre. Celle-ci annonçait « 152
     // coins ever traded » sous un compte de créateurs — une statistique sans
     // rapport, et qui appartient à « never bought », dont elle est le complément.
@@ -1417,7 +1432,12 @@ export function padHtml(pad) {
     `to a real pool. They hold nothing on the board below, by design — their curve is empty because ` +
     `it emptied into the pool.` +
     (pad.vol24hUsd ? ` Between them they traded <b>${fmtUsdRound(pad.vol24hUsd)}</b> in the last 24 hours, ` +
-      `over ${fmtInt(pad.trades24h)} trades.` : "") + `</p>` +
+      `over ${fmtInt(pad.trades24h)} trades.` : "") +
+    // Tout le reste de la page est lu sur la chaîne toutes les deux minutes.
+    // Ces quatre colonnes ne le sont pas, et un lecteur croit sinon lire un
+    // seul instrument.
+    ` These four figures come from the pools' own market data, on a 24-hour ` +
+    `window; everything else on this page is read off the chain every two minutes.</p>` +
     `<div class="p-wrap"><table class="p-table"><thead><tr>` +
     `<th>Coin</th><th>Base</th><th class="p-num">Pool</th><th class="p-num">Cap</th>` +
     `<th class="p-num">24h volume</th><th class="p-num">24h trades</th></tr></thead><tbody>` +
@@ -1438,16 +1458,22 @@ export function padHtml(pad) {
       `<td class="p-num p-dim" data-k="24h trades">${c.pool ? fmtInt(c.pool.trades24h) : "—"}</td></tr>`).join("") +
     `</tbody></table></div>`;
 
-  // Le classement porte sur les courbes, donc sur celles qui y sont encore, et
-  // il se trie par progression : c'est la course à la graduation qu'on regarde,
-  // et l'argent seul mettait devant une pièce chère à graduer plutôt que la
-  // plus proche d'y arriver. À progression égale — les mortes sont toutes à
-  // zéro — l'argent immobilisé départage.
-  const coins = pad.coins.filter((c) => !c.graduated)
+  // Le classement porte sur la course à la graduation, donc sur les courbes qui
+  // y sont encore ET qui ont de l'argent dedans. Une pièce à zéro n'est pas
+  // dernière de la course : elle n'y est pas.
+  //
+  // Elles y figuraient toutes, et le pad prend cent quarante pièces par jour :
+  // cent soixante-quatorze lignes rigoureusement identiques — $0, $0, never
+  // traded — sur trois cent vingt-deux, et des milliers d'ici un mois. Ce n'est
+  // plus de l'exhaustivité, c'est du bruit. Elles gardent une liste à elles,
+  // en dessous, où chacune reste trouvable.
+  const onCurve = pad.coins.filter((c) => !c.graduated);
+  const coins = onCurve.filter((c) => c.traded)
     .sort((a, b) => (b.progress - a.progress) || ((b.lockedUsd ?? -1) - (a.lockedUsd ?? -1)));
+  const dead = onCurve.filter((c) => !c.traded).sort((a, b) => a.symbol.localeCompare(b.symbol));
   const rows = coins.map((c, i) => {
     const pct = Math.round(c.progress * 100);
-    return `<tr class="${c.traded ? "" : "p-cold"}${c.graduated ? " p-grad" : ""}">` +
+    return `<tr>` +
       `<td class="p-n">${i + 1}</td>` +
       // Une pièce encore sur sa courbe ne s'échange que sur printer.fun : c'est
       // là qu'on l'achète, et le tableau serait une impasse sans le chemin.
@@ -1464,7 +1490,7 @@ export function padHtml(pad) {
       // Pleine sans avoir gradué : déployer la pool est un appel séparé, et
       // « 100% » tout court laisse croire que rien ne s'est passé au bout.
       `<span class="p-pct${pct >= 100 ? " p-full" : ""}">${
-        c.traded ? (pct >= 100 ? "full — pool not deployed yet" : `${pct}%`) : "never traded"
+        pct >= 100 ? "full — pool not deployed yet" : `${pct}%`
       }</span></td></tr>`;
   }).join("");
 
@@ -1473,14 +1499,28 @@ export function padHtml(pad) {
       `a name already taken, and a launch tends to be copied in the slots right after it. The address of ` +
       `whoever launched each one is under its name, and the first to use a name is marked.`
     : "";
-  const board = `<span class="label">Still on the curve</span>` +
-    `<p class="w-small">The other ${fmtInt(coins.length)}, by how close they are to graduating. ` +
-    `The bar is how far along its curve a coin has come.${dupeNote}</p>` +
+  const board = `<span class="label">Racing to graduate</span>` +
+    `<p class="w-small">The ${fmtInt(coins.length)} coins that hold money and have not graduated, ` +
+    `by how close they are. The bar is how far along its curve a coin has come.${dupeNote}</p>` +
     `<div class="p-wrap"><table class="p-table"><thead><tr>` +
     `<th></th><th>Coin</th><th>Base</th><th class="p-num">Locked</th>` +
     `<th class="p-num">Nominal</th><th>To graduate</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 
-  return moving + head + caveat + gradBlock + bases + board;
+  // Lancées et jamais échangées. Elles restent trouvables — c'est peut-être la
+  // sienne qu'on cherche — mais un nom et un lien suffisent : il n'y a rien
+  // d'autre à en dire, et cent soixante-quatorze lignes à zéro le disaient
+  // cent soixante-quatorze fois.
+  const graveyard = !dead.length ? "" :
+    `<span class="label">Launched and never traded</span>` +
+    `<p class="w-small">${fmtInt(dead.length)} of them, holding nothing. They are not ranked above ` +
+    `because they are not in the race; each still links to its page.</p>` +
+    `<div class="p-dead">` + dead.map((c) =>
+      `<a href="https://www.printer.fun/coin/${esc(c.token)}" target="_blank" rel="noopener"` +
+      ` title="${esc(c.name)}${c.creator ? ` — launched by ${c.creator}` : ""}">${esc(c.symbol)}` +
+      (c.sharing > 1 ? `<i>${c.rank === 1 ? "first" : `\u00d7${fmtInt(c.sharing)}`}</i>` : "") +
+      `</a>`).join("") + `</div>`;
+
+  return moving + head + caveat + gradBlock + bases + board + graveyard;
 }
 
 /** Ce que le filtre laisse passer, sur l'ensemble du carnet. Silencieux tant

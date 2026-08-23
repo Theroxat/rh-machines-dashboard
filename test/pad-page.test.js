@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { padHtml, sinceWords, namesake, shortAddr } from "../src/public/app.js";
+import { padHtml, sinceWords, namesake, shortAddr, netWords } from "../src/public/app.js";
 
 const coin = (over = {}) => ({
   token: "0xT", symbol: "MEME", name: "Meme Coin", baseSymbol: "NVDA", base: "0xB",
@@ -98,13 +98,36 @@ test("with no pair read the name carries no link to nowhere", () => {
   assert.doesNotMatch(html, /p-go/);
 });
 
-test("every coin is listed, the graduated apart from those still on a curve", () => {
+// Le pad prend cent quarante pièces par jour et plus de la moitié n'est jamais
+// achetée : cent soixante-quatorze lignes identiques sur trois cent vingt-deux,
+// des milliers d'ici un mois. Elles gardent une liste à elles, où chacune reste
+// trouvable — c'est peut-être la sienne qu'on cherche.
+test("the race holds the coins in it, and the rest keep a list of their own", () => {
   const html = padHtml(PAD);
-  // Le nom d'une graduée porte le lien vers son graphique : il est dans une
-  // ancre, et le relever demande de la traverser.
   const order = [...html.matchAll(/class="p-sym">(?:<a [^>]*>)?([A-Z]+)/g)].map((m) => m[1]);
-  assert.deepEqual(order, ["JDOG", "BSNOB", "DEAD"]);
-  assert.match(html, /The other 2, by how close they are to graduating/);
+  assert.deepEqual(order, ["JDOG", "BSNOB"], "DEAD n'a rien à faire dans la course");
+  assert.match(html, /The 1 coins that hold money and have not graduated/);
+
+  const grave = html.slice(html.indexOf("Launched and never traded"));
+  assert.match(grave, /1 of them, holding nothing/);
+  assert.match(grave, /href="https:\/\/www\.printer\.fun\/coin\/0xT"[^>]*>DEAD/);
+});
+
+test("with nothing dead there is no graveyard", () => {
+  const html = padHtml({ ...PAD, coins: PAD.coins.filter((c) => c.traded) });
+  assert.doesNotMatch(html, /Launched and never traded/);
+});
+
+// Un homonyme reste repérable même relégué : c'est justement là que se
+// trouvent les seize copies de ZEUB.
+test("a namesake stays marked in the graveyard, where the copies actually are", () => {
+  const html = padHtml({ ...PAD, coins: [
+    coin({ symbol: "ZEUB", token: "0x1", traded: false, sharing: 17, rank: 1 }),
+    coin({ symbol: "ZEUB", token: "0x2", traded: false, sharing: 17, rank: 5 }),
+  ] });
+  const grave = html.slice(html.indexOf("Launched and never traded"));
+  assert.match(grave, />ZEUB<i>first<\/i>/);
+  assert.match(grave, />ZEUB<i>×17<\/i>/);
 });
 
 // C'est la course à la graduation qu'on regarde. Trié par argent, une pièce
@@ -167,10 +190,8 @@ test("a full curve whose pool is not deployed yet says which of the two it is", 
 // chemin, le tableau la nomme et n'en dit pas plus : c'est une impasse.
 test("a coin still on its curve links to where it can be bought", () => {
   const html = padHtml(PAD);
-  const board = html.slice(html.indexOf("Still on the curve"));
+  const board = html.slice(html.indexOf("Racing to graduate"), html.indexOf("Launched and never traded"));
   assert.match(board, /href="https:\/\/www\.printer\.fun\/coin\/0xT" target="_blank" rel="noopener">BSNOB/);
-  // Même la morte : on peut vouloir aller voir pourquoi elle l'est.
-  assert.match(board, />DEAD<span class="p-go">buy<\/span>/);
 });
 
 // Les onze bases s'étalaient sur toute la largeur : le montant finissait à
@@ -305,12 +326,15 @@ test("a window in which nothing moved says exactly that", () => {
 
 // Une pièce jamais échangée n'est pas à 0% de sa graduation : elle n'a jamais
 // commencé. Une barre vide sous un pourcentage se lit comme un échec de départ.
-test("a coin nobody ever bought says so instead of showing nothing at zero", () => {
-  const html = padHtml(PAD);
-  assert.match(html, /class="p-cold"/);
-  assert.match(html, /never traded/);
+// Le classement ne contient plus que des pièces qui tiennent de l'argent :
+// « never traded » et la ligne éteinte n'y ont plus de raison d'être, et une
+// règle morte dans la feuille finit par mentir sur ce que la page fait.
+test("nothing in the race is dressed as dead, since the dead are not in it", () => {
+  const board = padHtml(PAD).split("Launched and never traded")[0];
+  assert.doesNotMatch(board, /never traded/);
+  assert.doesNotMatch(board, /p-cold/);
   const css = readFileSync(new URL("../src/public/index.html", import.meta.url), "utf8");
-  assert.match(css, /\.p-cold \.b-bar \{[^}]*visibility: hidden/);
+  assert.doesNotMatch(css, /\.p-cold/);
 });
 
 // Une pièce graduée a quitté la courbe. Une barre pleine se lirait « sur le
@@ -384,6 +408,32 @@ test("how long ago is said in words, at the scale that reads", () => {
   assert.equal(sinceWords(now - 50 * 3600000, now), "2 days ago");
   // Jamais « 0 minute ago » : on vient de regarder, c'est une minute.
   assert.equal(sinceWords(now, now), "1 minute ago");
+});
+
+// Un niveau seul ne dit pas s'il monte : $8,812 sortait de $16,435 le matin
+// même, et rien ne le laissait voir.
+test("the level in the curves says which way it has been going", () => {
+  const html = padHtml({ ...PAD, movement: MOVE });
+  assert.match(html, /in the curves<\/span><span class="p-x">across 2 coins &middot; \+\$860 in 24h/);
+});
+
+test("with a partial window the move is dated by what was actually watched", () => {
+  const html = padHtml({ ...PAD, movement: { ...MOVE, partial: true } });
+  assert.match(html, /\+\$860 since we began watching/);
+});
+
+test("a level that has not moved says nothing rather than plus nothing", () => {
+  assert.equal(netWords({ inUsd: 100, outUsd: 100, partial: false }), "");
+  assert.equal(netWords(null), "");
+  assert.match(netWords({ inUsd: 0, outUsd: 380, partial: false }), /−\$380 in 24h/);
+});
+
+// Quatre colonnes viennent d'une autre source et d'une autre fenêtre que tout
+// le reste de la page. Un lecteur croit sinon lire un seul instrument.
+test("the pool figures say where they come from and over what window", () => {
+  const html = padHtml(PAD);
+  assert.match(html, /come from the pools' own market data, on a 24-hour window/);
+  assert.match(html, /everything else on this page is read off the chain every two minutes/);
 });
 
 // --- les homonymes, sur la page --------------------------------------------

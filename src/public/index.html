@@ -699,6 +699,17 @@
   .p-sym a:hover .p-go, .p-sym a:focus-visible .p-go { color: var(--paper); background: var(--ink); }
   /* Le graphique d'une graduée, chez DexTools : c'est ce qu'on vient chercher
      dès qu'une pièce s'échange pour de bon. */
+  /* Le cimetière : lancées, jamais échangées. Un nom et un lien suffisent —
+     il n'y a rien d'autre à en dire, et une ligne de tableau par pièce le
+     disait cent soixante-quatorze fois. */
+  .p-dead { display: flex; flex-wrap: wrap; gap: 5px; margin: 4px 0 18px; }
+  .p-dead a {
+    font-size: 11px; color: var(--dim); text-decoration: none;
+    border: 1px solid var(--rule-2); padding: 2px 6px; white-space: nowrap;
+  }
+  .p-dead a:hover, .p-dead a:focus-visible { color: var(--ink); border-color: var(--ink); }
+  .p-dead i { font-style: normal; color: var(--reink); margin-left: 4px; font-size: 9px; }
+
   /* Le premier à porter un nom, et ceux qui le reprennent. Dix-sept lignes
      « ZEUB » avec un bouton d'achat chacune sont un piège, pas un tableau. */
   .p-first, .p-dupe {
@@ -726,11 +737,6 @@
     margin-left: 6px; font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;
     color: var(--paper); background: var(--under); padding: 1px 4px; font-weight: 700;
   }
-  /* Jamais échangée : lancée et laissée là. La moitié du pad, et l'éteindre
-     vaut mieux que la cacher — le compte de tête l'annonce, la ligne le montre. */
-  .p-cold .p-sym { color: var(--dim); font-weight: 400; }
-  .p-cold .p-num, .p-cold .p-name { color: var(--dim); }
-  .p-cold .b-bar { visibility: hidden; }
 
   /* Le badge porte l'écart ; la phrase au-dessus de la bande dit ce qu'il veut
      dire. Deux mots de jargon ne portaient pas l'idée. */
