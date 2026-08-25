@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { ethers } from "ethers";
 
-import { loadConfig, RPC_URL, CHAIN_ID, ADDRESSES, TOTAL_MACHINES, PAD } from "./config.js";
+import { loadConfig, RPC_URL, CHAIN_ID, ADDRESSES, TOTAL_MACHINES, PAD, PROTON } from "./config.js";
 import { fetchListings, fetchCollectionStats } from "./opensea.js";
 import { loadTraits } from "./traits.js";
 import { loadMetadata } from "./metadata.js";
@@ -31,6 +31,8 @@ import { createStore } from "./store.js";
 import { assetHash, assetPath, stampPage, cacheHeaders, securityHeaders, etagOf } from "./http.js";
 import { multicallOf } from "./multicall.js";
 import { readPad, readPools, priceCoin, padStats, padMovement, markNamesakes } from "./pad.js";
+import { readProton } from "./proton.js";
+import { burnSplit, lockUp, fuseOdds } from "./scarcity.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const cfg = loadConfig(process.env, JSON.parse(readFileSync(join(here, "..", "config.json"), "utf8")));
@@ -109,6 +111,10 @@ let stockPrices = new Map();
 // deux cent soixante-quatorze pièces ne bougent pas à la minute, et les relire
 // à chaque balayage du carnet coûterait mille appels pour rien.
 let pad = null;
+// Le Proton, son coffre, et ce que l'écosystème a détruit. Lu à part : remonter
+// les journaux coûte une centaine de requêtes, et rien de tout cela ne bouge à
+// la minute.
+let scarcity = null;
 
 async function sweepOwners() {
   owners = await readOwners({
@@ -188,6 +194,57 @@ async function sweepPad() {
     (pad.poolUsd === null ? "" : `, $${Math.round(pad.poolUsd)} in pools, $${Math.round(pad.vol24hUsd)} traded in 24h`) +
     (movement ? `; since ${new Date(movement.since).toISOString().slice(11, 16)}: ` +
       `+${movement.launched} launched, $${Math.round(movement.inUsd)} in, $${Math.round(movement.outUsd)} out` : ""));
+}
+
+async function sweepScarcity() {
+  const p = await readProton({
+    provider,
+    proton: PROTON.contract,
+    factory: PROTON.factory,
+    machines: ADDRESSES.MACHINES,
+  });
+
+  // Le poids des machines du coffre : le protocole annonce qu'il les active et
+  // partage leurs revenus. Le vérifier tient en une lecture par machine.
+  const MINE = new ethers.Interface(["function weightOf(uint256) view returns (uint256)"]);
+  let awake = null, vaultWeight = null;
+  if (p.heldIds.length) {
+    try {
+      const res = await multicallOf(provider, ADDRESSES.MULTICALL3)(
+        p.heldIds.map((id) => ({ target: ADDRESSES.MINE, allowFailure: true, callData: MINE.encodeFunctionData("weightOf", [id]) })));
+      awake = 0; vaultWeight = 0;
+      for (const r of res) {
+        if (!r[0]) continue;
+        const w = Number(MINE.decodeFunctionResult("weightOf", r[1])[0]);
+        if (w > 0) { awake++; vaultWeight += w; }
+      }
+    } catch (e) { console.error(`vault weights: ${e.message}`); }
+  }
+
+  // L'offre de $PRINTER et l'encre brûlée : deux lectures, et la soustraction
+  // qui les sépare dit ce qui a brûlé ailleurs.
+  const ERC = new ethers.Interface(["function totalSupply() view returns (uint256)"]);
+  const num = async (to, iface, fn) => {
+    try { return Number(ethers.formatUnits(iface.decodeFunctionResult(fn, await provider.call({ to, data: iface.encodeFunctionData(fn) }))[0], 18)); }
+    catch { return null; }
+  };
+  const supply = await num(ADDRESSES.TOKEN, ERC, "totalSupply");
+  const inkBurned = await num(ADDRESSES.MINE, new ethers.Interface(["function totalInkBurned() view returns (uint256)"]), "totalInkBurned");
+
+  scarcity = {
+    proton: p,
+    vault: lockUp({ held: p.heldIds.length, awake, weight: vaultWeight, total: TOTAL_MACHINES }),
+    burn: burnSplit({ supply, inkBurned, protonBurned: p.printerBurned }),
+    // Le taux ne se présente que sur une lecture entière : calculé sur un
+    // échantillon amputé par la fenêtre de journaux, il serait faux.
+    odds: p.complete === false ? null : fuseOdds({ won: p.won, lost: p.lost, claimedBps: PROTON.claimedSuccessBps }),
+    owner: PROTON.owner,
+    readAt: Date.now(),
+  };
+  console.log(`proton: ${p.committed} fusions (${p.won} won, ${p.lost} lost` +
+    (p.pending ? `, ${p.pending} pending` : "") + `), ${p.heldIds.length} machines in the vault` +
+    (awake === null ? "" : ` (${p.heldIds.length - awake} dormant)`) +
+    (p.complete === false ? " — LOG WINDOW INCOMPLETE" : ""));
 }
 
 async function sweepBook() {
@@ -374,6 +431,21 @@ const server = createServer(async (req, res) => {
   // Le tableau pèse soixante-douze kilo-octets et ne bouge qu'aux dix minutes,
   // quand le snapshot repart toutes les quinze secondes : embarqué, il aurait
   // voyagé trente-neuf fois sur quarante pour rien.
+  // Ce qui quitte la circulation : le coffre du Proton et le $PRINTER brûlé.
+  // Sa propre route, comme le pad : il ne bouge qu'aux dix minutes.
+  if (req.url === "/api/scarcity") {
+    const body = JSON.stringify(scarcity ?? null);
+    const etag = etagOf(body);
+    const headers = { "content-type": "application/json", etag, ...cacheHeaders("api"), ...securityHeaders() };
+    if (scarcity && req.headers["if-none-match"] === etag) {
+      res.writeHead(304, headers);
+      res.end();
+      return;
+    }
+    res.writeHead(200, headers);
+    res.end(body);
+    return;
+  }
   if (req.url === "/api/pad") {
     const body = JSON.stringify(pad ?? null);
     const etag = etagOf(body);
@@ -571,6 +643,7 @@ const started = async () => {
   loop("ink", sweepInk, cfg.inkPollIntervalMs, { runNow: false });
   loop("owners", sweepOwners, cfg.inkPollIntervalMs);
   loop("pad", sweepPad, cfg.padPollIntervalMs);
+  loop("proton", sweepScarcity, cfg.protonPollIntervalMs);
 
   server.listen(cfg.port, () => console.log(`dashboard on :${cfg.port}, serving ${appPath}`));
 };

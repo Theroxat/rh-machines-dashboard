@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { loadConfig, CLASSES, CLASS_BY_VALUE, PAD } from "../src/config.js";
+import { loadConfig, CLASSES, CLASS_BY_VALUE, PAD, PROTON } from "../src/config.js";
 
 const RAW = {
   port: 3050,
@@ -12,6 +12,7 @@ const RAW = {
   maxBookPages: 200,
   maxMetadataPages: 80,
   padPollIntervalMs: 120000,
+  protonPollIntervalMs: 600000,
 };
 
 test("the seven sealed classes are declared in ascending order", () => {
@@ -57,4 +58,14 @@ test("both pad factories are declared, and they are not the same one twice", () 
   assert.equal(new Set(PAD.factories.map((a) => a.toLowerCase())).size, 2);
   for (const a of PAD.factories) assert.match(a, /^0x[0-9a-fA-F]{40}$/);
   assert.match(PAD.treasury, /^0x[0-9a-fA-F]{40}$/);
+});
+
+// Le coffre n'est pas un feu : il a un propriétaire et une porte. Les trois
+// adresses sont distinctes, et les confondre ferait dire à la page qu'une
+// machine sacrifiée est détruite.
+test("the Proton, its vault and their owner are three distinct addresses", () => {
+  const a = [PROTON.contract, PROTON.factory, PROTON.owner];
+  for (const x of a) assert.match(x, /^0x[0-9a-fA-F]{40}$/);
+  assert.equal(new Set(a.map((x) => x.toLowerCase())).size, 3);
+  assert.equal(PROTON.claimedSuccessBps, 8000);
 });

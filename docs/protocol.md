@@ -565,3 +565,97 @@ La **date de lancement** d'une pièce ne l'est pas non plus. `allCoins(i)` donne
 l'ordre de création au sein d'une factory, mais les deux tournent en parallèle :
 il n'existe pas d'ordre global sans horodatage de bloc. Le classement est donc
 par argent immobilisé, et aucune section « lancements récents » n'est affichée.
+
+---
+
+## Le Proton et son coffre
+
+Ajouté à l'écosystème le 2026-08-22, avec la refonte du site officiel
+(`rhmachines.com`). On y sacrifie une machine pour en alourdir une autre :
+80% de réussite annoncés, sacrifice dormant → cible ×1.5, sacrifice actif →
++1.5× son poids.
+
+### Les contrats
+
+| rôle | adresse | vérification |
+|---|---|---|
+| Proton | `0xbA28ac2377291E1d92B4cB5fD587dC24604dA8aE` | `nextCommitId()` répond |
+| coffre (Factory) | `0xE4979E6c766a239C8e491433d42E697B22fAcf40` | `heldCount()` répond |
+| propriétaire des deux | `0xA08c58FCC285D9Cd48b7122293C8a62446AA3d17` | `owner()` sur les deux |
+
+Aucun des deux n'est vérifié sur l'explorateur. Les adresses viennent de
+`/api/protonConfig` du site officiel, chacune recoupée on-chain.
+
+### La machine n'est pas brûlée
+
+C'est le point que rien ne dit et qui change tout. Le commentaire du
+développeur, dans leur propre bundle :
+
+> *« commit (pay fee, **sacrifice leaves to the Factory**), wait ~2 blocks,
+> then reveal the roll »*
+
+La machine quitte le portefeuille **au commit, avant le tirage**. Elle n'est
+pas détruite : `totalSupply` du NFT reste à 10 000, vérifié. Elle change de
+propriétaire, un point c'est tout.
+
+Le coffre expose **`releaseMachine(uint256,address)`**, réservée au
+propriétaire — simulée depuis celui-ci sur une machine détenue : l'appel passe ;
+depuis une adresse quelconque : `OwnableUnauthorizedAccount`. Le propriétaire
+est une **clé simple, pas un multisig** (0 octet de bytecode), et il contrôle
+aussi le Proton. `renounceOwnership()` existe et n'a pas été appelée.
+
+Il expose également `sweepStock(address,address,uint256)` : sortir les actions
+accumulées vers l'adresse de son choix. Simulée depuis le propriétaire, elle
+passe le contrôle d'accès et n'échoue que sur `ERC20InsufficientBalance`.
+
+**Aucun abus constaté** : 178 entrées, 0 sortie. La fonction a probablement une
+raison légitime. Mais « enfermée » n'est pas « brûlée », et la page le dit.
+
+### Ce que le coffre fait vraiment
+
+Le site annonce que la Factory *« les active et partage leurs revenus avec la
+flotte »*. Au 2026-08-25 : **172 des 178 machines dorment**. Six sont allumées,
+600 points au total. La promesse n'est pas tenue aujourd'hui.
+
+### Le taux d'échec
+
+77 fusions, 54 gagnées, 22 perdues → **28,9% d'échec contre 20% annoncés**.
+
+L'écart n'est pas concluant : sur un tirage honnête à 80/20, une série aussi
+mauvaise survient environ **une fois sur 25**. La page publie les deux — le
+compte brut et la probabilité qu'il ne soit qu'un hasard — parce que publier le
+premier seul accuse, et taire les deux cache. Il faudrait quelques centaines de
+fusions pour trancher.
+
+Les révélations tardives (`lateDraw`) sont comptées à part : ce n'est pas un dé
+perdu, c'est un joueur qui n'est pas revenu à temps.
+
+### La combustion du $PRINTER
+
+Le rapprochement tombe au centième près :
+
+```
+  offre frappée            200 000 000
+  − offre actuelle         155 814 801   (totalSupply, lu)
+  − encre brûlée            43 285 199   (totalInkBurned, lu)
+  = brûlé autrement            900 000
+```
+
+Dont **425 000 par le Proton**, mesurés sur ses évènements `FuseCommitted`. Le
+reste vient des rachats du pad et du swap.
+
+### Lecture des journaux
+
+Cette chaîne produit un bloc toutes les 0,1 s : les journaux défilent en
+quelques heures. La lecture remonte par tranches de 100 000 blocs jusqu'à 20
+tranches vides consécutives, puis **se recoupe avec `nextCommitId()`**. Sans ce
+recoupement, un taux d'échec calculé sur un échantillon amputé aurait l'air
+aussi sérieux que le vrai. Quand le compte ne retombe pas, aucun taux n'est
+présenté et la page le dit.
+
+### Effet sur les floors
+
+178 machines ne peuvent pas être mises en vente. L'offre réellement échangeable
+est de **9 822**, pas 10 000 — et le coffre gagne ~48 machines par jour. Le
+ratio d'annonces affiché s'en écarte de 0,12 point aujourd'hui ; dans un mois,
+au même rythme, l'écart serait de plus d'un point.

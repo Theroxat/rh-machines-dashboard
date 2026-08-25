@@ -1523,6 +1523,103 @@ export function padHtml(pad) {
   return moving + head + caveat + gradBlock + bases + board + graveyard;
 }
 
+/**
+ * Ce qui quitte la circulation.
+ *
+ * Deux disparitions, et elles ne sont pas de même nature. Le $PRINTER brûle :
+ * détruit, irrécupérable, l'offre baisse. Les machines, elles, partent au
+ * coffre du Proton et y restent — `totalSupply` du NFT ne bouge pas, et le
+ * coffre a un propriétaire qui peut les ressortir. La page ne doit jamais
+ * laisser lire l'un pour l'autre : une machine brûlée réduit l'offre pour
+ * toujours, une machine au coffre peut revenir demain.
+ */
+export function scarcityHtml(sc) {
+  if (!sc) {
+    return `<p class="w-small">Not read yet. Walking the chain's logs takes a hundred requests, ` +
+      `so this page is refreshed on its own slower cadence.</p>`;
+  }
+
+  const fig = (v, k, x, cls = "") =>
+    `<div class="p-fig"><span class="p-v${cls}">${v}</span><span class="p-k">${k}</span>` +
+    (x ? `<span class="p-x">${x}</span>` : "") + `</div>`;
+
+  // ---- le coffre ----
+  const v = sc.vault;
+  const vault = !v ? "" :
+    `<span class="label">Machines locked away</span>` +
+    `<p class="w-small">Fusing a Machine into another sends the sacrifice to a vault the protocol ` +
+    `calls the Factory. It is <b>not burned</b> — the collection is still ten thousand strong — but it ` +
+    `leaves your wallet for good, before the dice even roll.</p>` +
+    `<div class="p-figs">` +
+    fig(fmtInt(v.held), "in the vault", `${fmtRatio(v.share)} of the collection`) +
+    (v.dormant === null ? "" :
+      fig(fmtInt(v.dormant), "of them dormant", v.dormant ? "earning nothing for anyone" : "all of them running")) +
+    fig(fmtInt(v.circulating), "still tradeable", "everything else can be listed") +
+    (sc.proton?.released ? fig(fmtInt(sc.proton.released), "released", "taken back out of the vault") : "") +
+    `</div>` +
+    `<div class="sc-bar" title="${fmtInt(v.held)} locked of ${fmtInt(v.total)}">` +
+    `<span style="width:${Math.max(0.4, (v.share * 100)).toFixed(2)}%"></span></div>` +
+    // Le fait qui n'est écrit nulle part ailleurs, et qui change ce que
+    // « enfermée » veut dire.
+    `<p class="w-small">The vault is owned by a single key — not a multi-signature wallet — and exposes ` +
+    `<b>releaseMachine</b>, which sends any Machine it holds to any address. Nothing has ever come back ` +
+    `out${sc.proton?.released ? "" : " so far"}, and the function may well exist to recover a Machine sent by mistake. ` +
+    `But locked is not burned, and this page will not call it that.</p>`;
+
+  // ---- le burn ----
+  const b = sc.burn;
+  const pct = (x) => (x / b.minted) * 100;
+  const burn = !b ? "" :
+    `<span class="label">$PRINTER burned</span>` +
+    `<p class="w-small">Lighting a Machine burns 4,250 $PRINTER as ink, and it never comes back. ` +
+    `Every other engine — the Proton, the pad, the swap — burns more.</p>` +
+    `<div class="p-figs">` +
+    // `fmtUsdShort` rend « 200000k » sur deux cents millions : il n'est prévu
+    // que pour des dollars, et il s'arrête aux milliers.
+    fig(fmtInt(b.minted), "ever minted", "the whole supply, once") +
+    fig(fmtInt(Math.round(b.supply)), "left today", `${fmtRatio(b.burnedShare)} of it gone`, " sc-down") +
+    (b.ink === null ? "" : fig(fmtInt(Math.round(b.ink)), "burned as ink", "Machines being lit")) +
+    (b.other === null ? "" : fig(fmtInt(Math.round(b.other)), "burned otherwise",
+      b.proton ? `${fmtInt(Math.round(b.proton))} of it by the Proton` : "buybacks and fees")) +
+    `</div>` +
+    (b.ink === null ? "" :
+      `<div class="sc-stack" title="ink ${fmtInt(Math.round(b.ink))} · other ${fmtInt(Math.round(b.other))} · left ${fmtInt(Math.round(b.supply))}">` +
+      `<span class="sc-ink" style="width:${pct(b.ink).toFixed(2)}%"></span>` +
+      `<span class="sc-oth" style="width:${Math.max(0.3, pct(b.other)).toFixed(2)}%"></span>` +
+      `<span class="sc-left" style="width:${pct(b.supply).toFixed(2)}%"></span></div>` +
+      `<p class="sc-key"><i class="sc-ink"></i>ink<i class="sc-oth"></i>other burns<i class="sc-left"></i>still circulating</p>`);
+
+  // ---- le pari ----
+  const p = sc.proton, o = sc.odds;
+  const odds = !p ? "" :
+    `<span class="label">The Proton's odds</span>` +
+    `<div class="p-figs">` +
+    fig(fmtInt(p.committed), "fusions", p.pending ? `${fmtInt(p.pending)} still awaiting their roll` : "all resolved") +
+    fig(fmtInt(p.won), "won", "the target grew heavier") +
+    fig(fmtInt(p.lost), "lost", "sacrifice and cost gone", " sc-down") +
+    fig(fmtInt(Math.round(p.printerBurned)), "$PRINTER burned", `and ${fmtInt(p.weightAdded)} weight created`) +
+    `</div>` +
+    (!o ? `<p class="w-small">Too few rolls have been read to say anything about the odds.</p>` :
+      `<p class="w-small">The protocol claims <b>${fmtRatio(1 - o.claimedFailRate)}</b> success. ` +
+      `So far <b>${fmtRatio(o.failRate)}</b> have failed, against ${o.expected.toFixed(0)} expected out of ` +
+      `${fmtInt(o.done)}.` +
+      // Publier le compte seul accuse ; le taire cache. Les deux, donc.
+      (o.oneIn
+        ? ` That is not proof of anything: on an honest ${fmtRatio(1 - o.claimedFailRate)} roll, a run this ` +
+          `bad turns up about <b>once in ${fmtInt(o.oneIn)}</b>. Worth watching, not yet worth believing — ` +
+          `it would take a few hundred fusions to tell.`
+        : ` That is at or below what was promised.`) + `</p>`) +
+    (p.lateDraws ? `<p class="w-small">${fmtInt(p.lateDraws)} of the losses were late draws — the player ` +
+      `did not come back in time to reveal — rather than a roll genuinely lost.</p>` : "");
+
+  const foot = `<p class="w-small sc-foot">Neither the Proton nor its vault is verified on the block ` +
+    `explorer. Their addresses come from the official terminal and were checked against the chain. ` +
+    `Read from the logs, which scroll off this chain in hours — the count is reconciled against the ` +
+    `contract's own counter${p?.complete === false ? ", and right now it does not match: some fusions are missing" : ""}.</p>`;
+
+  return vault + burn + odds + foot;
+}
+
 /** Ce que le filtre laisse passer, sur l'ensemble du carnet. Silencieux tant
  *  qu'aucun filtre n'est posé : un compteur permanent serait du bruit. */
 export function filterSummary(d, filter) {
@@ -1696,7 +1793,7 @@ if (typeof document !== "undefined") {
   // la même page, un rechargement ne renvoie pas au marché, et le bouton retour
   // du navigateur fait ce qu'on attend de lui. Sans script, aucun onglet n'est
   // marqué et les quatre pages restent visibles — dégradé, mais entier.
-  const TABS = ["market", "wallet", "vote", "pad", "how"];
+  const TABS = ["market", "wallet", "vote", "pad", "scarcity", "how"];
   const tabsEl = $("tabs");
 
   const showTab = (name) => {
@@ -1726,13 +1823,29 @@ if (typeof document !== "undefined") {
     }
   };
 
+  // Même cadence que le pad, et pour la même raison : cent requêtes de journaux
+  // n'ont pas à repartir toutes les quinze secondes.
+  let scarcityAt = 0;
+  const loadScarcity = async (force = false) => {
+    if (!force && Date.now() - scarcityAt < 300000) return;
+    scarcityAt = Date.now();
+    try {
+      const res = await fetch("/api/scarcity");
+      $("scarcity").innerHTML = scarcityHtml(res.ok ? await res.json() : null);
+    } catch {
+      scarcityAt = 0;
+    }
+  };
+
   let tab = showTab((location.hash || "").slice(1));
   if (tab === "pad") loadPad(true);
+  if (tab === "scarcity") loadScarcity(true);
   addEventListener("hashchange", () => {
     tab = showTab((location.hash || "").slice(1));
     // La bande de tête se mesure sur une page visible : cachée, elle rend zéro.
     if (tab === "market" && measureBest()) { painted = ""; paint(); }
     if (tab === "pad") loadPad();
+    if (tab === "scarcity") loadScarcity();
   });
 
   // Le portefeuille du visiteur.

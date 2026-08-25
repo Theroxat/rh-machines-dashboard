@@ -49,6 +49,27 @@ export const TOTAL_MACHINES = 10000;
  * La trésorerie est gardée pour référence — c'est elle qui encaisse le frais de
  * 1% avant qu'il ne rachète et ne brûle du $PRINTER.
  */
+/**
+ * Le Proton et son coffre, ajoutés à l'écosystème le 2026-08-22.
+ *
+ * On y sacrifie une machine pour en alourdir une autre. La sacrifiée part au
+ * coffre — elle n'est pas détruite : `totalSupply` du NFT ne bouge pas.
+ *
+ * Ni l'un ni l'autre n'est vérifié sur l'explorateur. Les adresses viennent de
+ * `/api/protonConfig` du site officiel, relevées le 2026-08-25 et recoupées
+ * on-chain : le Proton répond à `nextCommitId()`, le coffre à `heldCount()`.
+ *
+ * Les deux ont le même propriétaire, `0xA08c58FC…AA3d17`, une clé simple et non
+ * un multisig. Le coffre expose `releaseMachine(uint256,address)`, réservée à ce
+ * propriétaire : les machines y sont déposées, pas scellées.
+ */
+export const PROTON = Object.freeze({
+  contract: "0xbA28ac2377291E1d92B4cB5fD587dC24604dA8aE",
+  factory: "0xE4979E6c766a239C8e491433d42E697B22fAcf40",
+  owner: "0xA08c58FCC285D9Cd48b7122293C8a62446AA3d17",
+  claimedSuccessBps: 8000,
+});
+
 export const PAD = Object.freeze({
   factories: Object.freeze([
     "0x0C8c78ab91b87a03659c8AD4A11e6d23d5Ab869b",
@@ -129,5 +150,6 @@ export function loadConfig(env, raw) {
     maxBookPages:        num("maxBookPages", 1, 5000),
     maxMetadataPages:    num("maxMetadataPages", 1, 1000),
     padPollIntervalMs:   num("padPollIntervalMs", 60000, 86400000),
+    protonPollIntervalMs: num("protonPollIntervalMs", 60000, 86400000),
   });
 }

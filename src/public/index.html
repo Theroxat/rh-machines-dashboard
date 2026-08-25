@@ -699,6 +699,33 @@
   .p-sym a:hover .p-go, .p-sym a:focus-visible .p-go { color: var(--paper); background: var(--ink); }
   /* Le graphique d'une graduée, chez DexTools : c'est ce qu'on vient chercher
      dès qu'une pièce s'échange pour de bon. */
+  /* ---- ce qui quitte la circulation ----
+     Une barre pour la part enfermée, une barre empilée pour le sort de l'offre
+     de jetons. Les mêmes couleurs que partout : ambre pour ce qui a été
+     consommé, vert pour ce qui reste au porteur. */
+  .sc-bar {
+    height: 10px; background: var(--paper-2); margin: 2px 0 10px; max-width: 880px;
+    border: 1px solid var(--rule-2);
+  }
+  .sc-bar span { display: block; height: 100%; background: var(--reink); }
+  .sc-stack {
+    display: flex; height: 14px; margin: 2px 0 8px; max-width: 880px;
+    border: 1px solid var(--rule-2); overflow: hidden;
+  }
+  .sc-stack span { display: block; height: 100%; }
+  .sc-stack .sc-ink  { background: var(--ink); }
+  .sc-stack .sc-oth  { background: var(--reink); }
+  .sc-stack .sc-left { background: var(--paper-2); }
+  .sc-key { margin: 0 0 16px; font-size: 11px; color: var(--muted); }
+  .sc-key i { display: inline-block; width: 9px; height: 9px; margin: 0 5px 0 14px; }
+  .sc-key i:first-child { margin-left: 0; }
+  .sc-key i.sc-ink { background: var(--ink); }
+  .sc-key i.sc-oth { background: var(--reink); }
+  .sc-key i.sc-left { background: var(--paper-2); border: 1px solid var(--rule-2); }
+  /* Ce qui a été perdu ou détruit ne porte pas le vert de ce qu'on encaisse. */
+  .p-v.sc-down { color: var(--reink); }
+  .sc-foot { color: var(--dim); margin-top: 18px; }
+
   /* Le cimetière : lancées, jamais échangées. Un nom et un lien suffisent —
      il n'y a rien d'autre à en dire, et une ligne de tableau par pièce le
      disait cent soixante-quatorze fois. */
@@ -998,6 +1025,7 @@
     <a href="#wallet" role="tab" data-tab="wallet">My wallet</a>
     <a href="#vote"   role="tab" data-tab="vote">The vote</a>
     <a href="#pad"    role="tab" data-tab="pad">PRINTER.FUN</a>
+    <a href="#scarcity" role="tab" data-tab="scarcity">Scarcity</a>
     <a href="#how"    role="tab" data-tab="how">How it works</a>
   </nav>
   <div class="banner" id="banner" role="status"></div>
@@ -1071,6 +1099,18 @@
   chain, and it is where <b>$PRINTER</b> gets bought back and burned.
   <a href="https://www.printer.fun/" target="_blank" rel="noopener">printer.fun</a></p>
   <div id="pad"></div>
+</section>
+
+<!-- ═══ CE QUI QUITTE LA CIRCULATION ═══
+     Deux disparitions de nature différente : le $PRINTER brûle et ne revient
+     pas ; les machines partent au coffre du Proton, d'où un propriétaire peut
+     les ressortir. La page ne doit jamais laisser lire l'un pour l'autre. -->
+<section class="pane" id="pane-scarcity">
+  <p class="w-small p-lede">Two things leave circulation here, and they do not leave the same way.
+  <b>$PRINTER</b> burns — destroyed, gone, the supply drops. <b>Machines</b> do not: fusing one sends
+  it to a vault, where it still exists and can still be taken back out. This page counts both, and
+  keeps them apart.</p>
+  <div id="scarcity"></div>
 </section>
 
 <!-- ═══ COMMENT ÇA MARCHE ═══ -->

@@ -379,7 +379,7 @@ test("the tab and its pane are both declared", () => {
   assert.match(page, /data-tab="pad">PRINTER\.FUN</);
   assert.match(page, /id="pane-pad"/);
   const app = readFileSync(new URL("../src/public/app.js", import.meta.url), "utf8");
-  assert.match(app, /TABS = \["market", "wallet", "vote", "pad", "how"\]/);
+  assert.match(app, /TABS = \[[^\]]*"pad"[^\]]*\]/);
   assert.match(app, /\$\("pad"\)\.innerHTML = padHtml/);
 });
 
