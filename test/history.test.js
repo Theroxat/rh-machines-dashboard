@@ -239,3 +239,61 @@ test("a pad never recorded yields an empty baseline rather than throwing", () =>
   assert.equal(b.oldest, null);
   h.close();
 });
+
+// Le site officiel annonce 175 000 $PRINTER brûlés par heure « en moyenne
+// depuis le lancement », sous un bandeau « live ». Le rythme réel du moment est
+// trois à treize fois plus bas : la ruée d'activation initiale écrase la
+// moyenne, et une moyenne sous un bandeau « live » se lit comme un rythme.
+test("the burn rate is measured over a window, not averaged since the dawn of time", () => {
+  const h = openHistory(":memory:");
+  const H = 3600000;
+  const now = 100 * H;
+  // 1 000 000 brûlés en 10 h → 100 000 / h
+  const at = (t, supply) => h.record(snap({ at: t, printer: { usd: 0.01, marketCap: supply * 0.01, volume24h: 1, liquidityUsd: 1 } }));
+  at(now - 10 * H, 160_000_000);
+  at(now - 5 * H, 159_500_000);
+  at(now, 159_000_000);
+
+  const r = h.burnRate(24 * H, now);
+  assert.equal(Math.round(r.perHour), 100_000);
+  assert.equal(Math.round(r.burned), 1_000_000);
+  assert.equal(r.hours, 10);
+  assert.equal(r.suspect, false);
+
+  // Une fenêtre plus courte voit un rythme différent — c'est tout l'intérêt.
+  const short = h.burnRate(6 * H, now);
+  assert.equal(Math.round(short.perHour), 100_000);
+  assert.equal(short.hours, 5);
+  h.close();
+});
+
+// Deux relevés espacés d'une minute donneraient un taux horaire tiré du bruit.
+test("too short a span yields no rate rather than one drawn from noise", () => {
+  const h = openHistory(":memory:");
+  const now = 100 * 3600000;
+  const at = (t, s) => h.record(snap({ at: t, printer: { usd: 0.01, marketCap: s * 0.01, volume24h: 1, liquidityUsd: 1 } }));
+  at(now - 60000, 160_000_000);
+  at(now, 159_999_000);
+  assert.equal(h.burnRate(24 * 3600000, now), null);
+  h.close();
+});
+
+test("a single reading is not a rate", () => {
+  const h = openHistory(":memory:");
+  h.record(snap({ at: 1000 }));
+  assert.equal(h.burnRate(86400000, 1000), null);
+  h.close();
+});
+
+// Le $PRINTER ne peut pas être frappé. Une offre qui monte veut dire que la
+// capitalisation ou le prix a bougé sous nos pieds — on le signale plutôt que
+// de publier une combustion négative.
+test("a supply that rose is flagged, never published as a negative burn", () => {
+  const h = openHistory(":memory:");
+  const H = 3600000, now = 100 * H;
+  const at = (t, s) => h.record(snap({ at: t, printer: { usd: 0.01, marketCap: s * 0.01, volume24h: 1, liquidityUsd: 1 } }));
+  at(now - 10 * H, 159_000_000);
+  at(now, 160_000_000);
+  assert.equal(h.burnRate(24 * H, now).suspect, true);
+  h.close();
+});

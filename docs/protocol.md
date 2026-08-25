@@ -659,3 +659,65 @@ présenté et la page le dit.
 est de **9 822**, pas 10 000 — et le coffre gagne ~48 machines par jour. Le
 ratio d'annonces affiché s'en écarte de 0,12 point aujourd'hui ; dans un mois,
 au même rythme, l'écart serait de plus d'un point.
+
+---
+
+## Recoupement du site officiel (2026-08-25)
+
+La refonte de `rhmachines.com` publie trois pages chiffrées — Flywheel, Burn,
+Stock. Recoupées une à une contre la chaîne.
+
+### Ce qui concorde
+
+`activeMachines()` rend **7 495**, exactement ce que le tableau de bord affiche.
+L'epoch est bien 4. La combustion totale — 44 185 199 sur 200 000 000, soit
+**22,1%** — se recoupe au centième.
+
+### Ce qui ne concorde pas
+
+**Leur site se contredit lui-même sur la combustion.** La page Flywheel annonce
+« 21.2% gone », la page Burn « 22.1% of the 200M cap ». Le calcul donne 22,09% :
+la page Burn a raison, celle du Flywheel est figée et accuse **1 785 199 de
+retard**.
+
+**Leur compte de machines actives est en cache.** Ils affichent 7 458 contre
+7 495 on-chain. L'écart n'est ni le coffre (178) ni ses machines allumées (6) :
+c'est une valeur qui n'est pas recalculée à la vue.
+
+### Le taux de combustion, et pourquoi le nôtre diffère
+
+La page Burn annonce **175 098 $PRINTER/h**, sous un bandeau « live ». C'est une
+moyenne depuis le lancement, écrasée par la ruée d'activation des premiers
+jours. Mesuré sur notre historique :
+
+| fenêtre | rythme réel |
+|---|---|
+| 6 dernières heures | ~13 000 /h |
+| 24 dernières heures | ~52 000 /h |
+| 3 derniers jours | ~32 000 /h |
+| tout notre relevé (6 j) | ~48 000 /h |
+
+Soit **trois à treize fois** sous leur affichage. Leur chiffre n'est pas faux —
+il est mal cadré : une moyenne sous un bandeau « live » se lit comme un rythme
+courant. Notre page nomme sa fenêtre et met les deux côte à côte.
+
+### Le pot : deux définitions, pas une erreur
+
+Leur page Stock annonce **$35 630 « READY FOR STOCK »**, décomposé ainsi :
+
+| poste | montant | vérifié |
+|---|---|---|
+| in the pot · USDG, ready | $19 031 | **oui** — solde USDG du SWAPPER, $19 038 relevé |
+| ETH fees · converting | $13 477 | non localisé |
+| USDG fees · converting | $2 016 | non localisé |
+| $PRINTER · converting | $1 107 | partiellement — $7 443 de $PRINTER au VAULT |
+
+Notre `pot` lit le solde USDG du SWAPPER : **ce qui est déjà converti et prêt à
+acheter des actions**. Le leur y ajoute les frais encaissés et pas encore
+convertis, répartis dans des contrats que nous n'avons pas tous identifiés.
+
+Les deux définitions sont défendables. La nôtre est plus conservatrice et
+entièrement vérifiable ; la leur est plus complète et invérifiable en l'état.
+**Nous gardons la nôtre**, faute de pouvoir recouper les $16 600 restants : un
+pot annoncé sur des soldes qu'on n'a pas su trouver serait un chiffre repris,
+pas un chiffre lu.

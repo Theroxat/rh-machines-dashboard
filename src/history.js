@@ -327,6 +327,46 @@ export function openHistory(path) {
       return { at, gradAt, firstSeen, oldest: o };
     },
 
+    /**
+     * Le rythme de combustion du $PRINTER, mesuré.
+     *
+     * L'offre se déduit de la capitalisation et du prix — deux colonnes que le
+     * tick enregistre depuis le premier jour. Le site officiel n'annonce qu'une
+     * moyenne depuis le lancement, écrasée par la ruée d'activation initiale :
+     * 175 000 par heure quand le rythme réel du moment est trois à treize fois
+     * plus bas. Une moyenne présentée sous un bandeau « live » se lit comme un
+     * rythme courant, et ce n'en est pas un.
+     *
+     * Rend `null` plutôt qu'un chiffre sur trop peu de points : deux relevés
+     * espacés d'une minute donneraient un taux horaire tiré du bruit.
+     */
+    burnRate(windowMs, now = Date.now()) {
+      let rows;
+      try {
+        rows = db.prepare(
+          `SELECT t, printerMcap, printerUsd FROM tick
+           WHERE t >= ? AND printerMcap > 0 AND printerUsd > 0 ORDER BY t`).all(now - windowMs);
+      } catch {
+        return null;
+      }
+      if (rows.length < 2) return null;
+      const supply = (r) => r.printerMcap / r.printerUsd;
+      const first = rows[0], last = rows[rows.length - 1];
+      const hours = (last.t - first.t) / 3600000;
+      if (hours < 0.5) return null;
+      const burned = supply(first) - supply(last);
+      return {
+        perHour: burned / hours,
+        burned,
+        hours,
+        since: first.t,
+        // Le $PRINTER ne peut pas être frappé : une hausse de l'offre voudrait
+        // dire que la capitalisation ou le prix a bougé sous nos pieds, pas
+        // qu'on a créé du jeton. On le signale au lieu de publier un négatif.
+        suspect: burned < 0,
+      };
+    },
+
     close() { try { db.close(); } catch {} },
   };
 }

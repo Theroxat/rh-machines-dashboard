@@ -12,6 +12,10 @@ const SC = {
   odds: { won: 54, lost: 22, done: 76, failRate: 0.2895, claimedFailRate: 0.2,
     expected: 15.2, sigma: 1.95, oneIn: 25 },
   owner: "0xA08c58FCC285D9Cd48b7122293C8a62446AA3d17",
+  rate: {
+    day: { perHour: 51711, burned: 1241064, hours: 24, since: 1, suspect: false },
+    all: { perHour: 47428, burned: 6830432, hours: 144, since: 1, suspect: false },
+  },
 };
 
 // La distinction qui porte toute la page : un jeton brûlé est détruit, une
@@ -123,4 +127,43 @@ test("the tab and its pane are declared, and the page fetches its own route", ()
   const app = readFileSync(new URL("../src/public/app.js", import.meta.url), "utf8");
   assert.match(app, /TABS = \["market", "wallet", "vote", "pad", "scarcity", "how"\]/);
   assert.match(app, /fetch\("\/api\/scarcity"\)/);
+});
+
+// --- le rythme -------------------------------------------------------------
+
+// Le site officiel annonce 175 098 $PRINTER/h « en moyenne depuis le
+// lancement », sous un bandeau « live ». Le rythme du moment est trois à treize
+// fois plus bas : la ruée d'activation initiale écrase la moyenne.
+test("the burn rate is given for a named window, never as a timeless average", () => {
+  const html = scarcityHtml(SC);
+  assert.match(html, /class="p-v">51,711<\/span><span class="p-k">burning per hour<\/span><span class="p-x">measured over the last 24 hours/);
+});
+
+test("when the average and the moment disagree, the page says both", () => {
+  const html = scarcityHtml(SC);
+  assert.match(html, /The pace is not steady: <b>51,711<\/b> an hour over the last day/);
+  assert.match(html, /against <b>47,428<\/b> averaged across the 6 days we have watched/);
+  assert.match(html, /Most of what burned, burned early/);
+});
+
+// Le $PRINTER ne peut pas être frappé : une offre qui monte veut dire que le
+// prix ou la capitalisation a bougé sous nos pieds, pas qu'on a créé du jeton.
+test("a suspect reading is not published as a rate", () => {
+  const html = scarcityHtml({ ...SC, rate: { day: { perHour: -900, hours: 24, suspect: true }, all: SC.rate.all } });
+  assert.doesNotMatch(html, /burning per hour/);
+  assert.doesNotMatch(html, /The pace is not steady/);
+});
+
+test("with no history behind it, no rate is claimed", () => {
+  const html = scarcityHtml({ ...SC, rate: null });
+  assert.doesNotMatch(html, /burning per hour/);
+  assert.match(html, /class="p-k">burned as ink/);
+});
+
+// Sur une fenêtre trop courte, moyenne et moment sont la même chose : la phrase
+// qui les oppose n'aurait rien à dire.
+test("with too little history the two figures are not set against each other", () => {
+  const html = scarcityHtml({ ...SC, rate: { day: SC.rate.day, all: { ...SC.rate.all, hours: 30 } } });
+  assert.doesNotMatch(html, /The pace is not steady/);
+  assert.match(html, /burning per hour/);
 });

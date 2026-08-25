@@ -1572,11 +1572,27 @@ export function scarcityHtml(sc) {
   const burn = !b ? "" :
     `<span class="label">$PRINTER burned</span>` +
     `<p class="w-small">Lighting a Machine burns 4,250 $PRINTER as ink, and it never comes back. ` +
-    `Every other engine — the Proton, the pad, the swap — burns more.</p>` +
+    `Every other engine — the Proton, the pad, the swap — burns more.` +
+    // La moyenne depuis le lancement vaut plusieurs fois le rythme du moment :
+    // la ruée d'activation des premiers jours l'écrase. La donner sans la
+    // fenêtre qui va avec fait passer une ruée pour un régime.
+    (sc.rate?.day && sc.rate?.all && !sc.rate.day.suspect && !sc.rate.all.suspect
+      && sc.rate.all.hours > sc.rate.day.hours * 2
+      ? ` The pace is not steady: <b>${fmtInt(Math.round(sc.rate.day.perHour))}</b> an hour over the last day, ` +
+        `against <b>${fmtInt(Math.round(sc.rate.all.perHour))}</b> averaged across the ` +
+        `${Math.round(sc.rate.all.hours / 24)} days we have watched. Most of what burned, burned early.`
+      : "") + `</p>` +
     `<div class="p-figs">` +
     // `fmtUsdShort` rend « 200000k » sur deux cents millions : il n'est prévu
     // que pour des dollars, et il s'arrête aux milliers.
     fig(fmtInt(b.minted), "ever minted", "the whole supply, once") +
+    // Un rythme mesuré sur une fenêtre nommée, jamais une moyenne depuis
+    // toujours : la ruée d'activation des premiers jours écrase la seconde, et
+    // elle se lirait comme le rythme du moment.
+    (sc.rate?.day && !sc.rate.day.suspect
+      ? fig(fmtInt(Math.round(sc.rate.day.perHour)), "burning per hour",
+          `measured over the last ${sc.rate.day.hours < 1.5 ? "hour" : `${Math.round(sc.rate.day.hours)} hours`}`)
+      : "") +
     fig(fmtInt(Math.round(b.supply)), "left today", `${fmtRatio(b.burnedShare)} of it gone`, " sc-down") +
     (b.ink === null ? "" : fig(fmtInt(Math.round(b.ink)), "burned as ink", "Machines being lit")) +
     (b.other === null ? "" : fig(fmtInt(Math.round(b.other)), "burned otherwise",

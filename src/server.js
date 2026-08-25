@@ -231,8 +231,16 @@ async function sweepScarcity() {
   const supply = await num(ADDRESSES.TOKEN, ERC, "totalSupply");
   const inkBurned = await num(ADDRESSES.MINE, new ethers.Interface(["function totalInkBurned() view returns (uint256)"]), "totalInkBurned");
 
+  // Le rythme réel, sur trois fenêtres. Le site officiel n'annonce qu'une
+  // moyenne depuis le lancement — écrasée par la ruée d'activation initiale, et
+  // trois à treize fois au-dessus du rythme du moment.
+  const rate = history
+    ? { day: history.burnRate(24 * 3600000), week: history.burnRate(7 * 24 * 3600000), all: history.burnRate(365 * 24 * 3600000) }
+    : null;
+
   scarcity = {
     proton: p,
+    rate,
     vault: lockUp({ held: p.heldIds.length, awake, weight: vaultWeight, total: TOTAL_MACHINES }),
     burn: burnSplit({ supply, inkBurned, protonBurned: p.printerBurned }),
     // Le taux ne se présente que sur une lecture entière : calculé sur un
