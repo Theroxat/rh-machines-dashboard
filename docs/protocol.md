@@ -721,3 +721,43 @@ entièrement vérifiable ; la leur est plus complète et invérifiable en l'éta
 **Nous gardons la nôtre**, faute de pouvoir recouper les $16 600 restants : un
 pot annoncé sur des soldes qu'on n'a pas su trouver serait un chiffre repris,
 pas un chiffre lu.
+
+---
+
+## La provenance des chiffres
+
+Le tableau de bord reproche au terminal officiel de ne pas cadrer ses sources.
+Il ne peut pas s'en dispenser. La page *How it works* porte désormais la
+répartition ligne par ligne, en trois groupes qui ne disent pas « fiable /
+douteux » mais quelque chose de plus utile :
+
+| genre | ce que le lecteur peut en faire |
+|---|---|
+| **lu sur la chaîne** | refaire la lecture et devoir trouver le même chiffre |
+| **servi par un tiers** | faire confiance, ou ne pas s'en servir |
+| **calculé ici** | notre arithmétique, et donc là où vivent nos erreurs |
+
+### Ce qui n'est pas on-chain, et pourquoi ça ne peut pas l'être
+
+**Tous les prix demandés** viennent d'OpenSea — c'est-à-dire le sujet même du
+site. Les ordres Seaport sont signés hors chaîne et ne la touchent qu'à
+l'exécution : il n'existe aucun carnet d'ordres à lire à la place. On pourrait
+lire les ventes *conclues*, mais ce serait un historique, pas un prix demandé.
+
+**Tous les montants en dollars** viennent de DexScreener (repli CoinGecko pour
+l'ETH). La chaîne connaît les réserves d'une pool, jamais un cours. Les deux
+paires sont épinglées par adresse : la leçon a été payée deux fois — l'imposteur
+USDG qui price l'ETH 5% faux, et le jour où la paire s'est inversée.
+
+Ce sont des **limites, pas des raccourcis**, et la page les nomme comme telles.
+
+### Le garde-fou
+
+`src/sources.js` déclare les hôtes tiers. Un test balaie tout `src/`, extrait
+chaque URL appelée, et **échoue si un hôte est interrogé sans être déclaré** —
+vérifié en injectant une fausse source : la suite tombe avec le nom de l'hôte
+fautif. L'inverse est vrai aussi : un hôte déclaré qui n'est appelé nulle part
+fait échouer la suite, pour que la page ne nomme rien qu'elle n'interroge.
+
+La documentation ne peut donc pas dériver du code sans que quelqu'un s'en
+aperçoive.

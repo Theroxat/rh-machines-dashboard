@@ -4,6 +4,7 @@ import { deskShares } from "./vote.js";
 import { deskName } from "./desks.js";
 import { epochUsd } from "./pot.js";
 import { valueHoldings } from "./holdings.js";
+import { SOURCES, SOURCE_KINDS } from "./sources.js";
 
 /** Assemblage pur de tout ce dont la page a besoin. Une dérivation qui
  *  diviserait par une valeur non lue produit null plutôt qu'un zéro confiant. */
@@ -198,6 +199,9 @@ export function composeSnapshot({
   return {
     at: now,
     rows,
+    // D'où vient chaque chiffre. Scellé, donc servi tel quel : c'est une
+    // déclaration, pas une mesure.
+    sources: { list: SOURCES, kinds: SOURCE_KINDS },
     legend: legend ?? null,
     traitFilters: meta ? buildTraitIndex({ meta, listed,
       deskOf: (id) => meta.get(id)?.desk ?? deskName(deskIndex?.get(id)) }) : null,

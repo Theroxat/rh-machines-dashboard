@@ -355,11 +355,19 @@ test("the page says the square root and the Lit delay in plain words", () => {
 
 // Une page qui explique doit dire d'où elle tient ce qu'elle affirme, et ce
 // qu'elle ne sait pas.
+// La prose disait « lu sur la chaîne » et laissait croire que tout l'était. Le
+// sujet même du site — les prix demandés — vient d'OpenSea, et le taire est
+// exactement ce qu'on reproche au terminal officiel.
 test("the page names its sources and admits what is derived", () => {
   const how = page.slice(page.indexOf('id="pane-how"'));
-  assert.match(how, /read from the chain, not computed here/);
+  assert.match(how, /Not all of it is read from the chain/);
   assert.match(how, /shown as unknown\s+rather than as zero/);
-  assert.match(how, /derived rather than read/);
+  // Les deux limites, nommées comme telles et non comme des choix.
+  assert.match(how, /A price in dollars cannot come from the chain/);
+  assert.match(how, /signed off-chain and only touch the chain\s+when someone buys/);
+  assert.match(how, /Those are limits, not shortcuts/);
+  // Et la table, qui porte le détail ligne par ligne.
+  assert.match(how, /id="sources"/);
 });
 
 // Au-delà de soixante-dix caractères, l'œil perd sa ligne.

@@ -1524,6 +1524,31 @@ export function padHtml(pad) {
 }
 
 /**
+ * D'où vient chaque chiffre.
+ *
+ * Le tableau de bord reproche au terminal officiel de ne pas cadrer ses sources.
+ * Il ne peut pas s'en dispenser lui-même — et le point le plus facile à taire
+ * est le plus important : les prix demandés, sujet même du site, ne viennent
+ * pas de la chaîne.
+ */
+export function sourcesHtml(sources, kinds) {
+  const group = (kind) => (sources ?? []).filter((s) => s.kind === kind);
+  const block = (kind) => {
+    const rows = group(kind);
+    if (!rows.length) return "";
+    const k = kinds[kind];
+    return `<div class="src-group"><span class="label">${esc(k.label)}</span>` +
+      `<p class="src-blurb">${esc(k.blurb)}</p><ul class="src-list">` +
+      rows.map((r) =>
+        `<li><span class="src-what">${esc(r.what)}</span>` +
+        `<span class="src-from">${esc(r.from)}</span>` +
+        (r.note ? `<span class="src-note">${esc(r.note)}</span>` : "") + `</li>`).join("") +
+      `</ul></div>`;
+  };
+  return `<div class="src-cols">${block("chain")}${block("api")}${block("derived")}</div>`;
+}
+
+/**
  * Ce qui quitte la circulation.
  *
  * Deux disparitions, et elles ne sont pas de même nature. Le $PRINTER brûle :
@@ -2008,6 +2033,10 @@ if (typeof document !== "undefined") {
     $("drop-note").innerHTML = dropNote(v.data);
     paint();
     $("legend").innerHTML = legendHtml(v.data.legend);
+    // La provenance ne bouge jamais : elle se dessine une fois.
+    if (v.data.sources && !$("sources").innerHTML) {
+      $("sources").innerHTML = sourcesHtml(v.data.sources.list, v.data.sources.kinds);
+    }
   };
 
   refresh();

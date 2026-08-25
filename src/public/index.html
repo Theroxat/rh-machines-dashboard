@@ -699,6 +699,21 @@
   .p-sym a:hover .p-go, .p-sym a:focus-visible .p-go { color: var(--paper); background: var(--ink); }
   /* Le graphique d'une graduée, chez DexTools : c'est ce qu'on vient chercher
      dès qu'une pièce s'échange pour de bon. */
+  /* ---- d'où vient chaque chiffre ----
+     Trois colonnes : lu, servi, calculé. La séparation est l'information — pas
+     « fiable / douteux », mais « refaisable / à croire / de notre fait ». */
+  .src-cols {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 0 26px; margin-top: 10px;
+  }
+  .src-group { padding-bottom: 14px; }
+  .src-blurb { margin: 3px 0 8px; font-size: 11.5px; color: var(--muted); line-height: 1.45; }
+  .src-list { list-style: none; margin: 0; padding: 0; }
+  .src-list li { padding: 6px 0; border-bottom: 1px solid var(--rule); }
+  .src-what { display: block; font-size: 12.5px; color: var(--text); font-weight: 600; }
+  .src-from { display: block; font-size: 11px; color: var(--muted); margin-top: 1px; }
+  .src-note { display: block; font-size: 11px; color: var(--dim); line-height: 1.45; margin-top: 3px; }
+
   /* ---- ce qui quitte la circulation ----
      Une barre pour la part enfermée, une barre empilée pour le sort de l'offre
      de jetons. Les mêmes couleurs que partout : ambre pour ce qui a été
@@ -1197,17 +1212,25 @@
     </div>
     <div class="doc-block">
     <h2>Where the numbers come from</h2>
-    <p>Weights, ink, desks, the ballot and the pot are read from the chain, not computed here.
-    Listings and pictures come from the public OpenSea API. Token prices come from DexScreener. The
-    book is swept every minute, ink every ten. Anything that cannot be read is shown as unknown
-    rather than as zero — a zero and a failed read are not the same thing, and confusing them is how
-    a dashboard lies quietly.</p>
-    <p>Two things are derived rather than read: which headwear grants which rarity, and the split
-    between what a Machine earns from each desk's slice. Both are checked against the chain on every
-    boot, and the first is set out below.</p>
+    <p>Not all of it is read from the chain, and the difference decides what you can conclude from
+    it. Anything that cannot be read is shown as unknown rather than as zero — a zero and a failed
+    read are not the same thing, and confusing them is how a dashboard lies quietly. The book is
+    swept every minute, ink every ten, the pad every two, the Proton every ten.</p>
+    <p>The full split is set out below, line by line.</p>
   </div>
     </div>
   </div>
+
+  <!-- La provenance, ligne par ligne. Rendue depuis src/sources.js, et un test
+       compare cette liste aux URL réellement appelées : une source ajoutée sans
+       être déclarée casse la suite plutôt que de laisser la page mentir par
+       omission. -->
+  <h2 class="label">Where every number comes from</h2>
+  <p class="note">A price in dollars cannot come from the chain — it knows a pool's reserves, never a
+    rate. Neither can an order book: OpenSea orders are signed off-chain and only touch the chain
+    when someone buys. Those are limits, not shortcuts, and this page names them rather than letting
+    a figure pass for something it is not.</p>
+  <div id="sources"></div>
 
   <h2 class="label">Which headwear grants which rarity</h2>
   <p class="note">A Machine's rarity is sealed on chain, and it always matches the <b>Headwear</b> it
