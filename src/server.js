@@ -570,6 +570,19 @@ const server = createServer(async (req, res) => {
 });
 
 const started = async () => {
+  // On écoute avant de lire quoi que ce soit.
+  //
+  // Le balayage de l'encre prend vingt-cinq secondes sur dix mille machines, et
+  // le serveur attendait qu'il finisse. Pendant ce temps rien n'écoutait : le
+  // tunnel rendait un refus de connexion, c'est-à-dire une page d'erreur du
+  // navigateur, alors que le service allait très bien et travaillait.
+  //
+  // La route du snapshot rend déjà 503 tant qu'elle n'a rien, et la page sait
+  // le dire — « warming up » vaut infiniment mieux qu'un écran d'erreur. Le
+  // trou de déploiement passe de cinquante-six secondes de site mort à
+  // cinquante-six secondes de site qui s'annonce en train de démarrer.
+  server.listen(cfg.port, () => console.log(`dashboard on :${cfg.port}, serving ${appPath} — warming up`));
+
   const { traits: t, source } = await loadTraits({
     provider,
     cachePath: join(here, "..", "data", "traits.json"),
@@ -653,7 +666,7 @@ const started = async () => {
   loop("pad", sweepPad, cfg.padPollIntervalMs);
   loop("proton", sweepScarcity, cfg.protonPollIntervalMs);
 
-  server.listen(cfg.port, () => console.log(`dashboard on :${cfg.port}, serving ${appPath}`));
+  console.log("ready: first sweep done, serving live data");
 };
 
 started().catch((e) => { console.error(e); process.exit(1); });

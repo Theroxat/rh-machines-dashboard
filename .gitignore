@@ -6,3 +6,6 @@ data/history-*.db*
 
 # Captures pour les tweets : des livrables, pas du code.
 tweet-*.png
+
+# La base du banc d essai : jetable, jamais versionnée.
+data-staging/

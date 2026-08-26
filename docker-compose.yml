@@ -11,3 +11,32 @@ services:
       - "192.168.0.11:3050:3050"
     volumes:
       - ./data:/app/data
+
+  # ── Le banc d'essai ────────────────────────────────────────────────────────
+  #
+  # La prod a des visiteurs. Reconstruire son conteneur pour éprouver une idée
+  # la coupe cinquante-six secondes — dont vingt-cinq où rien n'écoute et où le
+  # tunnel rend une erreur de connexion. Vingt déploiements dans un après-midi
+  # font vingt minutes de site mort pour du travail qui n'était pas encore prêt
+  # à être vu.
+  #
+  # Le banc tourne sur le même code, sur un port à lui (3051, vérifié libre sur
+  # cet hôte, y compris parmi les conteneurs arrêtés), et n'est pas exposé par
+  # le tunnel. On y déploie autant qu'on veut.
+  #
+  # Trois différences avec la prod, et elles sont délibérées :
+  #   - sa propre base d'historique, pour ne pas écrire dans celle qui sert ;
+  #   - aucun webhook Discord, pour ne pas sonner chez le porteur à chaque essai ;
+  #   - pas de redémarrage automatique : un banc mort ne doit alerter personne.
+  rh-dashboard-staging:
+    build: .
+    container_name: rh-dashboard-staging
+    profiles: ["staging"]
+    restart: "no"
+    env_file: .env
+    environment:
+      DISCORD_WEBHOOK: ""
+    ports:
+      - "192.168.0.11:3051:3050"
+    volumes:
+      - ./data-staging:/app/data
