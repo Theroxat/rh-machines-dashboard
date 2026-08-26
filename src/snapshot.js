@@ -8,6 +8,25 @@ import { SOURCES, SOURCE_KINDS } from "./sources.js";
 
 /** Assemblage pur de tout ce dont la page a besoin. Une dérivation qui
  *  diviserait par une valeur non lue produit null plutôt qu'un zéro confiant. */
+/** La part de l'offre déjà brûlée. `null` si l'offre n'a pas pu être lue :
+ *  une part manquante n'est pas une part nulle. */
+export function burnHeadline(protocol) {
+  const supply = protocol?.printerSupply;
+  if (supply === null || supply === undefined) return null;
+  if (!Number.isFinite(supply) || supply <= 0) return null;
+  const minted = 200_000_000;
+  const burned = minted - supply;
+  return {
+    minted,
+    supply,
+    burned,
+    share: burned / minted,
+    // L'encre, c'est-à-dire ce que les machines ont brûlé pour s'allumer. Le
+    // reste vient des rachats du pad, du swap et du Proton.
+    ink: protocol?.totalInkBurned ? Number(protocol.totalInkBurned) / 1e18 : null,
+  };
+}
+
 export function composeSnapshot({
   grid, printer, eth, protocol, stats, book, inkMeta, meta, legend, ink, weights, anvil,
   deskIndex, vote, potUsd, sectorWeight, tickers, holdings, stockPrices, ownerOf, now,
@@ -225,6 +244,10 @@ export function composeSnapshot({
       failures: inkMeta?.failures ?? null,
     },
     protocol,
+    // Ce que la collection a détruit, en tête de page. L'offre frappée au
+    // départ est scellée à 200 millions : la part brûlée est donc une
+    // soustraction, pas une estimation.
+    burn: burnHeadline(protocol),
     // Le scrutin décide de la taille des parts du pot, donc du coefficient qui
     // s'applique par desk. Illisible, il vaut null : la page dira qu'elle ne
     // sait pas plutôt que d'annoncer seize parts égales, qu'elles ne sont pas.

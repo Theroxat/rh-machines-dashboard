@@ -89,15 +89,69 @@ export const esc = (s) => String(s).replace(/[&<>"]/g,
  * floor, volume, machines allumées, offre de l'anvil, pot, bulletin, epoch.
  * Trois servaient à décider quelque chose.
  */
-export function heroHtml(d) {
+export function heroHtml(d, active = null) {
   if (!d?.pot?.usd) {
     return `<div class="hero"><h2>Reading the chain…</h2>` +
       `<p>The first sweep is still running. Nothing below is wrong — there is just nothing yet.</p></div>`;
   }
-  return `<div class="hero">` +
-    `<h2>Nobody has been paid <mark>yet</mark>.</h2>` +
-    `<p>${fmtUsdShort(d.pot.usd)} is sitting in the pot, and it buys real tokenised stock ` +
-    `the moment the vote closes — split across every Machine by weight.</p></div>`;
+
+  const total = d.collection?.machines ?? 10000;
+  const b = d.burn;
+  // La combustion est le titre. Sans l'offre lue, on ne l'invente pas : on
+  // annonce ce qu'on sait — le nombre de machines — et rien de plus.
+  // Le point après « Machines » n'est pas un détail de ponctuation. Écrit
+  // « 10,000 Machines, and 22.5% of the $PRINTER already burned », le dernier
+  // mot se rattache aussi au premier membre et la phrase annonce dix mille
+  // machines brûlées. Il n'en existe aucune : `totalSupply` n'a jamais bougé.
+  const head = b
+    ? `<h2>${fmtInt(total)} Machines. <mark>${fmtRatio(b.share)}</mark> of the ` +
+      `$PRINTER already burned.</h2>`
+    : `<h2>${fmtInt(total)} Machines, and a $PRINTER supply that only ever falls.</h2>`;
+
+  const said = b
+    ? `<p>Every Machine ever minted still exists — none has ever been destroyed. ` +
+      `The $PRINTER is the part that burns: ${fmtInt(Math.round(b.burned))} of the ` +
+      `${fmtInt(b.minted)} ever minted are gone for good` +
+      (b.ink ? `, ${fmtInt(Math.round(b.ink))} of it as ink to switch Machines on` : "") +
+      `, and there is no way to mint more.</p>`
+    : `<p>Every Machine ever minted still exists. Burning $PRINTER is how one is switched on, ` +
+      `and none of that $PRINTER ever comes back.</p>`;
+
+  return `<div class="hero">` + head + said + floorsHtml(d, active) + `</div>`;
+}
+
+/**
+ * Le prix plancher de chaque classe, et le filtre du carnet.
+ *
+ * C'est ce que le site promettait depuis le début — le prix d'entrée par
+ * classe — et ça tenait jusqu'ici sous six cents vignettes. Les blocs sont
+ * aussi le filtre : on lit le prix et on clique dessus. Un tableau de prix
+ * qu'on regarde puis une rangée de pastilles qu'on touche disaient la même
+ * chose deux fois, à deux endroits.
+ *
+ * Le plancher allumé est le grand chiffre : c'est celui qui rapporte. Le
+ * dormant est dessous, plus petit et sans couleur — il ne rapporte rien tant
+ * que personne n'a brûlé pour lui.
+ */
+export function floorsHtml(d, active = null) {
+  const eth = d?.eth?.usd;
+  const rows = (d?.rows ?? []).filter((r) => (r.inked?.listed ?? 0) + (r.dormant?.listed ?? 0) > 0);
+  if (!rows.length) return "";
+  const money = (e) => (e && eth ? fmtUsdRound(e * eth) : e ? `${fmtEth(e)} ETH` : "—");
+
+  return `<div class="floors"><span class="floors-lab">Floor by class — tap one to filter</span>` +
+    `<div class="floors-row">` +
+    `<button type="button" class="fl fl-all" data-k="" aria-pressed="${active ? "false" : "true"}">` +
+      `<b>All</b><u>${fmtInt(rows.reduce((a, r) => a + (r.inked?.listed ?? 0) + (r.dormant?.listed ?? 0), 0))} listed</u>` +
+    `</button>` +
+    rows.map((r) =>
+      `<button type="button" class="fl" data-k="${esc(r.classLabel)}" ` +
+      `aria-pressed="${active === r.classLabel ? "true" : "false"}">` +
+      `<span class="fl-cls">${esc(r.classLabel)}</span>` +
+      `<b>${money(r.inked?.floorEth)}</b>` +
+      `<u>${r.dormant?.floorEth ? `${money(r.dormant.floorEth)} dormant` : "none dormant"}</u>` +
+      `</button>`).join("") +
+    `</div></div>`;
 }
 
 /** Quatre chiffres, et chacun porte sa couleur parce qu'il porte un rôle. */
@@ -115,9 +169,11 @@ export function statsHtml(d) {
   ].join("");
 }
 
+/** L'ordre des deux boutons est celui de la page : le prix d'abord, parce
+ *  que c'est la première question de quelqu'un qui regarde un carnet. */
 export const SORTS = Object.freeze([
-  { key: "back", label: "Best return" },
   { key: "cheap", label: "Cheapest" },
+  { key: "back", label: "Best return" },
 ]);
 
 /**
@@ -128,7 +184,7 @@ export const SORTS = Object.freeze([
  * porte l'allumage — sans quoi elle passerait devant à prix égal en ne
  * rapportant rien.
  */
-export function pickMachines(d, { klass = null, limit = 24, sort = "back" } = {}) {
+export function pickMachines(d, { klass = null, limit = 24, sort = SORTS[0].key } = {}) {
   const eth = d?.eth?.usd;
   const light = d?.ink?.activationTotalUsd ?? 0;
   const out = [];
@@ -168,7 +224,8 @@ export function cardHtml(m, { light = 0 } = {}) {
     ? fmtEth(m.priceEth)
     : fmtUsdRound(m.priceUsd);
 
-  return `<a class="card" href="${itemUrl(m.tokenId)}" target="_blank" rel="noopener">` +
+  return `<a class="card" data-id="${m.tokenId}" href="${itemUrl(m.tokenId)}" ` +
+    `target="_blank" rel="noopener">` +
     art +
     `<span class="card-body">` +
       `<span class="card-id">#${m.tokenId} &middot; ${esc(m.classLabel ?? "")}` +
@@ -181,17 +238,82 @@ export function cardHtml(m, { light = 0 } = {}) {
 }
 
 /** Les classes en pastilles, et le tri sur sa propre ligne. */
-export function chipsHtml(d, active, sort = "back") {
-  const cls = `<button type="button" data-k="" aria-pressed="${active ? "false" : "true"}">All</button>` +
-    (d?.rows ?? [])
-      .filter((r) => (r.inked?.listed ?? 0) + (r.dormant?.listed ?? 0) > 0)
-      .map((r) => `<button type="button" data-k="${esc(r.classLabel)}" ` +
-        `aria-pressed="${active === r.classLabel ? "true" : "false"}">${esc(r.classLabel)}</button>`)
-      .join("");
-  const sorts = SORTS.map((o) =>
+/** Le tri, et lui seul : la classe se choisit sur les blocs de plancher. */
+export function chipsHtml(d, active, sort = SORTS[0].key) {
+  return `<div class="chips chips-sort">` + SORTS.map((o) =>
     `<button type="button" data-s="${o.key}" aria-pressed="${sort === o.key ? "true" : "false"}">${
-      esc(o.label)}</button>`).join("");
-  return `<div class="chips">${cls}</div><div class="chips chips-sort">${sorts}</div>`;
+      esc(o.label)}</button>`).join("") + `</div>`;
+}
+
+/**
+ * Le détail d'une machine.
+ *
+ * Une carte porte ce qu'il faut pour choisir ; le panneau porte ce qu'il faut
+ * pour vérifier. Tout ce que la chaîne dit d'une machine se lit ici — son
+ * poids exact, l'encre qu'elle a brûlée, les actions qu'elle transporte, ce
+ * que l'anvil en donnerait — et rien n'oblige à ouvrir OpenSea pour le savoir.
+ */
+export function detailHtml(m, d) {
+  if (!m) return "";
+  const eth = d?.eth?.usd;
+  const usd = (e) => (e && eth ? fmtUsdRound(e * eth) : null);
+  const reinked = m.inkMult > 1.0001 && m.weight;
+
+  const row = (k, v, cls = "") =>
+    v === null || v === undefined || v === "" ? ""
+      : `<div class="d-row ${cls}"><span>${esc(k)}</span><b>${v}</b></div>`;
+
+  // Ce qu'elle transporte. Le compte appartient au jeton : ces actions partent
+  // avec la machine si elle se vend, et c'est le genre de chose qu'on découvre
+  // trop tard.
+  const holds = !m.holds?.lines?.length ? "" :
+    `<div class="d-block"><h4>Carrying ${fmtUsd(m.holds.usd)} of stock</h4>` +
+    `<p class="d-note">It sits in the Machine's own account and goes with it if it sells, ` +
+    `unless the owner withdraws first.</p>` +
+    m.holds.lines.filter((l) => l.usd > 0.005)
+      .sort((a, b) => b.usd - a.usd)
+      .map((l) => row(l.symbol, `${fmtAmount(l.amount)} &middot; ${fmtUsd(l.usd)}`))
+      .join("") + `</div>`;
+
+  const art = m.machine?.image
+    ? `<img class="d-art" src="${esc(m.machine.image)}" alt="Machine #${m.tokenId}">`
+    : `<span class="d-art d-noart"></span>`;
+
+  const traits = ["headwear", "body", "eyes"]
+    .map((t) => m.machine?.[t] ? row(t, esc(m.machine[t])) : "")
+    .join("");
+
+  return `<div class="d-panel" role="dialog" aria-modal="true" aria-label="Machine #${m.tokenId}">` +
+    `<button class="d-close" type="button" aria-label="Close">&times;</button>` +
+    `<div class="d-top">${art}` +
+      `<div class="d-head">` +
+        `<span class="d-id">#${m.tokenId}</span>` +
+        `<h3>${esc(m.classLabel ?? "")}${reinked ? ` <span class="d-re">re-inked</span>` : ""}</h3>` +
+        (m.lit
+          ? `<span class="card-earn">${fmtUsd(m.epochUsd ?? 0)} a drop</span>`
+          : `<span class="card-earn off">Not printing</span>`) +
+        `<div class="d-price">${usd(m.priceEth) ?? fmtEth(m.priceEth)}` +
+          (m.priceEth ? `<small>${fmtEth(m.priceEth)} ETH on OpenSea</small>` : "") + `</div>` +
+        `<a class="d-buy" href="${itemUrl(m.tokenId)}" target="_blank" rel="noopener">Open on OpenSea &rarr;</a>` +
+      `</div>` +
+    `</div>` +
+    `<div class="d-block"><h4>What the chain says</h4>` +
+      row("weight", m.weight ? `${fmtExact(m.weight / 100)}&times;` : "none — never inked") +
+      row("ink burned", m.inkPrinter ? `${fmtInt(Math.round(m.inkPrinter))} $PRINTER` : null) +
+      (reinked ? row("burned past activation",
+        `${fmtExact(m.inkPrinter / 4250)}&times; the base ink`, "d-hot") : "") +
+      row("desk", m.machine?.desk ? esc(m.machine.desk) : null) +
+      traits +
+    `</div>` +
+    holds +
+    // L'anvil est un acheteur permanent : ce qu'il donne est le seul prix
+    // qu'on obtienne à coup sûr, et il se paie en $PRINTER, pas en ETH.
+    (m.anvilBidEth
+      ? `<div class="d-block"><h4>The Anvil would pay ${usd(m.anvilBidEth) ?? fmtEth(m.anvilBidEth)}</h4>` +
+        `<p class="d-note">${fmtInt(Math.round(m.anvilBidPrinter))} $PRINTER, net of the sell fee — ` +
+        `the same standing bid for any Machine, whatever its class.</p></div>`
+      : "") +
+    `</div>`;
 }
 
 /* ══ CE QUE JE POSSÈDE ═════════════════════════════════════════════════════ */
@@ -431,7 +553,9 @@ if (typeof document !== "undefined") {
 
   let data = null;
   let klass = null;
-  let sort = "back";
+  // Le carnet ouvre sur le prix : « combien ça coûte » vient avant « combien
+  // ça rend », et c'est aussi le seul tri qui montre les dormantes.
+  let sort = SORTS[0].key;
   let mine = null;
   let learnPainted = false;
 
@@ -450,6 +574,7 @@ if (typeof document !== "undefined") {
     if (!data) return;
     const light = data.ink?.activationTotalUsd ?? 0;
     const picked = pickMachines(data, { klass, sort });
+    $("hero").innerHTML = heroHtml(data, klass);
     $("chips").innerHTML = chipsHtml(data, klass, sort);
     $("cards").innerHTML = picked.length
       ? picked.map((m) => cardHtml(m, { light })).join("")
@@ -463,6 +588,65 @@ if (typeof document !== "undefined") {
     $("more-note").textContent = picked.length && total > picked.length
       ? `Showing ${picked.length} of ${total} for sale.` : "";
   };
+
+  /**
+   * Le détail d'une machine.
+   *
+   * La carte reste un lien vers OpenSea : un clic du milieu, un clic modifié ou
+   * « ouvrir dans un nouvel onglet » doivent continuer d'y mener. Le panneau ne
+   * vole que le clic simple, et il rend au clavier ce qu'il prend à la souris —
+   * Échap ferme, et le focus revient là où on l'avait laissé.
+   */
+  const veil = $("detail");
+  let lastFocus = null;
+
+  const closeDetail = () => {
+    veil.hidden = true;
+    veil.innerHTML = "";
+    lastFocus?.focus?.();
+    lastFocus = null;
+  };
+
+  const openDetail = (tokenId, from) => {
+    if (!data) return;
+    let found = null;
+    for (const r of data.rows ?? []) {
+      for (const [lit, cell] of [[true, r.inked], [false, r.dormant]]) {
+        const e = (cell?.entries ?? []).find((x) => x.tokenId === tokenId);
+        if (e) found = { ...e, lit, classLabel: r.classLabel };
+      }
+    }
+    if (!found) return;
+    lastFocus = from ?? null;
+    veil.innerHTML = detailHtml(found, data);
+    veil.hidden = false;
+    veil.querySelector(".d-close")?.focus();
+  };
+
+  veil.addEventListener("click", (e) => {
+    // Le voile ferme ; le panneau ne ferme que par sa croix.
+    if (e.target === veil || e.target.closest(".d-close")) closeDetail();
+  });
+  addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !veil.hidden) closeDetail();
+  });
+
+  $("cards").addEventListener("click", (e) => {
+    const card = e.target.closest("a.card");
+    if (!card || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+    const id = Number(card.dataset.id);
+    if (!Number.isFinite(id)) return;
+    e.preventDefault();
+    openDetail(id, card);
+  });
+
+  // Le plancher d'une classe est aussi son filtre : on lit le prix, on clique.
+  $("hero").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-k]");
+    if (!b) return;
+    klass = b.dataset.k || null;
+    paintBuy();
+  });
 
   $("chips").addEventListener("click", (e) => {
     const b = e.target.closest("button");
@@ -537,7 +721,6 @@ if (typeof document !== "undefined") {
 
     setContract(v.data.collection?.contract);
     data = v.data;
-    $("hero").innerHTML = heroHtml(data);
     $("stats").innerHTML = statsHtml(data);
     paintBuy();
     $("vote").innerHTML = voteHtml(data.vote, data.protocol?.epoch);

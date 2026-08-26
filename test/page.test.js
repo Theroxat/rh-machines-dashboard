@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
-  heroHtml, statsHtml, cardHtml, chipsHtml, pickMachines, mineHtml,
+  heroHtml, statsHtml, cardHtml, chipsHtml, floorsHtml, detailHtml, pickMachines, mineHtml,
   stepsHtml, voteHtml, scarcityHtml, padHtml, sourcesHtml, bannerMessage,
   setContract, itemUrl, esc, ADDRESS_RE, SORTS,
 } from "../src/public/app.js";
@@ -20,6 +20,8 @@ const DATA = {
   ink: { activationTotalUsd: 151 },
   totals: { inked: 7504, dormant: 2496 },
   book: { listed: 660 },
+  collection: { machines: 10000 },
+  burn: { minted: 200000000, supply: 155000000, burned: 45000000, share: 0.225, ink: 43285199 },
   protocol: { epoch: 4 },
   rows: [
     { classValue: 100, classLabel: "x1",
@@ -79,10 +81,39 @@ test("every ink density clears the contrast threshold on paper", () => {
 });
 
 /* ── l'ouverture ─────────────────────────────────────────────────────────── */
-test("the page opens on a sentence, not on a wall of figures", () => {
+/* ── l'ouverture ───────────────────────────────────────────────────────────
+   Le titre porte ce qui ne bouge pas — dix mille machines — et ce qui ne
+   remonte jamais : la part du jeton déjà détruite. */
+test("the page opens on the fleet and on what has been burned for good", () => {
   const html = heroHtml(DATA);
-  assert.match(html, /Nobody has been paid <mark>yet<\/mark>/);
-  assert.match(html, /\$32k is sitting in the pot/);
+  assert.match(html, /10,000 Machines\. <mark>22\.5%<\/mark> of the \$PRINTER already burned/);
+  assert.match(html, /45,000,000 of the 200,000,000 ever minted are gone for good/);
+  assert.match(html, /43,285,199 of it as ink/);
+  assert.match(html, /there is no way to mint more/);
+});
+
+// « 10,000 Machines, and 22.5% of the $PRINTER already burned » se lit aussi
+// comme dix mille machines brûlées. Il n'en existe aucune : `totalSupply` n'a
+// jamais bougé, et la page doit le dire au lieu de laisser le doute.
+test("the headline cannot be read as ten thousand Machines burned", () => {
+  const html = heroHtml(DATA);
+  // Le point sépare les deux affirmations ; une virgule les enchaînait.
+  assert.match(html, /Machines\. <mark>/);
+  assert.doesNotMatch(html, /Machines, and <mark>/);
+  assert.match(html, /Every Machine ever minted still exists — none has ever been destroyed/);
+});
+
+test("with no supply read it still says no Machine was ever destroyed", () => {
+  assert.match(heroHtml({ ...DATA, burn: null }), /Every Machine ever minted still exists/);
+});
+
+// Une part manquante n'est pas une part nulle : sans l'offre lue on annonce ce
+// qu'on sait, et rien de plus.
+test("with no supply read, no burn share is invented", () => {
+  const html = heroHtml({ ...DATA, burn: null });
+  assert.match(html, /10,000 Machines, and a \$PRINTER supply that only ever falls/);
+  assert.doesNotMatch(html, /%<\/mark>/);
+  assert.doesNotMatch(html, /gone for good/);
 });
 
 test("with nothing read the page says so rather than showing zeros", () => {
@@ -114,7 +145,9 @@ test("sorting by price is what makes a dormant Machine reachable at all", () => 
   const cheap = pickMachines(DATA, { sort: "cheap" });
   assert.equal(back[back.length - 1].lit, false, "classée par retour, une dormante finit dernière");
   assert.equal(cheap[0].lit, false, "classée par prix, elle passe devant");
-  assert.deepEqual(SORTS.map((s) => s.key), ["back", "cheap"]);
+  // Le prix d'abord : c'est la première question devant un carnet, et le seul
+  // tri qui fait apparaître une dormante.
+  assert.deepEqual(SORTS.map((s) => s.key), ["cheap", "back"]);
 });
 
 // À prix égal l'allumée est le meilleur achat : elle rapporte, l'autre non.
@@ -132,12 +165,40 @@ test("a dormant Machine carries the price of lighting it in its cost", () => {
   assert.equal(Math.round(d.cost), Math.round(d.priceUsd + 151));
 });
 
-test("a class filter narrows the book, and the chips say which one is on", () => {
+/* ── les prix planchers ───────────────────────────────────────────────────
+   Ce que le site promet dans son titre depuis le début, et qui tenait sous six
+   cents vignettes. Les blocs sont aussi le filtre : lire le prix puis cliquer
+   dessus est un seul geste, là où un tableau plus des pastilles disaient la
+   même chose deux fois. */
+test("the hero carries the floor of every class that has something listed", () => {
+  const html = heroHtml(DATA);
+  // x1 allumée : 0.072 ETH × 2460 = $177
+  assert.match(html, /class="fl-cls">x1<\/span><b>\$177<\/b><u>\$172 dormant/);
+  assert.match(html, /class="fl-cls">x4<\/span><b>\$640<\/b><u>\$492 dormant/);
+  assert.match(html, /Floor by class — tap one to filter/);
+});
+
+test("a class with nothing listed is not given a price it does not have", () => {
+  const bare = { ...DATA, rows: [{ classValue: 600, classLabel: "x6",
+    inked: { listed: 0, entries: [] }, dormant: { listed: 0, entries: [] } }] };
+  assert.equal(floorsHtml(bare), "");
+});
+
+test("a class listed only lit says so rather than inventing a dormant floor", () => {
+  const one = { ...DATA, rows: [{ classValue: 100, classLabel: "x1",
+    inked: { floorEth: 0.072, listed: 3, entries: [] },
+    dormant: { floorEth: null, listed: 0, entries: [] } }] };
+  assert.match(floorsHtml(one), /<u>none dormant<\/u>/);
+});
+
+test("a floor block is the filter, and it says which one is on", () => {
   assert.ok(pickMachines(DATA, { klass: "x4" }).every((m) => m.classLabel === "x4"));
-  const chips = chipsHtml(DATA, "x4", "cheap");
-  assert.match(chips, /data-k="x4" aria-pressed="true"/);
-  assert.match(chips, /data-k="" aria-pressed="false"/);
-  assert.match(chips, /data-s="cheap" aria-pressed="true"/);
+  const html = heroHtml(DATA, "x4");
+  assert.match(html, /data-k="x4" aria-pressed="true"/);
+  assert.match(html, /data-k="" aria-pressed="false"/);
+  // Le tri reste à part : c'est une seconde question, pas une huitième classe.
+  assert.match(chipsHtml(DATA, "x4", "cheap"), /data-s="cheap" aria-pressed="true"/);
+  assert.doesNotMatch(chipsHtml(DATA, "x4", "cheap"), /data-k=/);
 });
 
 /* ── une carte ───────────────────────────────────────────────────────────── */
@@ -315,6 +376,14 @@ test("the page says it is unofficial before anyone opens it", () => {
   assert.ok(head < page.indexOf('id="pane-buy"'), "la mention doit précéder les chiffres");
 });
 
+// Les quatre chiffres d'état se lisent avant la phrase qui les commente : on
+// regarde ce qui est vrai, puis ce qu'on en dit.
+test("the state of the protocol is read before the sentence about it", () => {
+  const buy = page.slice(page.indexOf('id="pane-buy"'), page.indexOf('id="pane-mine"'));
+  assert.ok(buy.indexOf('id="stats"') < buy.indexOf('id="hero"'),
+    "les chiffres doivent précéder l'ouverture");
+});
+
 test("every section the site carries has somewhere to be drawn", () => {
   for (const id of ["hero", "stats", "chips", "cards", "mine-out",
                     "learn-steps", "vote", "scarcity", "pad", "sources"]) {
@@ -328,4 +397,89 @@ test("motion is optional, and refusing it costs nothing", () => {
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
   const block = css.slice(css.indexOf("prefers-reduced-motion"));
   assert.match(block, /transform: none/);
+});
+
+// Le carnet doit ouvrir sur le prix sans qu'on ait à cliquer : le défaut des
+// fonctions et celui du câblage sont le même, et ils suivent l'ordre des
+// boutons plutôt qu'une chaîne recopiée à trois endroits.
+test("the book opens on price, and nothing hard-codes which sort that is", () => {
+  const app = readFileSync(new URL("../src/public/app.js", import.meta.url), "utf8");
+  assert.match(app, /sort = SORTS\[0\]\.key/);
+  assert.doesNotMatch(app, /sort = "back"/);
+  const picked = pickMachines(DATA);
+  assert.equal(picked[0].lit, false, "sans argument, le carnet s'ouvre sur le moins cher");
+  assert.match(chipsHtml(DATA, null), /data-s="cheap" aria-pressed="true"/);
+});
+
+/* ── le détail d'une machine ───────────────────────────────────────────────
+   Une carte porte ce qu'il faut pour choisir ; le panneau porte ce qu'il faut
+   pour vérifier. */
+test("the panel shows what the chain says, not just what the card said", () => {
+  const html = detailHtml({
+    tokenId: 1587, classLabel: "x4", lit: true, priceEth: 0.235, epochUsd: 8.13,
+    weight: 400, inkPrinter: 4331, inkMult: 1,
+    machine: { image: "https://i2c.seadn.io/x.webp", headwear: "Smitten", body: "Cotton Candy", desk: "tech" },
+    anvilBidPrinter: 6706, anvilBidEth: 0.075,
+  }, DATA);
+  assert.match(html, /#1587/);
+  assert.match(html, /<span>weight<\/span><b>4&times;<\/b>/);
+  assert.match(html, /<span>ink burned<\/span><b>4,331 \$PRINTER<\/b>/);
+  assert.match(html, /<span>desk<\/span><b>tech<\/b>/);
+  assert.match(html, /<span>headwear<\/span><b>Smitten<\/b>/);
+  assert.match(html, /Open on OpenSea/);
+});
+
+// L'anvil est un acheteur permanent : ce qu'il donne est le seul prix qu'on
+// obtienne à coup sûr, et il se paie en $PRINTER, pas en ETH.
+test("the panel says what the Anvil would pay, and in what currency", () => {
+  const html = detailHtml({ tokenId: 1, classLabel: "x1", lit: true, priceEth: 0.1,
+    anvilBidPrinter: 6706, anvilBidEth: 0.075 }, DATA);
+  assert.match(html, /The Anvil would pay \$185/);
+  assert.match(html, /6,706 \$PRINTER, net of the sell fee/);
+  assert.match(html, /the same standing bid for any Machine/);
+});
+
+// Le compte appartient au jeton : ces actions partent avec la machine si elle
+// se vend, et c'est le genre de chose qu'on découvre trop tard.
+test("the panel lists the stock a Machine is carrying, and says whose it is", () => {
+  const html = detailHtml({ tokenId: 1, classLabel: "x1", lit: true, priceEth: 0.1,
+    holds: { usd: 16.4, lines: [
+      { symbol: "NVDA", amount: 0.0512, usd: 11.2 },
+      { symbol: "GME", amount: 0.287, usd: 5.2 },
+      { symbol: "DUST", amount: 0.0000001, usd: 0.001 },
+    ] } }, DATA);
+  assert.match(html, /Carrying \$16\.40 of stock/);
+  assert.match(html, /goes with it if it sells/);
+  // « NVDA » n'est pas « nvda » : c'est le nom d'une action, pas un intitulé.
+  assert.match(html, /<span>NVDA<\/span>/);
+  assert.doesNotMatch(css, /\.d-row span \{[^}]*text-transform/);
+  // Les poussières à un dixième de centime n'apprennent rien et allongent la liste.
+  assert.doesNotMatch(html, /DUST/);
+  // Le plus gros d'abord.
+  assert.ok(html.indexOf("NVDA") < html.indexOf("GME"));
+});
+
+test("a re-inked Machine says how far past activation it burned", () => {
+  const html = detailHtml({ tokenId: 1, classLabel: "x1", lit: true, priceEth: 0.1,
+    weight: 103, inkPrinter: 4551, inkMult: 1.03 }, DATA);
+  assert.match(html, /class="d-re">re-inked</);
+  assert.match(html, /burned past activation<\/span><b>1\.07&times; the base ink/);
+});
+
+test("a dormant Machine's panel carries no live colour", () => {
+  const html = detailHtml({ tokenId: 1, classLabel: "x1", lit: false, priceEth: 0.07, weight: 0 }, DATA);
+  assert.match(html, /class="card-earn off">Not printing</);
+  assert.doesNotMatch(html, /class="card-earn">/);
+  assert.match(html, /<span>weight<\/span><b>none — never inked<\/b>/);
+});
+
+// Le panneau ne vole que le clic simple : un clic modifié ou du milieu doit
+// continuer de mener au marché.
+test("a modified click still goes to the marketplace", () => {
+  const app = readFileSync(new URL("../src/public/app.js", import.meta.url), "utf8");
+  assert.match(app, /metaKey \|\| e\.ctrlKey \|\| e\.shiftKey \|\| e\.altKey \|\| e\.button !== 0\) return/);
+  // Et il rend au clavier ce qu'il prend à la souris.
+  assert.match(app, /e\.key === "Escape" && !veil\.hidden/);
+  assert.match(app, /lastFocus\?\.focus\?\.\(\)/);
+  assert.match(page, /id="detail" hidden/);
 });
