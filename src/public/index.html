@@ -12,248 +12,270 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 
 <style>
-  /* ══ LA BOUTIQUE ═══════════════════════════════════════════════════════════
-     Ce site vendait des chiffres dans un terminal gris. Il parle d'une
-     collection de pixel-art bariolé sur fond vert acide — il ne ressemblait pas
-     à ce qu'il montrait.
+  /* ══ NÉO-BRUTALISME ════════════════════════════════════════════════════════
+     Le site vendait une collection de pixel-art en aplats francs depuis un
+     terminal gris. Ici il parle la même langue qu'elle : bordures épaisses,
+     ombres portées dures, couleurs saturées, typographie lourde.
 
-     Ici les machines SONT l'interface. Elles sont grandes, en cartes, et chaque
-     carte porte ses propres chiffres. Plus de bandeau de dix nombres, plus de
-     grille de quatorze cases, plus de légende.
+     LA DISCIPLINE DE COULEUR, parce qu'un néo-brutalisme sans règle devient un
+     arc-en-ciel qui ne dit rien :
 
-     LA RÈGLE DE COULEUR, ET IL N'Y EN A QU'UNE : le vert n'existe que sur une
-     machine qui imprime. Une dormante est entièrement grise, sans une touche.
-     On balaie la grille et on voit ce qui est vivant, sans notice. */
+       LIME   ce que le protocole te rend. Une machine qui imprime, et rien
+              d'autre. Une dormante n'en porte aucune trace.
+       ROSE   ce sur quoi on agit — l'onglet ouvert, le bouton qu'on presse.
+       JAUNE  ce qu'il faut payer ou brûler.
+       BLEU   l'état du parc, ce qui ne se décide pas.
+
+     Chaque couleur classe quelque chose. Aucune n'est là pour égayer. */
 
   :root {
-    --bg:        #0D0D0F;
-    --card:      #17171B;
-    --card-hi:   #1F1F25;
-    --line:      #2A2A32;
+    --ink:    #111111;
+    --paper:  #FFFDF5;
+    --paper-2:#F2EFE2;
 
-    --fg:        #F2F2F0;
-    --fg-2:      #A0A0AA;
-    --fg-3:      #6E6E78;
+    --lime:   #C9F53E;
+    --pink:   #FF4FA3;
+    --sky:    #4FC3FF;
+    --sun:    #FFCE3E;
 
-    /* Le vert de l'art de la collection. Il ne sert qu'à une chose : dire
-       qu'une machine imprime. Jamais de décoration. */
-    --live:      #C5F000;
-    /* Une seule autre couleur, pour ce qui a brûlé deux fois. */
-    --hot:       #FF5C7A;
+    /* L'encre diluée, pour ce qui accompagne sans porter. Mesurée sur le
+       papier : 4.5:1 minimum pour du petit texte. */
+    --ink-2:  #56534B;
+    --ink-3:  #6E6A60;
 
-    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-    --mono: ui-monospace, "SF Mono", "JetBrains Mono", "DejaVu Sans Mono", Menlo, Consolas, monospace;
+    --b:      3px;
+    --shadow: 6px 6px 0 var(--ink);
+    --shadow-sm: 4px 4px 0 var(--ink);
 
-    --gap: 20px;
-    --radius: 14px;
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+            "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", "DejaVu Sans Mono", Menlo, monospace;
   }
 
   * { box-sizing: border-box; }
 
-  html { background: var(--bg); -webkit-text-size-adjust: 100%; }
+  html { background: var(--paper); -webkit-text-size-adjust: 100%; }
 
   body {
     margin: 0;
     /* Dix-sept pixels, pas douze et demi. Le site s'adressait à quelqu'un qui
-       lit un terminal ; il s'adresse maintenant à quelqu'un qui décide. */
-    font: 17px/1.55 var(--sans);
-    color: var(--fg);
-    background: var(--bg);
-    padding: 0 0 80px;
+       déchiffre un terminal ; il s'adresse à quelqu'un qui décide. */
+    font: 17px/1.5 var(--sans);
+    color: var(--ink);
+    background: var(--paper);
+    padding: 0 0 70px;
   }
 
-  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 18px; }
 
   a { color: inherit; }
-  :focus-visible { outline: 2px solid var(--live); outline-offset: 3px; }
+  /* Le focus doit se voir sur du papier : un liseré rose, jamais le contour
+     par défaut du navigateur qui disparaît sur fond clair. */
+  :focus-visible { outline: var(--b) solid var(--pink); outline-offset: 2px; }
 
-  /* ── l'en-tête ────────────────────────────────────────────────────────────
-     Deux lignes, et la navigation se pose sous le pouce sur téléphone. */
-  header { padding: 22px 0 0; }
-  .brand { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
-  .brand h1 {
-    margin: 0;
-    font-size: 19px; font-weight: 700; letter-spacing: -0.01em;
+  /* ── l'en-tête ──────────────────────────────────────────────────────────── */
+  header { padding: 20px 0 0; }
+  .bar {
+    display: flex; align-items: center; justify-content: space-between; gap: 14px;
+    border: var(--b) solid var(--ink); background: var(--lime);
+    padding: 11px 17px; box-shadow: var(--shadow);
   }
-  .brand .unof {
-    font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase;
-    color: var(--fg-3); white-space: nowrap;
+  .bar h1 {
+    margin: 0; font-size: 25px; font-weight: 900;
+    letter-spacing: -0.045em; text-transform: uppercase;
   }
-  .x-link { color: var(--fg-3); display: inline-flex; }
-  .x-link:hover, .x-link:focus-visible { color: var(--fg); }
-  .x-link svg { width: 16px; height: 16px; fill: currentColor; display: block; }
+  .bar .right { display: flex; align-items: center; gap: 11px; }
+  .tag {
+    font-size: 11px; font-weight: 800; letter-spacing: 0.13em; text-transform: uppercase;
+    border: var(--b) solid var(--ink); background: var(--paper); padding: 3px 9px;
+    white-space: nowrap;
+  }
+  .x-link { display: inline-flex; color: var(--ink); }
+  .x-link svg { width: 19px; height: 19px; fill: currentColor; display: block; }
 
-  nav.nav { display: flex; gap: 8px; margin: 20px 0 0; }
+  nav.nav { display: flex; gap: 10px; margin: 18px 0 0; flex-wrap: wrap; }
   nav.nav a {
-    flex: 1;
-    padding: 11px 14px;
-    text-align: center;
-    font-size: 15px; font-weight: 600;
-    color: var(--fg-2); text-decoration: none;
-    background: var(--card);
-    border: 1px solid var(--line);
-    border-radius: 10px;
+    font-size: 15px; font-weight: 900; text-transform: uppercase; letter-spacing: -0.005em;
+    text-decoration: none; color: var(--ink);
+    border: var(--b) solid var(--ink); padding: 9px 21px;
+    background: var(--paper); box-shadow: var(--shadow-sm);
   }
-  nav.nav a:hover { color: var(--fg); }
-  /* L'onglet ouvert s'inverse, il ne verdit pas. Le vert ne dit qu'une chose
-     sur cette page — cette machine imprime — et l'employer pour l'état d'un
-     bouton lui vole exactement ce qui fait sa force. */
-  nav.nav a[aria-selected="true"] {
-    color: var(--bg); background: var(--fg); border-color: var(--fg);
-  }
-  @media (min-width: 700px) {
-    nav.nav { gap: 10px; }
-    nav.nav a { flex: 0 0 auto; min-width: 132px; }
-  }
+  /* Rose : on est là, et c'est là qu'on agit. */
+  nav.nav a[aria-selected="true"] { background: var(--pink); color: var(--paper); }
+  nav.nav a:hover { transform: translate(1px, 1px); box-shadow: 3px 3px 0 var(--ink); }
 
-  /* ── l'état du protocole, en une ligne ────────────────────────────────────
-     Ce que dix encadrés disaient. Trois faits, et ils tiennent sur une ligne. */
-  .pulse {
-    display: flex; flex-wrap: wrap; gap: 8px 26px;
-    margin: 26px 0 4px; padding: 0;
-    font-size: 15px; color: var(--fg-2);
+  /* ── l'ouverture ────────────────────────────────────────────────────────── */
+  .hero {
+    border: var(--b) solid var(--ink); background: var(--paper);
+    box-shadow: var(--shadow); padding: 24px 22px; margin: 24px 0 22px;
   }
-  .pulse b { color: var(--fg); font-weight: 700; }
-  .pulse .on { color: var(--live); }
+  .hero h2 {
+    margin: 0 0 9px; font-size: clamp(30px, 5vw, 48px); line-height: 0.96;
+    font-weight: 900; letter-spacing: -0.05em; max-width: 17ch; text-wrap: balance;
+  }
+  .hero h2 mark { background: var(--sun); color: var(--ink); padding: 0 5px; }
+  .hero p { margin: 0; font-size: 17px; font-weight: 600; max-width: 56ch; color: var(--ink); }
 
-  /* ── les cartes ───────────────────────────────────────────────────────────
-     L'unité de la page. Une machine, son art en grand, ses chiffres, et un
-     seul geste possible. */
-  .grid {
-    display: grid; gap: var(--gap);
-    grid-template-columns: 1fr;
-    margin: 26px 0 0;
+  /* ── les chiffres d'état ────────────────────────────────────────────────── */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 13px; margin-bottom: 26px; }
+  .st { border: var(--b) solid var(--ink); padding: 14px 15px; box-shadow: var(--shadow-sm); }
+  .st b {
+    display: block; font-size: clamp(22px, 3vw, 30px); font-weight: 900;
+    letter-spacing: -0.04em; line-height: 1; font-variant-numeric: tabular-nums;
   }
-  @media (min-width: 560px) { .grid { grid-template-columns: repeat(2, 1fr); } }
-  @media (min-width: 860px) { .grid { grid-template-columns: repeat(3, 1fr); } }
+  .st u {
+    display: block; text-decoration: none; font-size: 11px; font-weight: 800;
+    letter-spacing: 0.08em; text-transform: uppercase; margin-top: 6px;
+  }
+  .st-live { background: var(--lime); }
+  .st-pot  { background: var(--sky); }
+  .st-cost { background: var(--sun); }
+  .st-book { background: var(--paper-2); }
+  @media (max-width: 780px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+
+  /* ── titres de section ─────────────────────────────────────────────────── */
+  h3.sec {
+    font-size: 13px; font-weight: 900; letter-spacing: 0.12em;
+    text-transform: uppercase; margin: 0 0 13px;
+  }
+  h3.sec::after { content: " \2192"; }
+  p.sub { margin: -6px 0 16px; font-size: 15px; font-weight: 600; color: var(--ink-2); max-width: 58ch; }
+
+  /* ── les pastilles de filtre ───────────────────────────────────────────── */
+  .chips { display: flex; flex-wrap: wrap; gap: 9px; margin: 0 0 18px; }
+  .chips button {
+    font: 900 14px var(--sans); text-transform: uppercase; letter-spacing: -0.005em;
+    padding: 8px 16px; cursor: pointer; color: var(--ink);
+    border: var(--b) solid var(--ink); background: var(--paper);
+    box-shadow: var(--shadow-sm);
+  }
+  .chips button:hover { transform: translate(1px, 1px); box-shadow: 3px 3px 0 var(--ink); }
+  .chips button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+  .chips-sort button[aria-pressed="true"] { background: var(--pink); color: var(--paper); }
+  .chips-sort { margin-top: -8px; }
+
+  /* ── les cartes ────────────────────────────────────────────────────────── */
+  .grid { display: grid; gap: 16px; grid-template-columns: repeat(4, 1fr); }
+  @media (max-width: 980px) { .grid { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 720px)  { .grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 460px)  { .grid { grid-template-columns: 1fr; } }
 
   .card {
-    display: flex; flex-direction: column;
-    background: var(--card);
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    overflow: hidden;
-    text-decoration: none;
-    color: inherit;
+    display: block; text-decoration: none; color: var(--ink);
+    border: var(--b) solid var(--ink); background: var(--paper);
+    box-shadow: var(--shadow);
   }
-  .card:hover, .card:focus-visible { background: var(--card-hi); border-color: #3A3A45; }
-
-  .card-art { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; background: #000; }
-  .card-noart { display: block; width: 100%; aspect-ratio: 1; background: var(--card-hi); }
-
-  .card-body { padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 2px; }
-
-  .card-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
-  .card-id { font: 13px var(--mono); color: var(--fg-3); }
-  .card-cls { font-size: 13px; font-weight: 700; color: var(--fg-2); }
-  /* Re-encrée : la seule autre couleur de la page. */
-  .card-cls.re { color: var(--hot); }
-
+  .card:hover { transform: translate(2px, 2px); box-shadow: 4px 4px 0 var(--ink); }
+  .card-art {
+    display: block; width: 100%; aspect-ratio: 1; object-fit: cover;
+    border-bottom: var(--b) solid var(--ink);
+  }
+  .card-noart {
+    display: block; width: 100%; aspect-ratio: 1; background: var(--paper-2);
+    border-bottom: var(--b) solid var(--ink);
+  }
+  .card-body { display: block; padding: 11px 13px 13px; }
+  .card-id {
+    display: block; font-size: 11.5px; font-weight: 800;
+    letter-spacing: 0.05em; text-transform: uppercase;
+  }
+  .card-id .re { color: var(--pink); }
   .card-price {
-    margin-top: 8px;
-    font-size: 26px; font-weight: 700; letter-spacing: -0.02em;
+    display: block; font-size: 26px; font-weight: 900;
+    letter-spacing: -0.04em; line-height: 1; margin: 3px 0 9px;
     font-variant-numeric: tabular-nums;
   }
-  .card-price small { display: block; margin-top: 1px; font-size: 13px; font-weight: 400; color: var(--fg-3); }
-
-  /* Ce que la machine rend. Vert — et le vert ne dit que ça. */
-  .card-earn { margin-top: 12px; font-size: 15px; color: var(--live); font-weight: 600; }
-  .card-earn small { display: block; font-size: 13px; font-weight: 400; color: var(--fg-2); }
-  /* Une dormante ne rend rien : sa carte n'a aucune couleur, et c'est
-     l'information elle-même. */
-  .card-earn.off { color: var(--fg-3); font-weight: 400; }
-  .card-earn.off small { color: var(--fg-3); }
-
-  .card-inside { margin-top: 10px; font-size: 13px; color: var(--fg-2); }
-
-  /* ── les filtres, en pastilles ────────────────────────────────────────────
-     Cinq menus déroulants sont devenus sept pastilles qu'on touche. */
-  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0 0; }
-  /* Le tri est une seconde question, pas une huitième classe : il se pose sur
-     sa propre ligne, plus discrètement. */
-  .chips-sort { margin-top: 10px; }
-  .chips-sort button { font-size: 13px; padding: 6px 13px; }
-  .chips button {
-    font: inherit; font-size: 14px; font-weight: 600;
-    padding: 8px 15px;
-    color: var(--fg-2); background: var(--card);
-    border: 1px solid var(--line); border-radius: 999px;
-    cursor: pointer;
+  .card-price small { display: block; font-size: 11.5px; font-weight: 600; color: var(--ink-2); letter-spacing: 0; margin-top: 3px; }
+  /* Lime : cette machine imprime. Une dormante n'en porte aucune trace, et
+     c'est l'information elle-même — aucune légende n'est nécessaire. */
+  .card-earn {
+    display: inline-block; border: var(--b) solid var(--ink); background: var(--lime);
+    padding: 3px 8px; font-size: 13px; font-weight: 900;
   }
-  .chips button:hover { color: var(--fg); }
-  .chips button[aria-pressed="true"] { color: var(--bg); background: var(--fg); border-color: var(--fg); }
+  .card-earn.off { background: var(--paper-2); color: var(--ink-2); }
+  .card-inside { display: block; margin-top: 9px; font-size: 12.5px; font-weight: 700; }
 
-  /* ── titres de section ────────────────────────────────────────────────── */
-  h2.sec {
-    margin: 42px 0 6px;
-    font-size: 22px; font-weight: 700; letter-spacing: -0.015em;
-  }
-  p.sub { margin: 0; color: var(--fg-2); font-size: 15px; max-width: 60ch; }
-
-  /* ── le champ d'adresse ──────────────────────────────────────────────── */
-  .ask { display: flex; gap: 10px; margin: 24px 0 0; flex-wrap: wrap; }
+  /* ── le champ d'adresse ────────────────────────────────────────────────── */
+  .ask { display: flex; gap: 11px; margin: 20px 0 0; flex-wrap: wrap; }
   .ask input {
-    flex: 1 1 260px; min-width: 0;
-    font: 16px var(--mono);
-    padding: 13px 15px;
-    color: var(--fg); background: var(--card);
-    border: 1px solid var(--line); border-radius: 10px;
+    flex: 1 1 260px; min-width: 0; font: 16px var(--mono);
+    padding: 12px 14px; color: var(--ink); background: var(--paper);
+    border: var(--b) solid var(--ink); box-shadow: inset 2px 2px 0 rgba(0,0,0,.07);
   }
-  .ask input::placeholder { color: var(--fg-3); }
+  .ask input::placeholder { color: var(--ink-3); }
   .ask button {
-    font: inherit; font-size: 15px; font-weight: 700;
-    padding: 13px 22px;
-    color: var(--bg); background: var(--fg);
-    border: 0; border-radius: 10px; cursor: pointer;
+    font: 900 15px var(--sans); text-transform: uppercase; letter-spacing: -0.005em;
+    padding: 12px 24px; cursor: pointer; color: var(--paper); background: var(--pink);
+    border: var(--b) solid var(--ink); box-shadow: var(--shadow-sm);
   }
+  .ask button:hover { transform: translate(1px, 1px); box-shadow: 3px 3px 0 var(--ink); }
 
-  /* ── prose ────────────────────────────────────────────────────────────── */
-  .prose { max-width: 66ch; }
-  .prose p { color: var(--fg-2); }
-  .prose b, .prose strong { color: var(--fg); font-weight: 600; }
-
-  /* ── les étapes ───────────────────────────────────────────────────────────
-     Cinq temps, dans l'ordre où ils arrivent à une machine. Le numéro porte
-     une vraie information ici : c'est une séquence, pas une décoration. */
-  .steps { display: grid; gap: 26px; margin-top: 24px; max-width: 62ch; }
-  .step { display: flex; gap: 18px; align-items: flex-start; }
+  /* ── les étapes ────────────────────────────────────────────────────────── */
+  .steps { display: grid; gap: 16px; margin: 18px 0 0; max-width: 74ch; }
+  .step {
+    display: flex; gap: 15px; align-items: flex-start;
+    border: var(--b) solid var(--ink); background: var(--paper);
+    box-shadow: var(--shadow-sm); padding: 15px 17px;
+  }
   .step-n {
-    flex: none;
-    width: 34px; height: 34px; border-radius: 999px;
+    flex: none; width: 32px; height: 32px;
     display: grid; place-items: center;
-    font-size: 15px; font-weight: 700;
-    color: var(--fg); background: var(--card-hi); border: 1px solid var(--line);
+    border: var(--b) solid var(--ink); background: var(--sun);
+    font-size: 15px; font-weight: 900;
   }
-  .step h3 { margin: 5px 0 5px; font-size: 17px; font-weight: 700; }
-  .step p { margin: 0; color: var(--fg-2); font-size: 15.5px; }
-  .step b { color: var(--fg); font-weight: 600; }
+  .step h4 { margin: 3px 0 4px; font-size: 17px; font-weight: 900; letter-spacing: -0.02em; }
+  .step p { margin: 0; font-size: 15.5px; font-weight: 500; color: var(--ink-2); }
+  .step b { color: var(--ink); font-weight: 800; }
 
-  .note { color: var(--fg-3); font-size: 14px; }
+  /* ── les barres du vote ────────────────────────────────────────────────── */
+  .vote { display: grid; gap: 9px; max-width: 640px; }
+  .vt { border: var(--b) solid var(--ink); background: var(--paper); padding: 9px 12px; }
+  .vt-hd { display: flex; justify-content: space-between; font-size: 14px; font-weight: 800; }
+  .vt-hd u { text-decoration: none; font-variant-numeric: tabular-nums; }
+  .vt-bar { height: 10px; border: var(--b) solid var(--ink); margin-top: 6px; background: var(--paper-2); }
+  .vt-bar i { display: block; height: 100%; background: var(--sky); }
+  .vt:first-child .vt-bar i { background: var(--lime); }
+
+  /* ── blocs de prose ────────────────────────────────────────────────────── */
+  .prose { max-width: 68ch; }
+  .prose p { font-weight: 500; color: var(--ink-2); }
+  .prose b { color: var(--ink); font-weight: 800; }
+
+  .note { font-size: 14px; font-weight: 600; color: var(--ink-2); }
   .banner {
-    display: none; margin: 18px 0 0; padding: 12px 16px;
-    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
-    color: var(--fg-2); font-size: 14px;
+    display: none; margin: 16px 0 0; padding: 11px 15px;
+    border: var(--b) solid var(--ink); background: var(--sun);
+    font-size: 14.5px; font-weight: 700;
   }
   .banner.on { display: block; }
 
-  footer { margin-top: 56px; padding-top: 22px; border-top: 1px solid var(--line); }
+  footer { margin-top: 46px; padding-top: 20px; border-top: var(--b) solid var(--ink); }
 
   [hidden] { display: none !important; }
   .sr-only {
     position: absolute; width: 1px; height: 1px; overflow: hidden;
     clip: rect(0 0 0 0); white-space: nowrap;
   }
+
+  /* Une ombre portée dure qui glisse au survol suffit ; rien d'autre ne bouge
+     sur cette page, et qui refuse le mouvement ne perd aucune information. */
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+    .card:hover, .chips button:hover, nav.nav a:hover, .ask button:hover { transform: none; }
+  }
 </style>
 
 <div class="wrap">
   <header>
-    <div class="brand">
-      <h1>RH MACHINES</h1>
-      <a class="x-link" href="https://x.com/Theroxat" target="_blank" rel="noopener" aria-label="Theroxat on X">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-      </a>
+    <div class="bar">
+      <h1>RH Machines</h1>
+      <span class="right">
+        <span class="tag">Unofficial</span>
+        <a class="x-link" href="https://x.com/Theroxat" target="_blank" rel="noopener" aria-label="Theroxat on X">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+        </a>
+      </span>
     </div>
-    <p class="brand-unof unof" style="margin:4px 0 0">Unofficial · an independent, read-only view</p>
 
     <nav class="nav" id="nav" role="tablist">
       <a href="#buy"   role="tab" data-tab="buy">Buy</a>
@@ -267,27 +289,43 @@
   <main>
     <!-- ═══ ACHETER ═══ -->
     <section id="pane-buy">
-      <p class="pulse" id="pulse"></p>
+      <div id="hero"></div>
+      <div class="stats" id="stats"></div>
+      <h3 class="sec" id="buy-title">Most back per dollar</h3>
+      <p class="sub" id="buy-sub"></p>
       <div id="chips"></div>
       <div class="grid" id="cards"></div>
-      <p class="note" id="more-note"></p>
+      <p class="note" id="more-note" style="margin-top:16px"></p>
     </section>
 
     <!-- ═══ CE QUE JE POSSÈDE ═══ -->
     <section id="pane-mine" hidden>
-      <h2 class="sec">What do you own?</h2>
-      <p class="sub">Paste an address. Nothing to sign, nothing to connect — this only reads.</p>
-      <form class="ask" id="ask">
-        <input id="addr" type="text" inputmode="latin" spellcheck="false"
-               placeholder="0x…" aria-label="Wallet address" autocomplete="off">
-        <button type="submit">Look it up</button>
-      </form>
+      <div class="hero">
+        <h2>What do you <mark>own</mark>?</h2>
+        <p>Paste an address. Nothing to sign, nothing to connect — this only reads.</p>
+        <form class="ask" id="ask">
+          <input id="addr" type="text" inputmode="latin" spellcheck="false"
+                 placeholder="0x…" aria-label="Wallet address" autocomplete="off">
+          <button type="submit">Look it up</button>
+        </form>
+      </div>
       <div id="mine-out"></div>
     </section>
 
-    <!-- ═══ COMPRENDRE ═══ -->
+    <!-- ═══ COMPRENDRE ═══
+         Cinq étapes, puis ce qui décide de l'argent, puis ce qui disparaît de
+         la circulation, puis le memepad, puis d'où viennent les chiffres. -->
     <section id="pane-learn" hidden>
-      <div id="learn-out"></div>
+      <div id="learn-steps"></div>
+      <h3 class="sec" style="margin-top:44px">The vote decides who gets bought</h3>
+      <p class="sub" id="vote-sub"></p>
+      <div class="vote" id="vote"></div>
+      <h3 class="sec" style="margin-top:44px">What leaves circulation</h3>
+      <div id="scarcity"></div>
+      <h3 class="sec" style="margin-top:44px">PRINTER.FUN</h3>
+      <div id="pad"></div>
+      <h3 class="sec" style="margin-top:44px">Where every number comes from</h3>
+      <div id="sources"></div>
     </section>
   </main>
 

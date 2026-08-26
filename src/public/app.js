@@ -83,41 +83,51 @@ export const esc = (s) => String(s).replace(/[&<>"]/g,
 /* ══ ACHETER ═══════════════════════════════════════════════════════════════ */
 
 /**
- * L'état du protocole, en une ligne.
+ * L'ouverture : une phrase, pas un tableau de bord.
  *
- * Dix encadrés disaient le prix du $PRINTER, celui de l'ETH, le coût de
- * l'encre, le floor, le volume, le compte de machines allumées, l'offre de
- * l'anvil, le pot, le bulletin et l'epoch. Trois de ces dix servaient à
- * décider quelque chose ; les sept autres étaient vrais et sans emploi.
+ * Dix encadrés se dressaient ici — prix du $PRINTER, de l'ETH, coût de l'encre,
+ * floor, volume, machines allumées, offre de l'anvil, pot, bulletin, epoch.
+ * Trois servaient à décider quelque chose.
  */
-export function pulseLine(d) {
-  if (!d) return "";
-  const bits = [];
-  if (d.totals?.inked) {
-    bits.push(`<span><b class="on">${fmtInt(d.totals.inked)}</b> machines are printing</span>`);
+export function heroHtml(d) {
+  if (!d?.pot?.usd) {
+    return `<div class="hero"><h2>Reading the chain…</h2>` +
+      `<p>The first sweep is still running. Nothing below is wrong — there is just nothing yet.</p></div>`;
   }
-  if (d.pot?.usd) {
-    bits.push(`<span><b>${fmtUsdShort(d.pot.usd)}</b> waiting to be shared out</span>`);
-  }
-  if (d.book?.listed) {
-    bits.push(`<span><b>${fmtInt(d.book.listed)}</b> for sale right now</span>`);
-  }
-  return bits.join("");
+  return `<div class="hero">` +
+    `<h2>Nobody has been paid <mark>yet</mark>.</h2>` +
+    `<p>${fmtUsdShort(d.pot.usd)} is sitting in the pot, and it buys real tokenised stock ` +
+    `the moment the vote closes — split across every Machine by weight.</p></div>`;
 }
 
+/** Quatre chiffres, et chacun porte sa couleur parce qu'il porte un rôle. */
+export function statsHtml(d) {
+  if (!d) return "";
+  const x1 = (d.rows ?? []).find((r) => r.classValue === 100);
+  const cheapest = x1?.inked?.floorEth && d.eth?.usd ? x1.inked.floorEth * d.eth.usd : null;
+  const cell = (cls, value, label) =>
+    `<div class="st ${cls}"><b>${value}</b><u>${label}</u></div>`;
+  return [
+    cell("st-live", fmtInt(d.totals?.inked ?? 0), "printing now"),
+    cell("st-pot", fmtUsdShort(d.pot?.usd ?? 0), "in the pot"),
+    cell("st-cost", d.ink?.activationTotalUsd ? fmtUsdRound(d.ink.activationTotalUsd) : "—", "to switch one on"),
+    cell("st-book", cheapest === null ? "—" : fmtUsdRound(cheapest), "cheapest way in"),
+  ].join("");
+}
+
+export const SORTS = Object.freeze([
+  { key: "back", label: "Best return" },
+  { key: "cheap", label: "Cheapest" },
+]);
+
 /**
- * Ce qu'on peut acheter, en cartes.
+ * Ce qu'on peut acheter.
  *
  * L'ordre est celui du retour : ce que la machine rend rapporté à ce qu'elle
  * coûte. Une dormante ne rend rien tant qu'on ne l'a pas allumée, donc son coût
  * porte l'allumage — sans quoi elle passerait devant à prix égal en ne
  * rapportant rien.
  */
-export const SORTS = Object.freeze([
-  { key: "back", label: "Best return" },
-  { key: "cheap", label: "Cheapest" },
-]);
-
 export function pickMachines(d, { klass = null, limit = 24, sort = "back" } = {}) {
   const eth = d?.eth?.usd;
   const light = d?.ink?.activationTotalUsd ?? 0;
@@ -129,10 +139,7 @@ export function pickMachines(d, { klass = null, limit = 24, sort = "back" } = {}
         const priceUsd = eth ? e.priceEth * eth : null;
         const cost = priceUsd === null ? null : priceUsd + (lit ? 0 : light);
         const back = (e.epochUsd ?? 0) + (e.holds?.usd ?? 0);
-        out.push({
-          ...e, lit, classLabel: r.classLabel, priceUsd, cost, back,
-          ratio: cost ? back / cost : 0,
-        });
+        out.push({ ...e, lit, classLabel: r.classLabel, priceUsd, cost, back, ratio: cost ? back / cost : 0 });
       }
     }
   }
@@ -146,39 +153,36 @@ export function pickMachines(d, { klass = null, limit = 24, sort = "back" } = {}
   return out.sort(by).slice(0, limit);
 }
 
-/** Une machine, une carte. Un seul geste possible : aller l'acheter. */
+/** Une machine, une carte, un seul geste : aller l'acheter. */
 export function cardHtml(m, { light = 0 } = {}) {
   const reinked = m.inkMult > 1.0001 && m.weight;
   const art = m.machine?.image
     ? `<img class="card-art" src="${esc(m.machine.image)}" alt="" loading="lazy">`
     : `<span class="card-noart"></span>`;
-
-  // Le vert ne dit qu'une chose : cette machine imprime. Une dormante n'en
-  // porte aucune trace, et c'est l'information elle-même.
+  // Lime : cette machine imprime. Une dormante n'en porte aucune trace, et
+  // c'est l'information elle-même.
   const earns = m.lit
-    ? `<span class="card-earn">${fmtUsd(m.epochUsd ?? 0)}<small>each drop</small></span>`
-    : `<span class="card-earn off">Not printing<small>${
-        light ? `${fmtUsdRound(light)} of $PRINTER to switch it on` : "needs ink first"
-      }</small></span>`;
+    ? `<span class="card-earn">${fmtUsd(m.epochUsd ?? 0)} a drop</span>`
+    : `<span class="card-earn off">${light ? `${fmtUsdRound(light)} to switch on` : "no ink"}</span>`;
+  const price = m.priceUsd === null || m.priceUsd === undefined
+    ? fmtEth(m.priceEth)
+    : fmtUsdRound(m.priceUsd);
 
   return `<a class="card" href="${itemUrl(m.tokenId)}" target="_blank" rel="noopener">` +
     art +
     `<span class="card-body">` +
-      `<span class="card-top">` +
-        `<span class="card-id">#${m.tokenId}</span>` +
-        `<span class="card-cls${reinked ? " re" : ""}">${esc(m.classLabel)}${
-          reinked ? ` · re-inked` : ""}</span>` +
-      `</span>` +
-      `<span class="card-price">${m.priceUsd === null ? fmtEth(m.priceEth) : fmtUsdRound(m.priceUsd)}` +
-        `<small>${fmtEth(m.priceEth)} ETH</small></span>` +
+      `<span class="card-id">#${m.tokenId} &middot; ${esc(m.classLabel ?? "")}` +
+        `${reinked ? ` <span class="re">re-inked</span>` : ""}</span>` +
+      `<span class="card-price">${price}` +
+        (m.priceEth ? `<small>${fmtEth(m.priceEth)} ETH</small>` : "") + `</span>` +
       earns +
       (m.holds?.usd ? `<span class="card-inside">carrying ${fmtUsd(m.holds.usd)} of stock</span>` : "") +
     `</span></a>`;
 }
 
-/** Les classes, en pastilles qu'on touche. Cinq menus déroulants tenaient ici. */
+/** Les classes en pastilles, et le tri sur sa propre ligne. */
 export function chipsHtml(d, active, sort = "back") {
-  const cls = `<button type="button" data-k="" aria-pressed="${active ? "false" : "true"}">Everything</button>` +
+  const cls = `<button type="button" data-k="" aria-pressed="${active ? "false" : "true"}">All</button>` +
     (d?.rows ?? [])
       .filter((r) => (r.inked?.listed ?? 0) + (r.dormant?.listed ?? 0) > 0)
       .map((r) => `<button type="button" data-k="${esc(r.classLabel)}" ` +
@@ -197,50 +201,54 @@ export const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 /**
  * Le portefeuille d'un visiteur.
  *
- * Le total d'abord, parce que c'est ce qu'on vient chercher, puis les machines
- * dans les mêmes cartes que la boutique — une machine se lit pareil qu'on la
- * possède ou qu'on la convoite.
+ * Le total d'abord, puis les machines dans les mêmes cartes que la boutique :
+ * une machine se lit pareil qu'on la possède ou qu'on la convoite.
  *
  * Un floor est un prix demandé, pas un prix obtenu. Le total a l'air d'un solde
- * bancaire et n'en est pas un : la page le dit sous le chiffre plutôt que de le
+ * bancaire et n'en est pas un — la page le dit sous le chiffre plutôt que de le
  * sous-entendre.
  */
 export function mineHtml(w, { light = 0 } = {}) {
   if (!w) return "";
-  if (w.pending) return `<p class="note" style="margin-top:24px">Reading the chain…</p>`;
-  if (w.error) return `<p class="note" style="margin-top:24px">${esc(w.error)}</p>`;
+  if (w.pending) return `<p class="note" style="margin-top:22px">Reading the chain…</p>`;
+  if (w.error) return `<p class="note" style="margin-top:22px">${esc(w.error)}</p>`;
   if (!w.machines?.length) {
-    return `<p class="note" style="margin-top:24px">That address holds no Machine.</p>`;
+    return `<p class="note" style="margin-top:22px">That address holds no Machine.</p>`;
   }
 
   const wo = w.worth;
-  const total = wo?.total
-    ? `<h2 class="sec" style="margin-top:34px">${fmtUsdRound(wo.total)}</h2>` +
-      `<p class="sub">` +
-      [
-        wo.machinesUsd ? `${fmtInt(w.machines.length)} machines at ${fmtUsdRound(wo.machinesUsd)}` : null,
-        wo.insideUsd ? `${fmtUsd(wo.insideUsd)} of stock inside them` : null,
-        wo.printerUsd ? `${fmtUsd(wo.printerUsd)} of $PRINTER` : null,
-      ].filter(Boolean).join(" · ") + `</p>` +
-      `<p class="note" style="margin-top:8px">Machines are counted at the cheapest asking ` +
-      `price for their class and state. That is what others are asking, not what you would ` +
-      `be paid — nobody is bidding it.</p>`
-    : "";
-
   const earning = w.machines.filter((m) => m.weight).length;
-  const line = `<p class="pulse" style="margin-top:22px">` +
-    (earning ? `<span><b class="on">${fmtInt(earning)}</b> of them printing</span>` : "") +
-    (w.cutUsd ? `<span><b>${fmtUsd(w.cutUsd)}</b> waiting for you in the pot</span>` : "") +
-    (w.advice?.best ? `<span>vote <b>${esc(w.advice.best.ticker)}</b></span>` : "") + `</p>`;
+  const stats = `<div class="stats" style="margin-top:24px">` +
+    (wo?.total ? `<div class="st st-pot"><b>${fmtUsdRound(wo.total)}</b><u>all of it, together</u></div>` : "") +
+    `<div class="st st-live"><b>${fmtInt(earning)}</b><u>of yours printing</u></div>` +
+    (w.cutUsd !== null && w.cutUsd !== undefined
+      ? `<div class="st st-cost"><b>${fmtUsd(w.cutUsd)}</b><u>waiting for you</u></div>` : "") +
+    (w.advice?.best
+      ? `<div class="st st-book"><b>${esc(w.advice.best.ticker)}</b><u>what to vote</u></div>` : "") +
+    `</div>`;
+
+  const parts = !wo?.total ? "" :
+    `<p class="note" style="margin:-12px 0 20px">` +
+    [
+      wo.machinesUsd ? `${fmtInt(w.machines.length)} machines at ${fmtUsdRound(wo.machinesUsd)}` : null,
+      wo.insideUsd ? `${fmtUsd(wo.insideUsd)} of stock inside them` : null,
+      wo.printerUsd ? `${fmtUsd(wo.printerUsd)} of $PRINTER` : null,
+    ].filter(Boolean).join(" &middot; ") +
+    `. Machines are counted at the cheapest asking price for their class and state — ` +
+    `what others are asking, not what you would be paid.</p>`;
 
   const cards = w.machines.map((m) => cardHtml({
-    tokenId: m.tokenId, machine: { image: m.image }, classLabel: m.desk ?? "",
-    lit: Boolean(m.weight), epochUsd: m.epochUsd, holds: m.holds,
-    priceEth: null, priceUsd: wo?.lines?.find((l) => l.tokenId === m.tokenId)?.machineUsd ?? null,
-    inkMult: null, weight: m.weight,
+    tokenId: m.tokenId,
+    machine: { image: m.image },
+    classLabel: m.desk ?? "",
+    lit: Boolean(m.weight),
+    epochUsd: m.epochUsd,
+    holds: m.holds,
+    priceEth: null,
+    priceUsd: wo?.lines?.find((l) => l.tokenId === m.tokenId)?.machineUsd ?? null,
   }, { light })).join("");
 
-  return total + line + `<div class="grid">${cards}</div>`;
+  return stats + parts + `<div class="grid">${cards}</div>`;
 }
 
 /* ══ COMPRENDRE ════════════════════════════════════════════════════════════ */
@@ -248,47 +256,156 @@ export function mineHtml(w, { light = 0 } = {}) {
 /**
  * Comment ça marche, en cinq temps.
  *
- * L'ancienne page tenait en dix blocs de prose serrée sur trois colonnes, avec
- * une table de correspondance des couvre-chefs et un tableau des sources. Elle
- * était juste et personne ne la lisait.
- *
- * Ici : cinq étapes, dans l'ordre où elles arrivent à une machine, une idée par
- * étape. Ce qui reste — le vote, ce qui brûle, le memepad — se lit plus bas
- * pour qui veut.
+ * L'ancienne page tenait en dix blocs de prose serrée sur trois colonnes. Elle
+ * était juste et personne ne la lisait. Ici : cinq étapes, dans l'ordre où
+ * elles arrivent à une machine, une idée par étape. Le numéro porte une vraie
+ * information — c'est une séquence, pas une décoration.
  */
-export function learnHtml(d) {
+export function stepsHtml(d) {
   const activation = d?.ink?.activationTotalUsd;
   const steps = [
     ["You buy a Machine",
-     `Ten thousand exist. Two things about each are sealed forever: its <b>class</b> — x1 up ` +
-     `to x10 — and its <b>desk</b>, one of sixteen, which decides which stock it earns double on.`],
+     `Ten thousand exist. Two things about each are sealed forever: its <b>class</b> — x1 up to ` +
+     `x10 — and its <b>desk</b>, one of sixteen, which decides which stock it earns double on.`],
     ["You switch it on",
      `A Machine with no ink earns nothing and votes on nothing. Burning <b>5,000 $PRINTER</b>` +
      (activation ? ` — about ${fmtUsdRound(activation)} today` : "") +
      ` switches it on. That $PRINTER is destroyed and never comes back.`],
     ["It starts earning at the next drop",
-     `A Machine lit during an epoch takes no part in the pot that is already waiting. ` +
-     `It counts from the following one.`],
+     `A Machine lit during an epoch takes no part in the pot already waiting. It counts from the ` +
+     `following one — so buying and lighting today does not put you in this round.`],
     ["The protocol collects fees and buys real stock",
-     `Every sale, every trade, every fusion pays into one pot. When the vote closes, the pot ` +
-     `buys tokenised shares — NVDA, GME, SPCX — and they land <b>inside each Machine's own ` +
-     `wallet</b>, split by weight.`],
+     `Every sale, every trade, every fusion pays into one pot. When the vote closes it buys ` +
+     `tokenised shares — NVDA, GME, SPCX — and they land <b>inside each Machine's own wallet</b>, ` +
+     `split by weight.`],
     ["Selling the Machine sells what is inside it",
-     `The stock belongs to the token, not to you. Sell the Machine and its contents go with ` +
-     `it, unless you withdraw first — which is why every card here shows what it is carrying.`],
+     `The stock belongs to the token, not to you. Sell the Machine and its contents go with it, ` +
+     `unless you withdraw first — which is why every card here shows what it is carrying.`],
   ];
-
-  return `<h2 class="sec" style="margin-top:30px">How it works</h2>` +
-    `<div class="steps">` + steps.map(([t, b], i) =>
-      `<div class="step"><span class="step-n">${i + 1}</span>` +
-      `<div><h3>${esc(t)}</h3><p>${b}</p></div></div>`).join("") + `</div>`;
+  return `<div class="steps">` + steps.map(([t, b], i) =>
+    `<div class="step"><span class="step-n">${i + 1}</span>` +
+    `<div><h4>${esc(t)}</h4><p>${b}</p></div></div>`).join("") + `</div>`;
 }
 
-/* ══ CE QUE LA PAGE DIT QUAND ELLE NE SAIT PAS ═════════════════════════════ */
+/** Le dépouillement, desk par desk. C'est lui qui décide de la taille des parts. */
+export function voteHtml(vote, epoch) {
+  if (!vote) return `<p class="note">The ballot could not be read.</p>`;
+  if (!vote.opened) {
+    return `<p class="note">No ballot has opened for epoch ${esc(String(epoch ?? "—"))} yet. ` +
+      `Until one does, nothing is bought and the pot rolls forward.</p>`;
+  }
+  const voted = (vote.desks ?? []).filter((x) => x.votedWeight > 0);
+  if (!voted.length) return `<p class="note">The ballot is open and not one Machine has voted.</p>`;
+  const top = voted[0].votedWeight || 1;
+  return voted.slice(0, 8).map((dk) =>
+    `<div class="vt"><div class="vt-hd"><span>${esc(dk.ticker ?? dk.sector ?? `desk ${dk.index}`)}</span>` +
+    `<u>${fmtRatio(dk.share ?? 0)}</u></div>` +
+    `<div class="vt-bar"><i style="width:${Math.round((dk.votedWeight / top) * 100)}%"></i></div></div>`).join("");
+}
 
 /**
- * Une donnée absente et une donnée nulle ne sont pas la même chose, et les
- * confondre est la façon dont un tableau de bord ment sans bruit.
+ * Ce qui quitte la circulation.
+ *
+ * Deux disparitions, et elles ne sont pas de même nature. Le $PRINTER brûle :
+ * détruit, irrécupérable. Les machines, elles, partent au coffre du Proton et y
+ * restent — `totalSupply` du NFT ne bouge pas, et le coffre a un propriétaire
+ * qui peut les ressortir. La page ne doit jamais laisser lire l'un pour
+ * l'autre : une machine brûlée réduit l'offre pour toujours, une machine au
+ * coffre peut revenir demain.
+ */
+export function scarcityHtml(sc) {
+  if (!sc) return `<p class="note">Not read yet — walking the chain's logs takes a hundred requests.</p>`;
+  const v = sc.vault, b = sc.burn, o = sc.odds, p = sc.proton;
+  const st = (cls, val, label) => `<div class="st ${cls}"><b>${val}</b><u>${label}</u></div>`;
+
+  const vault = !v ? "" :
+    `<div class="stats">` +
+    st("st-book", fmtInt(v.held), "machines in the vault") +
+    (v.dormant === null ? "" : st("st-book", fmtInt(v.dormant), "of them dormant")) +
+    st("st-cost", b?.supply ? fmtInt(Math.round(b.supply)) : "—", "$PRINTER left") +
+    st("st-cost", b?.burnedShare ? fmtRatio(b.burnedShare) : "—", "of the supply burned") +
+    `</div>` +
+    `<div class="prose"><p>Fusing a Machine into another sends the sacrifice to a vault. ` +
+    `It is <b>not burned</b> — the collection is still ten thousand strong — but it leaves ` +
+    `your wallet for good, before the dice even roll. The vault is owned by a single key, not ` +
+    `a multi-signature wallet, and it can send any Machine it holds to any address. ` +
+    `${p?.released ? `${fmtInt(p.released)} have come back out.` : "Nothing has ever come back out so far."} ` +
+    `Locked is not burned, and this page will not call it that.</p>` +
+    (b?.ink === null || b?.ink === undefined ? "" :
+      `<p>Of the <b>${fmtInt(b.minted)}</b> $PRINTER ever minted, ${fmtInt(Math.round(b.ink))} ` +
+      `burned as ink switching Machines on, and ${fmtInt(Math.round(b.other))} burned elsewhere` +
+      `${b.proton ? ` — ${fmtInt(Math.round(b.proton))} of it by the Proton` : ""}.</p>`) +
+    (!o ? "" :
+      `<p>The Proton claims <b>${fmtRatio(1 - o.claimedFailRate)}</b> success. So far ` +
+      `<b>${fmtRatio(o.failRate)}</b> of ${fmtInt(o.done)} rolls have failed, against ` +
+      `${o.expected.toFixed(0)} expected.` +
+      (o.oneIn ? ` That is not proof of anything: on an honest roll a run this bad turns up about ` +
+        `once in ${fmtInt(o.oneIn)}. Worth watching, not yet worth believing.` : ` That is at or below what was promised.`) +
+      `</p>`) + `</div>`;
+  return vault;
+}
+
+/**
+ * PRINTER.FUN, le memepad du même écosystème.
+ *
+ * Lu sur les deux factories, pas sur le tableau du site officiel : celui-ci
+ * annonce zéro volume horaire dans le même document que vingt-cinq échanges
+ * horodatés.
+ */
+export function padHtml(pad) {
+  if (!pad) return `<p class="note">Not read yet.</p>`;
+  const st = (cls, val, label) => `<div class="st ${cls}"><b>${val}</b><u>${label}</u></div>`;
+  const grads = (pad.coins ?? []).filter((c) => c.graduated);
+  return `<div class="stats">` +
+    st("st-book", fmtInt(pad.launched), "coins launched") +
+    st("st-live", fmtInt(pad.graduated), "graduated") +
+    st("st-book", fmtInt(pad.untouched), "never bought") +
+    st("st-cost", pad.lockedUsd === null ? "—" : fmtUsdShort(pad.lockedUsd), "in the curves") +
+    `</div>` +
+    `<div class="prose"><p>Launch a memecoin paired against a tokenised Robinhood stock and trade ` +
+    `it on a bonding curve priced in that stock. <b>1% of every trade</b> buys back and burns ` +
+    `$PRINTER. Fill the curve and the coin graduates into a real pool.` +
+    (pad.vol24hUsd ? ` The ${fmtInt(pad.graduated)} that graduated traded ` +
+      `<b>${fmtUsdShort(pad.vol24hUsd)}</b> between them in the last 24 hours.` : "") +
+    ` Read from the two factories, not from the pad's own board.</p></div>` +
+    (!grads.length ? "" : `<div class="grid" style="margin-top:16px">` + grads.map((c) =>
+      `<a class="card" href="https://www.printer.fun/coin/${esc(c.token)}" target="_blank" rel="noopener">` +
+      `<span class="card-body"><span class="card-id">${esc(c.symbol)} &middot; ${esc(c.baseSymbol)}</span>` +
+      `<span class="card-price">${c.pool ? fmtUsdShort(c.pool.poolUsd) : "—"}<small>in its pool</small></span>` +
+      `<span class="card-earn">${c.pool ? fmtUsdShort(c.pool.vol24hUsd) : "—"} in 24h</span>` +
+      `</span></a>`).join("") + `</div>`);
+}
+
+/**
+ * D'où vient chaque chiffre.
+ *
+ * Le tableau de bord reproche au terminal officiel de ne pas cadrer ses
+ * sources ; il ne peut pas s'en dispenser. Le point le plus facile à taire est
+ * le plus important : les prix demandés, sujet même du site, ne viennent pas de
+ * la chaîne.
+ */
+export function sourcesHtml(sources, kinds) {
+  if (!sources || !kinds) return "";
+  const block = (kind) => {
+    const rows = sources.filter((s) => s.kind === kind);
+    if (!rows.length) return "";
+    return `<div class="step" style="display:block">` +
+      `<h4>${esc(kinds[kind].label)}</h4>` +
+      `<p style="margin-bottom:9px">${esc(kinds[kind].blurb)}</p>` +
+      `<p style="margin:0;font-size:14px">${rows.map((r) =>
+        `<b>${esc(r.what)}</b> — ${esc(r.from)}`).join("<br>")}</p></div>`;
+  };
+  return `<div class="steps">${block("chain")}${block("api")}${block("derived")}</div>` +
+    `<p class="note" style="margin-top:14px;max-width:68ch">A price in dollars cannot come from ` +
+    `the chain — it knows a pool's reserves, never a rate. Neither can an order book: OpenSea ` +
+    `orders are signed off-chain and only touch the chain when someone buys. Those are limits, ` +
+    `not shortcuts.</p>`;
+}
+
+/**
+ * Ce que la page dit quand elle ne sait pas. Une donnée absente et une donnée
+ * nulle ne sont pas la même chose, et les confondre est la façon dont un
+ * tableau de bord ment sans bruit.
  */
 export function bannerMessage(v) {
   if (!v?.data) return "Warming up — the first read of the chain is still running.";
@@ -316,6 +433,7 @@ if (typeof document !== "undefined") {
   let klass = null;
   let sort = "back";
   let mine = null;
+  let learnPainted = false;
 
   const show = (name) => {
     const want = TABS.includes(name) ? name : (MOVED[name] ?? TABS[0]);
@@ -336,13 +454,14 @@ if (typeof document !== "undefined") {
     $("cards").innerHTML = picked.length
       ? picked.map((m) => cardHtml(m, { light })).join("")
       : `<p class="note">Nothing listed in that class right now.</p>`;
+    $("buy-title").textContent = sort === "cheap" ? "Cheapest first" : "Most back per dollar";
+    $("buy-sub").textContent = sort === "cheap"
+      ? "What costs least to get in. Dormant ones are cheaper because they earn nothing yet."
+      : "What each Machine returns — its share of the pot, plus the stock already sitting in it — against what it costs.";
     const total = (data.rows ?? []).reduce((a, r) =>
       a + (r.inked?.listed ?? 0) + (r.dormant?.listed ?? 0), 0);
     $("more-note").textContent = picked.length && total > picked.length
-      ? (sort === "cheap"
-          ? `The ${picked.length} cheapest of ${total} for sale.`
-          : `The ${picked.length} that give the most back per dollar, of ${total} for sale.`)
-      : "";
+      ? `Showing ${picked.length} of ${total} for sale.` : "";
   };
 
   $("chips").addEventListener("click", (e) => {
@@ -364,8 +483,7 @@ if (typeof document !== "undefined") {
     mine = { pending: true };
     $("mine-out").innerHTML = mineHtml(mine);
     try {
-      const res = await fetch(`/api/wallet?address=${encodeURIComponent(value)}`);
-      mine = await res.json();
+      mine = await (await fetch(`/api/wallet?address=${encodeURIComponent(value)}`)).json();
     } catch {
       mine = { error: "Could not reach the service. Try again in a moment." };
     }
@@ -377,8 +495,31 @@ if (typeof document !== "undefined") {
     lookup($("addr").value.trim());
   });
 
+  // Le pad et la rareté vivent sur leurs propres routes et leur propre cadence :
+  // cent requêtes de journaux n'ont pas à repartir toutes les quinze secondes.
+  let extrasAt = 0;
+  const loadExtras = async (force = false) => {
+    if (!force && Date.now() - extrasAt < 300000) return;
+    extrasAt = Date.now();
+    for (const [id, path, render] of [
+      ["pad", "/api/pad", padHtml],
+      ["scarcity", "/api/scarcity", scarcityHtml],
+    ]) {
+      try {
+        const res = await fetch(path);
+        $(id).innerHTML = render(res.ok ? await res.json() : null);
+      } catch {
+        extrasAt = 0;
+      }
+    }
+  };
+
   let tab = show((location.hash || "").slice(1));
-  addEventListener("hashchange", () => { tab = show((location.hash || "").slice(1)); });
+  if (tab === "learn") loadExtras(true);
+  addEventListener("hashchange", () => {
+    tab = show((location.hash || "").slice(1));
+    if (tab === "learn") loadExtras();
+  });
 
   const refresh = async () => {
     let v;
@@ -396,9 +537,19 @@ if (typeof document !== "undefined") {
 
     setContract(v.data.collection?.contract);
     data = v.data;
-    $("pulse").innerHTML = pulseLine(data);
+    $("hero").innerHTML = heroHtml(data);
+    $("stats").innerHTML = statsHtml(data);
     paintBuy();
-    if (!$("learn-out").innerHTML) $("learn-out").innerHTML = learnHtml(data);
+    $("vote").innerHTML = voteHtml(data.vote, data.protocol?.epoch);
+    $("vote-sub").textContent =
+      "Every Machine votes with its weight, and the pot is cut between the desks in proportion " +
+      "to what they drew. A Machine counts twice on the slice bought for its own desk.";
+    // Ce qui ne bouge pas se dessine une fois.
+    if (!learnPainted) {
+      $("learn-steps").innerHTML = stepsHtml(data);
+      if (data.sources) $("sources").innerHTML = sourcesHtml(data.sources.list, data.sources.kinds);
+      learnPainted = true;
+    }
   };
 
   refresh();
