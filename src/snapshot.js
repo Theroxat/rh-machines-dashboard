@@ -27,9 +27,39 @@ export function burnHeadline(protocol) {
   };
 }
 
+/**
+ * Combien de machines circulent encore.
+ *
+ * Dix mille ont été frappées et dix mille existent toujours : rien n'est
+ * détruit, `totalSupply` ne bouge pas. Mais le coffre du Proton en garde — une
+ * de plus à chaque fusion — et une a été envoyée à l'adresse morte. Ces
+ * machines-là ne peuvent plus être achetées, ce qui n'est pas la même chose
+ * qu'être brûlées : le coffre a un propriétaire qui peut les en ressortir.
+ *
+ * Rend `null` si la lecture a échoué. Sans elle on annonce le total frappé, ce
+ * qui est vrai, plutôt qu'un « en circulation » qu'on n'a pas mesuré.
+ */
+export function fleetHeadline(off) {
+  const minted = TOTAL_MACHINES;
+  const vault = off?.vault ?? null;
+  const dead = off?.dead ?? null;
+  if (vault === null && dead === null) return null;
+  const gone = (vault ?? 0) + (dead ?? 0);
+  return {
+    minted,
+    vault,
+    dead,
+    // Le coffre est révocable, l'adresse morte ne l'est pas. La page a le droit
+    // de les additionner pour dire « pas achetable », jamais pour dire « perdu ».
+    circulating: minted - gone,
+    share: gone / minted,
+  };
+}
+
 export function composeSnapshot({
   grid, printer, eth, protocol, stats, book, inkMeta, meta, legend, ink, weights, anvil,
   deskIndex, vote, potUsd, sectorWeight, tickers, holdings, stockPrices, ownerOf, now,
+  offCirculation,
 }) {
   const activationPrinter = protocol?.activationInk
     ? Number(BigInt(protocol.activationInk) / 10n ** 15n) / 1000
@@ -248,6 +278,7 @@ export function composeSnapshot({
     // départ est scellée à 200 millions : la part brûlée est donc une
     // soustraction, pas une estimation.
     burn: burnHeadline(protocol),
+    fleet: fleetHeadline(offCirculation),
     // Le scrutin décide de la taille des parts du pot, donc du coefficient qui
     // s'applique par desk. Illisible, il vaut null : la page dira qu'elle ne
     // sait pas plutôt que d'annoncer seize parts égales, qu'elles ne sont pas.

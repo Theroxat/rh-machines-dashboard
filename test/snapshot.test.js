@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { composeSnapshot, burnHeadline } from "../src/snapshot.js";
+import { composeSnapshot, burnHeadline, fleetHeadline } from "../src/snapshot.js";
 
 const base = {
   grid: {
@@ -381,4 +381,29 @@ test("the whole snapshot survives being turned into JSON", () => {
     if (v && typeof v === "object") for (const [k, x] of Object.entries(v)) walk(x, `${path}.${k}`);
   };
   walk(snap);
+});
+
+/* ── ce qui ne circule plus ────────────────────────────────────────────────
+   Le coffre du Proton avale une machine à chaque fusion, et `totalSupply` la
+   compte encore. Elles ne sont pas détruites — le coffre peut les ressortir —
+   mais elles ne sont plus achetables, et c'est le chiffre qui intéresse. */
+test("what the vault holds is out of circulation without being destroyed", () => {
+  const f = fleetHeadline({ vault: 255, dead: 1 });
+  assert.equal(f.minted, 10000);
+  assert.equal(f.circulating, 9744);
+  assert.equal(f.vault, 255);
+  assert.equal(f.dead, 1);
+});
+
+test("an empty vault leaves the whole fleet in circulation", () => {
+  assert.equal(fleetHeadline({ vault: 0, dead: 0 }).circulating, 10000);
+});
+
+// Une lecture ratée n'est pas un coffre vide : annoncer dix mille en
+// circulation quand on n'a rien lu serait une affirmation qu'on n'a pas mesurée.
+test("an unread vault yields no count rather than a full fleet", () => {
+  assert.equal(fleetHeadline({ vault: null, dead: null }), null);
+  assert.equal(fleetHeadline(null), null);
+  // Une seule des deux lisible reste exploitable : l'autre vaut zéro connu.
+  assert.equal(fleetHeadline({ vault: 255, dead: null }).circulating, 9745);
 });

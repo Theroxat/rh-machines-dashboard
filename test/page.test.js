@@ -22,6 +22,7 @@ const DATA = {
   book: { listed: 660 },
   collection: { machines: 10000 },
   burn: { minted: 200000000, supply: 155000000, burned: 45000000, share: 0.225, ink: 43285199 },
+  fleet: { minted: 10000, vault: 255, dead: 1, circulating: 9744, share: 0.0256 },
   protocol: { epoch: 4 },
   rows: [
     { classValue: 100, classLabel: "x1",
@@ -86,7 +87,9 @@ test("every ink density clears the contrast threshold on paper", () => {
    remonte jamais : la part du jeton déjà détruite. */
 test("the page opens on the fleet and on what has been burned for good", () => {
   const html = heroHtml(DATA);
-  assert.match(html, /10,000 Machines\. <mark>22\.5%<\/mark> of the \$PRINTER already burned/);
+  // Le nombre qui compte n'est pas celui qui a été frappé, c'est celui qu'on
+  // peut encore acheter : le coffre du Proton en avale une à chaque fusion.
+  assert.match(html, /9,744 Machines still out there\. <mark>22\.5%<\/mark> of the \$PRINTER already burned/);
   assert.match(html, /45,000,000 of the 200,000,000 ever minted are gone for good/);
   assert.match(html, /43,285,199 of it as ink/);
   assert.match(html, /there is no way to mint more/);
@@ -98,20 +101,47 @@ test("the page opens on the fleet and on what has been burned for good", () => {
 test("the headline cannot be read as ten thousand Machines burned", () => {
   const html = heroHtml(DATA);
   // Le point sépare les deux affirmations ; une virgule les enchaînait.
-  assert.match(html, /Machines\. <mark>/);
+  assert.match(html, /out there\. <mark>/);
   assert.doesNotMatch(html, /Machines, and <mark>/);
-  assert.match(html, /Every Machine ever minted still exists — none has ever been destroyed/);
+  assert.match(html, /none has ever been destroyed/);
+});
+
+/* ── hors circulation n'est pas détruite ───────────────────────────────────
+   Le coffre du Proton a un propriétaire qui peut ressortir ce qu'il garde ;
+   l'adresse morte, non. La page compte les deux séparément plutôt que de les
+   fondre dans une perte, parce que la différence décide de ce qu'un floor
+   veut dire. */
+test("machines out of circulation are counted apart from machines destroyed", () => {
+  const html = heroHtml(DATA);
+  assert.match(html, /10,000 were minted and none has ever been destroyed/);
+  assert.match(html, /255 sit in the Proton's vault, which can send them back out/);
+  assert.match(html, /1 went to a dead address and cannot/);
+});
+
+test("with nothing in the vault the page says the whole fleet is still out there", () => {
+  const html = heroHtml({ ...DATA, fleet: { minted: 10000, vault: 0, dead: 0, circulating: 10000, share: 0 } });
+  assert.match(html, /All 10,000 ever minted are still in circulation/);
+  assert.doesNotMatch(html, /vault/);
+});
+
+// Sans la lecture, on annonce ce qui a été frappé — c'est vrai — plutôt qu'un
+// « en circulation » qu'on n'a pas mesuré.
+test("with no vault reading, the minted count is used and nothing is claimed about it", () => {
+  const html = heroHtml({ ...DATA, fleet: null, collection: { machines: 10000 } });
+  assert.match(html, /10,000 Machines\. <mark>/);
+  assert.doesNotMatch(html, /still out there/);
+  assert.doesNotMatch(html, /vault/);
 });
 
 test("with no supply read it still says no Machine was ever destroyed", () => {
-  assert.match(heroHtml({ ...DATA, burn: null }), /Every Machine ever minted still exists/);
+  assert.match(heroHtml({ ...DATA, burn: null }), /none has ever been destroyed/);
 });
 
 // Une part manquante n'est pas une part nulle : sans l'offre lue on annonce ce
 // qu'on sait, et rien de plus.
 test("with no supply read, no burn share is invented", () => {
   const html = heroHtml({ ...DATA, burn: null });
-  assert.match(html, /10,000 Machines, and a \$PRINTER supply that only ever falls/);
+  assert.match(html, /9,744 Machines still out there, and a \$PRINTER supply that only ever falls/);
   assert.doesNotMatch(html, /%<\/mark>/);
   assert.doesNotMatch(html, /gone for good/);
 });
@@ -292,6 +322,21 @@ test("a Machine in the vault is never called burned", () => {
   assert.match(html, /Locked is not burned, and this page will not call it that/);
   assert.match(html, /owned by a single key, not a multi-signature wallet/);
   assert.match(html, /Nothing has ever come back out so far/);
+});
+
+// Le protocole annonce que le coffre allume ce qu'il garde. Le compte des
+// allumées n'a pas bougé pendant que le coffre passait de 178 à 255 : ce n'est
+// pas « pas encore », c'est « pas du tout ».
+test("the page checks the vault against what the protocol says it does", () => {
+  const html = scarcityHtml(SC);
+  assert.match(html, /the vault activates what it holds and shares the stock back/);
+  assert.match(html, /<b>172 of the 178 are dormant<\/b>/);
+  assert.match(html, /has not moved while the vault filled up/);
+});
+
+test("a vault whose machines all run makes no such claim", () => {
+  const html = scarcityHtml({ ...SC, vault: { ...SC.vault, dormant: 0, awake: 178 } });
+  assert.doesNotMatch(html, /are dormant/);
 });
 
 test("a Machine taken back out of the vault is reported", () => {

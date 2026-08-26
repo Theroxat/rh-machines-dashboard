@@ -95,27 +95,40 @@ export function heroHtml(d, active = null) {
       `<p>The first sweep is still running. Nothing below is wrong — there is just nothing yet.</p></div>`;
   }
 
-  const total = d.collection?.machines ?? 10000;
+  const f = d.fleet;
   const b = d.burn;
+  // Le nombre qui compte n'est pas celui qui a été frappé, c'est celui qu'on
+  // peut encore acheter. Le coffre du Proton en avale une à chaque fusion.
+  const total = f?.circulating ?? d.collection?.machines ?? 10000;
   // La combustion est le titre. Sans l'offre lue, on ne l'invente pas : on
   // annonce ce qu'on sait — le nombre de machines — et rien de plus.
   // Le point après « Machines » n'est pas un détail de ponctuation. Écrit
   // « 10,000 Machines, and 22.5% of the $PRINTER already burned », le dernier
   // mot se rattache aussi au premier membre et la phrase annonce dix mille
   // machines brûlées. Il n'en existe aucune : `totalSupply` n'a jamais bougé.
+  const noun = f ? "Machines still out there" : "Machines";
   const head = b
-    ? `<h2>${fmtInt(total)} Machines. <mark>${fmtRatio(b.share)}</mark> of the ` +
+    ? `<h2>${fmtInt(total)} ${noun}. <mark>${fmtRatio(b.share)}</mark> of the ` +
       `$PRINTER already burned.</h2>`
-    : `<h2>${fmtInt(total)} Machines, and a $PRINTER supply that only ever falls.</h2>`;
+    : `<h2>${fmtInt(total)} ${noun}, and a $PRINTER supply that only ever falls.</h2>`;
+
+  // « Hors circulation » n'est pas « détruite » : le coffre du Proton a un
+  // propriétaire qui peut ressortir ce qu'il garde. La phrase compte les deux
+  // séparément plutôt que de les fondre dans une perte.
+  const gone = !f ? "" :
+    (f.vault
+      ? ` ${fmtInt(f.minted)} were minted and none has ever been destroyed — ` +
+        `${fmtInt(f.vault)} sit in the Proton's vault, which can send them back out` +
+        (f.dead ? `, and ${fmtInt(f.dead)} went to a dead address and cannot` : "") + `.`
+      : ` All ${fmtInt(f.minted)} ever minted are still in circulation.`);
 
   const said = b
-    ? `<p>Every Machine ever minted still exists — none has ever been destroyed. ` +
-      `The $PRINTER is the part that burns: ${fmtInt(Math.round(b.burned))} of the ` +
+    ? `<p>The $PRINTER is the part that burns: ${fmtInt(Math.round(b.burned))} of the ` +
       `${fmtInt(b.minted)} ever minted are gone for good` +
       (b.ink ? `, ${fmtInt(Math.round(b.ink))} of it as ink to switch Machines on` : "") +
-      `, and there is no way to mint more.</p>`
-    : `<p>Every Machine ever minted still exists. Burning $PRINTER is how one is switched on, ` +
-      `and none of that $PRINTER ever comes back.</p>`;
+      `, and there is no way to mint more.${gone}</p>`
+    : `<p>Burning $PRINTER is how a Machine is switched on, and none of it ever ` +
+      `comes back.${gone}</p>`;
 
   return `<div class="hero">` + head + said + floorsHtml(d, active) + `</div>`;
 }
@@ -453,6 +466,15 @@ export function scarcityHtml(sc) {
     `a multi-signature wallet, and it can send any Machine it holds to any address. ` +
     `${p?.released ? `${fmtInt(p.released)} have come back out.` : "Nothing has ever come back out so far."} ` +
     `Locked is not burned, and this page will not call it that.</p>` +
+    // Le protocole annonce que le coffre allume ce qu'il garde et en partage
+    // les revenus. Le compte des allumées n'a pas bougé pendant que le coffre
+    // grossissait de moitié : ce n'est pas « pas encore », c'est « pas du tout,
+    // et l'écart se creuse ».
+    (v.dormant
+      ? `<p>The protocol says the vault activates what it holds and shares the stock back to ` +
+        `the fleet. <b>${fmtInt(v.dormant)} of the ${fmtInt(v.held)} are dormant</b> — they earn ` +
+        `nothing, for anyone. The number that are lit has not moved while the vault filled up.</p>`
+      : "") +
     (b?.ink === null || b?.ink === undefined ? "" :
       `<p>Of the <b>${fmtInt(b.minted)}</b> $PRINTER ever minted, ${fmtInt(Math.round(b.ink))} ` +
       `burned as ink switching Machines on, and ${fmtInt(Math.round(b.other))} burned elsewhere` +

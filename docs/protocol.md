@@ -761,3 +761,58 @@ fait échouer la suite, pour que la page ne nomme rien qu'elle n'interroge.
 
 La documentation ne peut donc pas dériver du code sans que quelqu'un s'en
 aperçoive.
+
+---
+
+## Recoupement du Flywheel (2026-08-26)
+
+Leur page Flywheel, reprise ligne par ligne contre la chaîne.
+
+### Ce qui est exact
+
+**255 machines fusionnées** — vérifié, `balanceOf` du coffre rend exactement 255.
+
+### Ce qui est en retard
+
+| leur affichage | la chaîne | écart |
+|---|---|---|
+| « 21.2% gone » | **22,47%** | 2 540 448 jetons |
+| « 7 458 machines earning » | **7 507** | 49 machines |
+
+Le 21,2% est le même chiffre figé que le 2026-08-25 : il n'a pas bougé d'un
+dixième pendant que 2,5 millions de $PRINTER brûlaient. Leur propre page Burn
+affiche le bon.
+
+### Ce qui ne se produit pas
+
+> *« the Factory activates them & shares their stock with the fleet »*
+
+**6 machines allumées sur 255. 249 dorment.**
+
+Ce n'est plus « pas encore » : le coffre est passé de 178 à 255 en deux jours et
+le nombre d'allumées **n'a pas bougé d'une seule**. Les six qui tournent sont
+celles qui étaient déjà actives au moment du sacrifice.
+
+### Le pot : $59 210 contre $35 467
+
+Leur « STOCK POT · buys real tokenized equities every epoch ». Localisé :
+
+| poste | montant | ce que c'est |
+|---|---|---|
+| SWAPPER, en USDG | **$35 467** | prêt à acheter des actions — **notre pot** |
+| VAULT, en $PRINTER | $11 549 | le fonds de roulement de l'anvil |
+| pad factory B | $7 692 | les réserves des courbes du memepad |
+| pad treasury | $819 | frais du pad non convertis |
+| divers | $305 | |
+| **localisé** | **$55 832** | |
+| introuvable | $3 378 | 6% |
+
+Les $11 549 de l'anvil sont sa **capacité d'achat de machines**, pas de l'argent
+qui achètera des actions. Les $7 692 du pad appartiennent aux détenteurs de
+memecoins, pas aux porteurs de machines. Annoncer les trois sous « buys real
+tokenized equities every epoch » gonfle d'environ $19 000 ce qui sera réellement
+distribué.
+
+Nous gardons notre définition : **le solde USDG du swapper**, c'est-à-dire ce
+qui est converti et prêt. C'est aussi exactement la ligne « in the pot, ready »
+de leur propre page Stock.

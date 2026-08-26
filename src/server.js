@@ -196,6 +196,35 @@ async function sweepPad() {
       `+${movement.launched} launched, $${Math.round(movement.inUsd)} in, $${Math.round(movement.outUsd)} out` : ""));
 }
 
+/**
+ * Les machines qui ne circulent plus.
+ *
+ * Deux sorties, et elles ne sont pas de même nature. Le coffre du Proton en
+ * garde — son propriétaire peut les en ressortir, donc elles ne sont pas
+ * perdues. L'adresse morte en a une, envoyée à la main : celle-là ne revient
+ * pas. Aucune n'est détruite : `totalSupply` ne bouge pas d'un pouce, et
+ * confondre « hors circulation » avec « brûlée » changerait ce qu'un floor
+ * veut dire.
+ */
+const DEAD_ADDRESS = "0x000000000000000000000000000000000000dEaD";
+const ERC721_BAL = new ethers.Interface(["function balanceOf(address) view returns (uint256)"]);
+
+async function readOffCirculation(provider) {
+  const count = async (holder) => {
+    try {
+      const raw = await provider.call({
+        to: ADDRESSES.MACHINES,
+        data: ERC721_BAL.encodeFunctionData("balanceOf", [holder]),
+      });
+      return raw === "0x" ? null : Number(ERC721_BAL.decodeFunctionResult("balanceOf", raw)[0]);
+    } catch {
+      return null;
+    }
+  };
+  const [vault, dead] = await Promise.all([count(PROTON.factory), count(DEAD_ADDRESS)]);
+  return { vault, dead };
+}
+
 async function sweepScarcity() {
   const p = await readProton({
     provider,
@@ -256,12 +285,18 @@ async function sweepScarcity() {
 }
 
 async function sweepBook() {
-  const [book, printer, eth, protocol, stats] = await Promise.all([
+  const [book, printer, eth, protocol, stats, offCirculation] = await Promise.all([
     fetchListings({ apiKey: cfg.openseaApiKey, maxPages: cfg.maxBookPages }),
     fetchPrinter(),
     fetchEthUsd(),
     readProtocol({ provider }),
     fetchCollectionStats({ apiKey: cfg.openseaApiKey }),
+    // Ce que la collection a perdu de vue. Le coffre du Proton avale des
+    // machines à chaque fusion, et une machine envoyée à l'adresse morte ne
+    // revient jamais — mais `totalSupply` compte encore les deux. Deux lectures
+    // par balayage : c'est un chiffre de tête, il ne peut pas dépendre d'une
+    // route chargée à la demande.
+    readOffCirculation(provider),
   ]);
 
   // Le scrutin se lit après le protocole, qui seul dit de quelle epoch il
@@ -329,6 +364,7 @@ async function sweepBook() {
     book: { listed: book.listings.size, pages: book.pages, skipped: book.skipped },
     inkMeta, meta, legend, ink, weights, anvil, deskIndex, vote, potUsd, sectorWeight, tickers,
     holdings: held?.holdings, stockPrices, ownerOf: owners.byToken, now: Date.now(),
+    offCirculation,
   });
   store.succeed(composed);
 
