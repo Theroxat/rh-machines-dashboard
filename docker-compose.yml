@@ -40,3 +40,36 @@ services:
       - "192.168.0.11:3051:3050"
     volumes:
       - ./data-staging:/app/data
+
+  # ── L'ancienne version ─────────────────────────────────────────────────────
+  #
+  # Gardée en ligne le temps de savoir laquelle les gens préfèrent. Ce n'est
+  # pas une branche qu'on développe : l'image est construite depuis la branche
+  # `legacy` — l'état d'avant la refonte, plus le lien de retour vers la version
+  # actuelle, et rien d'autre. `build` est volontairement absent
+  # — un `up --build` sur ce fichier ne doit pas la remplacer par le code
+  # d'aujourd'hui, ce qui ferait servir la nouvelle version aux deux adresses
+  # sans que rien ne le signale.
+  #
+  #   git archive legacy | docker build -t rh-dashboard:legacy -
+  #
+  # Deux différences avec la prod, délibérées :
+  #   - sa propre base d'historique : deux services écrivant dans la même se
+  #     marcheraient dessus, et c'est celle du site qui sert qui y perdrait ;
+  #   - aucun webhook : un seul service notifie, sinon chaque annonce sonne
+  #     deux fois et on ne sait plus laquelle des deux versions l'a envoyée.
+  #
+  # 3052 a été vérifié libre sur cet hôte — écoutes réelles comprises, pas
+  # seulement les ports déclarés par des conteneurs.
+  rh-dashboard-legacy:
+    image: rh-dashboard:legacy
+    container_name: rh-dashboard-legacy
+    profiles: ["legacy"]
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DISCORD_WEBHOOK: ""
+    ports:
+      - "192.168.0.11:3052:3050"
+    volumes:
+      - ./data-legacy:/app/data

@@ -36,11 +36,26 @@ test("the staging bench cannot ring anyone's Discord", () => {
 });
 
 // Le banc ne doit pas prendre le port de la prod, ni être exposé par le tunnel.
-test("the bench and production do not share a port", () => {
+test("no two services claim the same host port", () => {
   const compose = readFileSync(new URL("../docker-compose.yml", import.meta.url), "utf8");
   const ports = [...compose.matchAll(/"192\.168\.0\.11:(\d+):\d+"/g)].map((m) => m[1]);
-  assert.equal(ports.length, 2);
-  assert.equal(new Set(ports).size, 2, "les deux services écoutent sur le même port hôte");
+  // La règle est l'unicité, pas le nombre. Figé à deux, ce test se contentait
+  // de tomber le jour où un troisième service arrive — sans rien dire de plus
+  // sur les ports que le compte qu'il avait appris par cœur.
+  assert.ok(ports.length >= 2, "aucun port publié");
+  assert.equal(new Set(ports).size, ports.length,
+    `deux services écoutent sur le même port hôte : ${ports.join(", ")}`);
+});
+
+// L'ancienne version est une pièce d'archive : son image est construite une
+// fois depuis un commit et ne se reconstruit pas. Lui donner un `build:` la
+// ferait remplacer par le code du jour au premier `up --build`, et les deux
+// adresses serviraient la même version sans que rien ne le signale.
+test("the archived version cannot be rebuilt from today's code", () => {
+  const compose = readFileSync(new URL("../docker-compose.yml", import.meta.url), "utf8");
+  const block = compose.slice(compose.indexOf("rh-dashboard-legacy:"));
+  assert.match(block, /image: rh-dashboard:legacy/);
+  assert.doesNotMatch(block.slice(0, block.indexOf("volumes:")), /^\s+build:/m);
 });
 
 // La marche à suivre doit exister et nommer le bon port : c'est elle qui évite
