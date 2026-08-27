@@ -520,6 +520,10 @@ test("the wallet tab is named by what it holds, not by a verb", () => {
 test("the way out of this version is a link, and does not read as a label", () => {
   const bar = page.slice(page.indexOf('class="bar"'), page.indexOf("</nav>"));
   assert.match(bar, /class="tag tag-link"[^>]*href="https:\/\/old\.rh-machines\.sex"/);
+  // À droite, avec les mentions — pas contre le nom du site, où il se lirait
+  // comme un qualificatif de celui-ci.
+  assert.ok(bar.indexOf('class="right"') < bar.indexOf("tag-link"),
+    "la sortie doit être dans le groupe de droite");
   // Sans la flèche, « RH MACHINES [OLD VERSION] » décrit cette page au lieu
   // d'en sortir — surtout collé à « UNOFFICIAL », qui est une étiquette.
   assert.match(bar, /Old version <span aria-hidden="true">&rarr;<\/span>/);
