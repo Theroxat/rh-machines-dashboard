@@ -299,11 +299,23 @@ export function pickMachines(d, { klass = null, state = null, limit = 24, sort =
   const eth = d?.eth?.usd;
   const light = d?.ink?.activationTotalUsd ?? 0;
   const out = [];
+  // Une machine ne peut pas être à vendre à deux endroits à la fois. L'anvil
+  // possède ce qu'il met en rayon, donc une annonce OpenSea sur la même
+  // machine est une annonce que son ancien propriétaire n'a pas retirée — elle
+  // ne peut plus être exécutée. La montrer ferait apparaître la même machine
+  // deux fois, à deux prix, dont un imaginaire.
+  const onShelf = new Set();
+  for (const r of d?.rows ?? []) {
+    for (const cell of [r.inked, r.dormant]) {
+      for (const e of cell?.anvilEntries ?? []) onShelf.add(e.tokenId);
+    }
+  }
   for (const r of d?.rows ?? []) {
     if (klass && r.classLabel !== klass) continue;
     for (const [lit, cell] of [[true, r.inked], [false, r.dormant]]) {
       if (state && lit !== (state === "lit")) continue;
       for (const e of cell?.entries ?? []) {
+        if (onShelf.has(e.tokenId)) continue;
         const priceUsd = eth ? e.priceEth * eth : null;
         const cost = priceUsd === null ? null : priceUsd + (lit ? 0 : light);
         const back = (e.epochUsd ?? 0) + (e.holds?.usd ?? 0);

@@ -782,3 +782,27 @@ test("with either market unread the comparison is not attempted", () => {
     /the fleet it burns for/);
   assert.doesNotMatch(scarcityHtml(SC), /the fleet it burns for/);
 });
+
+/* ── une machine, un seul endroit ──────────────────────────────────────────
+   L'anvil possède ce qu'il met en rayon. Une annonce OpenSea sur la même
+   machine est donc une annonce que son ancien propriétaire n'a pas retirée :
+   elle ne peut plus être exécutée, et la montrer ferait apparaître la même
+   machine deux fois, à deux prix, dont un imaginaire. */
+test("a machine on the shelf is not also offered as an OpenSea listing", () => {
+  const both = { ...DATA, rows: [{ classValue: 100, classLabel: "x1",
+    inked: { floorEth: 0.06, listed: 2, entries: [entry({ tokenId: 584, priceEth: 0.06 })],
+      anvilEntries: [{ tokenId: 584, askPrinter: 9113, askUsd: 174, askEth: 0.07,
+        weight: 100, inkMult: 1, epochUsd: 2.1, machine: null }] },
+    dormant: { listed: 0, entries: [] } }] };
+  const picked = pickMachines(both, { limit: 99 });
+  assert.equal(picked.length, 1, "la machine ne doit apparaître qu'une fois");
+  assert.equal(picked[0].from, "anvil", "et c'est le rayon qui gagne — lui la possède");
+});
+
+test("no machine appears twice in the book as it stands", () => {
+  const seen = new Set();
+  for (const m of pickMachines(DATA, { limit: 999 })) {
+    assert.ok(!seen.has(m.tokenId), `#${m.tokenId} figure deux fois`);
+    seen.add(m.tokenId);
+  }
+});
