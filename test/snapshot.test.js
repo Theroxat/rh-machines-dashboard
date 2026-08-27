@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { composeSnapshot } from "../src/snapshot.js";
+import { composeSnapshot, burnHeadline, fleetHeadline } from "../src/snapshot.js";
 
 const base = {
   grid: {
@@ -332,4 +332,105 @@ test("a desk with no ticker this epoch says null, not the neighbour's", () => {
     tickers: Array.from({ length: 16 }, (_, i) => (i === 10 ? "SPCX" : null)),
   });
   assert.equal(s.rows[0].inked.entries[0].machine.ticker, null);
+});
+
+// La part brûlée est un chiffre de tête : elle vient d'une lecture directe de
+// l'offre, pas d'une capitalisation servie par un tiers, et l'offre frappée au
+// départ est scellée à deux cents millions.
+test("the burn share is a subtraction from a sealed mint, not an estimate", () => {
+  const b = burnHeadline({ printerSupply: 155_000_000, totalInkBurned: 43_285_199n * 10n ** 18n });
+  assert.equal(b.minted, 200_000_000);
+  assert.equal(Math.round(b.burned), 45_000_000);
+  assert.equal((b.share * 100).toFixed(1), "22.5");
+  assert.equal(Math.round(b.ink), 43_285_199);
+});
+
+test("an unread supply yields no share rather than a share of nothing", () => {
+  assert.equal(burnHeadline({ printerSupply: null }), null);
+  assert.equal(burnHeadline({}), null);
+  assert.equal(burnHeadline(null), null);
+  // Une offre à zéro serait une lecture ratée, pas un jeton entièrement brûlé.
+  assert.equal(burnHeadline({ printerSupply: 0 }), null);
+});
+
+// `JSON.stringify` refuse un BigInt, et il emporte alors toute la réponse — pas
+// seulement le champ fautif. Le snapshot part en JSON à chaque requête : aucun
+// BigInt ne doit y survivre, quelle que soit la lecture qui l'a produit.
+test("the whole snapshot survives being turned into JSON", () => {
+  // Le décor reproduit ce que `readProtocol` rend vraiment : des chaînes pour
+  // les entiers de la chaîne, des nombres pour ce qu'on a déjà converti. Un
+  // décor en BigInt aurait décrit un service qui n'existe pas.
+  const snap = composeSnapshot({
+    ...base,
+    protocol: {
+      sellFeeBps: 500,
+      epoch: "4", ceiling: "200", activeMachines: "7502", totalWeight: "1515549",
+      totalInkBurned: "43548632351295000000000000",
+      activationInk: "4250000000000000000000",
+      printerSupply: 155_086_367.648,
+    },
+    // Les poids et l'encre arrivent bien en BigInt, eux : ils viennent de
+    // `readInk` et traversent le snapshot machine par machine.
+    weights: new Map([[1, 100n]]),
+    ink: new Map([[1, 4250n * 10n ** 18n]]),
+  });
+  assert.doesNotThrow(() => JSON.stringify(snap),
+    "un BigInt a atteint le snapshot et emporte toute la réponse avec lui");
+  const walk = (v, path = "") => {
+    if (typeof v === "bigint") assert.fail(`BigInt dans le snapshot à ${path}`);
+    if (v && typeof v === "object") for (const [k, x] of Object.entries(v)) walk(x, `${path}.${k}`);
+  };
+  walk(snap);
+});
+
+/* ── ce qui ne circule plus ────────────────────────────────────────────────
+   Le coffre du Proton avale une machine à chaque fusion, et `totalSupply` la
+   compte encore. Elles ne sont pas détruites — le coffre peut les ressortir —
+   mais elles ne sont plus achetables, et c'est le chiffre qui intéresse. */
+test("what the vault holds is out of circulation without being destroyed", () => {
+  const f = fleetHeadline({ vault: 255, dead: 1 });
+  assert.equal(f.minted, 10000);
+  assert.equal(f.circulating, 9744);
+  assert.equal(f.vault, 255);
+  assert.equal(f.dead, 1);
+});
+
+test("an empty vault leaves the whole fleet in circulation", () => {
+  assert.equal(fleetHeadline({ vault: 0, dead: 0 }).circulating, 10000);
+});
+
+// Une lecture ratée n'est pas un coffre vide : annoncer dix mille en
+// circulation quand on n'a rien lu serait une affirmation qu'on n'a pas mesurée.
+test("an unread vault yields no count rather than a full fleet", () => {
+  assert.equal(fleetHeadline({ vault: null, dead: null }), null);
+  assert.equal(fleetHeadline(null), null);
+  // Une seule des deux lisible reste exploitable : l'autre vaut zéro connu.
+  assert.equal(fleetHeadline({ vault: 255, dead: null }).circulating, 9745);
+});
+
+/* Une machine du rayon de l'anvil est une machine comme une autre. Son panneau
+   de détail s'affichait à moitié vide — pas d'encre, pas d'actions — parce que
+   la composition ne les lui donnait pas, pas parce qu'elles n'existaient pas. */
+test("a Machine on the shelf carries the same chain facts as one on OpenSea", () => {
+  const s = composeSnapshot({
+    ...withGrid,
+    grid: {
+      ...withGrid.grid,
+      rows: [{
+        ...withGrid.grid.rows[0],
+        inked: { ...withGrid.grid.rows[0].inked, anvilEntries: [{ tokenId: 1253, askPrinter: 23465 }] },
+      }],
+    },
+    ink: new Map([[1253, 8500n * 10n ** 18n]]),
+    weights: new Map([[1253, 2000n]]),
+    holdings: new Map([["0xacc", new Map([["0xnvda", 512n]])]]),
+    stockPrices: new Map([["0xnvda", { symbol: "NVDA", usd: 180, decimals: 2 }]]),
+  });
+  const shelf = s.rows[0].inked.anvilEntries[0];
+  assert.equal(shelf.inkPrinter, 8500);
+  assert.equal(shelf.weight, 2000);
+  // Deux fois l'encre d'activation : la vignette le dit déjà, le panneau doit
+  // pouvoir le dire aussi.
+  assert.ok(shelf.inkMult > 1.9);
+  assert.ok("holds" in shelf, "les actions du compte partent avec la machine");
 });

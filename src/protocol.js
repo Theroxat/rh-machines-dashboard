@@ -50,8 +50,28 @@ export async function readProtocol({ provider }) {
     if (raw !== "0x") sellFeeBps = Number(HOOK_ABI.decodeFunctionResult("currentFeeBps", raw)[0]);
   } catch { sellFeeBps = null; }
 
+  // L'offre du jeton, lue en même temps. C'est un chiffre de tête depuis que
+  // la page ouvre dessus : il ne peut pas dépendre d'une route chargée à la
+  // demande, ni se déduire d'une capitalisation servie par un tiers.
+  let printerSupply = null;
+  try {
+    const raw = await provider.call({
+      to: ADDRESSES.TOKEN,
+      data: new ethers.Interface(["function totalSupply() view returns (uint256)"])
+        .encodeFunctionData("totalSupply", []),
+    });
+    // En nombre entier de jetons, pas en BigInt : ce champ part dans le JSON du
+    // snapshot, et `JSON.stringify` refuse un BigInt — il emporte alors toute
+    // la réponse, pas seulement ce champ. La division se fait en entiers pour
+    // garder trois décimales exactes plutôt que de passer par un flottant.
+    if (raw !== "0x") {
+      printerSupply = Number(BigInt(raw) / 10n ** 15n) / 1000;
+    }
+  } catch { printerSupply = null; }
+
   return {
     sellFeeBps,
+    printerSupply,
     epoch: out.currentEpoch,
     ceiling: out.multiplierCeiling,
     totalInkBurned: out.totalInkBurned,

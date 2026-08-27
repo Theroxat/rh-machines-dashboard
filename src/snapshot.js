@@ -4,13 +4,63 @@ import { deskShares } from "./vote.js";
 import { deskName } from "./desks.js";
 import { epochUsd } from "./pot.js";
 import { valueHoldings } from "./holdings.js";
+import { crossCheck } from "./official.js";
 import { SOURCES, SOURCE_KINDS } from "./sources.js";
 
 /** Assemblage pur de tout ce dont la page a besoin. Une dérivation qui
  *  diviserait par une valeur non lue produit null plutôt qu'un zéro confiant. */
+/** La part de l'offre déjà brûlée. `null` si l'offre n'a pas pu être lue :
+ *  une part manquante n'est pas une part nulle. */
+export function burnHeadline(protocol) {
+  const supply = protocol?.printerSupply;
+  if (supply === null || supply === undefined) return null;
+  if (!Number.isFinite(supply) || supply <= 0) return null;
+  const minted = 200_000_000;
+  const burned = minted - supply;
+  return {
+    minted,
+    supply,
+    burned,
+    share: burned / minted,
+    // L'encre, c'est-à-dire ce que les machines ont brûlé pour s'allumer. Le
+    // reste vient des rachats du pad, du swap et du Proton.
+    ink: protocol?.totalInkBurned ? Number(protocol.totalInkBurned) / 1e18 : null,
+  };
+}
+
+/**
+ * Combien de machines circulent encore.
+ *
+ * Dix mille ont été frappées et dix mille existent toujours : rien n'est
+ * détruit, `totalSupply` ne bouge pas. Mais le coffre du Proton en garde — une
+ * de plus à chaque fusion — et une a été envoyée à l'adresse morte. Ces
+ * machines-là ne peuvent plus être achetées, ce qui n'est pas la même chose
+ * qu'être brûlées : le coffre a un propriétaire qui peut les en ressortir.
+ *
+ * Rend `null` si la lecture a échoué. Sans elle on annonce le total frappé, ce
+ * qui est vrai, plutôt qu'un « en circulation » qu'on n'a pas mesuré.
+ */
+export function fleetHeadline(off) {
+  const minted = TOTAL_MACHINES;
+  const vault = off?.vault ?? null;
+  const dead = off?.dead ?? null;
+  if (vault === null && dead === null) return null;
+  const gone = (vault ?? 0) + (dead ?? 0);
+  return {
+    minted,
+    vault,
+    dead,
+    // Le coffre est révocable, l'adresse morte ne l'est pas. La page a le droit
+    // de les additionner pour dire « pas achetable », jamais pour dire « perdu ».
+    circulating: minted - gone,
+    share: gone / minted,
+  };
+}
+
 export function composeSnapshot({
   grid, printer, eth, protocol, stats, book, inkMeta, meta, legend, ink, weights, anvil,
   deskIndex, vote, potUsd, sectorWeight, tickers, holdings, stockPrices, ownerOf, now,
+  offCirculation, official,
 }) {
   const activationPrinter = protocol?.activationInk
     ? Number(BigInt(protocol.activationInk) / 10n ** 15n) / 1000
@@ -119,6 +169,11 @@ export function composeSnapshot({
       weight,
       inkMult: weight ? weight / classValue : null,
       epochUsd: returnOf(e.tokenId, weight),
+      // La chaîne dit d'une machine du rayon exactement ce qu'elle dit d'une
+      // machine d'OpenSea. Le panneau de détail les affichait à moitié vide
+      // parce qu'on ne les lui donnait pas, pas parce qu'elles manquaient.
+      inkPrinter: ink?.get(e.tokenId) === undefined ? null : Number(ink.get(e.tokenId) / PRINTER),
+      holds: heldBy(e.tokenId),
       askUsd: printer?.usd ? e.askPrinter * printer.usd : null,
       askEth: printer?.usd && eth?.usd ? (e.askPrinter * printer.usd) / eth.usd : null,
     };
@@ -225,6 +280,17 @@ export function composeSnapshot({
       failures: inkMeta?.failures ?? null,
     },
     protocol,
+    // Ce que la collection a détruit, en tête de page. L'offre frappée au
+    // départ est scellée à 200 millions : la part brûlée est donc une
+    // soustraction, pas une estimation.
+    burn: burnHeadline(protocol),
+    fleet: fleetHeadline(offCirculation),
+    // Ce que le protocole publie de son propre pot, et le recoupement contre ce
+    // qu'on lit nous-mêmes. La page relaie un chiffre qu'elle ne dérive pas :
+    // elle doit pouvoir dire quand il cesse de tenir.
+    official: official
+      ? { ...official, check: crossCheck({ official, swapperUsdg: potUsd }) }
+      : null,
     // Le scrutin décide de la taille des parts du pot, donc du coefficient qui
     // s'applique par desk. Illisible, il vaut null : la page dira qu'elle ne
     // sait pas plutôt que d'annoncer seize parts égales, qu'elles ne sont pas.

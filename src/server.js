@@ -32,12 +32,14 @@ import { assetHash, assetPath, stampPage, cacheHeaders, securityHeaders, etagOf 
 import { multicallOf } from "./multicall.js";
 import { readPad, readPools, priceCoin, padStats, padMovement, markNamesakes } from "./pad.js";
 import { readProton } from "./proton.js";
+import { readOfficial, crossCheck } from "./official.js";
 import { burnSplit, lockUp, fuseOdds } from "./scarcity.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const cfg = loadConfig(process.env, JSON.parse(readFileSync(join(here, "..", "config.json"), "utf8")));
 const app = readFileSync(join(here, "public", "app.js"), "utf8");
 const favicon = readFileSync(join(here, "public", "favicon.svg"), "utf8");
+
 const appHash = assetHash(app);
 const appPath = assetPath(appHash);
 // La page part avec l'adresse du script qu'elle a été construite pour exécuter.
@@ -196,6 +198,35 @@ async function sweepPad() {
       `+${movement.launched} launched, $${Math.round(movement.inUsd)} in, $${Math.round(movement.outUsd)} out` : ""));
 }
 
+/**
+ * Les machines qui ne circulent plus.
+ *
+ * Deux sorties, et elles ne sont pas de même nature. Le coffre du Proton en
+ * garde — son propriétaire peut les en ressortir, donc elles ne sont pas
+ * perdues. L'adresse morte en a une, envoyée à la main : celle-là ne revient
+ * pas. Aucune n'est détruite : `totalSupply` ne bouge pas d'un pouce, et
+ * confondre « hors circulation » avec « brûlée » changerait ce qu'un floor
+ * veut dire.
+ */
+const DEAD_ADDRESS = "0x000000000000000000000000000000000000dEaD";
+const ERC721_BAL = new ethers.Interface(["function balanceOf(address) view returns (uint256)"]);
+
+async function readOffCirculation(provider) {
+  const count = async (holder) => {
+    try {
+      const raw = await provider.call({
+        to: ADDRESSES.MACHINES,
+        data: ERC721_BAL.encodeFunctionData("balanceOf", [holder]),
+      });
+      return raw === "0x" ? null : Number(ERC721_BAL.decodeFunctionResult("balanceOf", raw)[0]);
+    } catch {
+      return null;
+    }
+  };
+  const [vault, dead] = await Promise.all([count(PROTON.factory), count(DEAD_ADDRESS)]);
+  return { vault, dead };
+}
+
 async function sweepScarcity() {
   const p = await readProton({
     provider,
@@ -256,12 +287,22 @@ async function sweepScarcity() {
 }
 
 async function sweepBook() {
-  const [book, printer, eth, protocol, stats] = await Promise.all([
+  const [book, printer, eth, protocol, stats, offCirculation, official] = await Promise.all([
     fetchListings({ apiKey: cfg.openseaApiKey, maxPages: cfg.maxBookPages }),
     fetchPrinter(),
     fetchEthUsd(),
     readProtocol({ provider }),
     fetchCollectionStats({ apiKey: cfg.openseaApiKey }),
+    // Ce que la collection a perdu de vue. Le coffre du Proton avale des
+    // machines à chaque fusion, et une machine envoyée à l'adresse morte ne
+    // revient jamais — mais `totalSupply` compte encore les deux. Deux lectures
+    // par balayage : c'est un chiffre de tête, il ne peut pas dépendre d'une
+    // route chargée à la demande.
+    readOffCirculation(provider),
+    // Le pot ne se lit pas entièrement sur la chaîne : aucun contrat ne
+    // l'additionne. On prend le chiffre du protocole et on le recoupe contre
+    // l'USDG qu'on lit nous-mêmes.
+    readOfficial().catch(() => null),
   ]);
 
   // Le scrutin se lit après le protocole, qui seul dit de quelle epoch il
@@ -313,7 +354,14 @@ async function sweepBook() {
   // Seules les machines en vente : lire les dix mille comptes à chaque
   // balayage coûterait cent mille appels pour une information que personne ne
   // regarde sur une machine qui n'est pas à vendre.
-  const listedIds = [...book.listings.keys()];
+  // Le rayon de l'anvil compte parmi les machines en vente. Le compte d'une
+  // machine du rayon transporte des actions comme n'importe quelle autre, et
+  // elles partent avec elle : les omettre cachait à l'acheteur une partie de
+  // ce qu'il paie. C'est une dizaine de comptes de plus, pas dix mille.
+  const listedIds = [...new Set([
+    ...book.listings.keys(),
+    ...(anvil?.shelfListings?.keys() ?? []),
+  ])];
   const accounts = listedIds
     .map((id) => [id, meta.get(id)?.wallet])
     .filter(([, w]) => w);
@@ -329,6 +377,8 @@ async function sweepBook() {
     book: { listed: book.listings.size, pages: book.pages, skipped: book.skipped },
     inkMeta, meta, legend, ink, weights, anvil, deskIndex, vote, potUsd, sectorWeight, tickers,
     holdings: held?.holdings, stockPrices, ownerOf: owners.byToken, now: Date.now(),
+    offCirculation,
+    official,
   });
   store.succeed(composed);
 

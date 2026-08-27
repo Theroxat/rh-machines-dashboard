@@ -9,3 +9,6 @@ tweet-*.png
 
 # La base du banc d essai : jetable, jamais versionnée.
 data-staging/
+shop-*.png
+idee-*.png
+nb-*.png

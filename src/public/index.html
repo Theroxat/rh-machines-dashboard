@@ -1,1250 +1,583 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
 
 <!-- Le mot « unofficial » vit dans le titre et dans les balises de partage,
      pas seulement dans la page : un lien envoyé sur Discord affiche ça avant
-     que qui que ce soit n'ouvre le dashboard. -->
-<title>Unofficial RH MACHINES dashboard — floors by rarity and ink</title>
-<meta name="description" content="Unofficial, independent market view of the RH MACHINES NFT collection. Not built by or affiliated with the project team.">
+     que qui que ce soit n'ouvre le site. -->
+<title>Unofficial RH MACHINES — what to buy, and what it earns</title>
+<meta name="description" content="An independent, read-only view of the RH MACHINES collection. Not built by or affiliated with the project team.">
 <meta property="og:title" content="Unofficial RH MACHINES dashboard">
+<meta property="og:description" content="An independent, read-only view. Not built by, affiliated with, or endorsed by the RH MACHINES team.">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<meta property="og:description" content="An independent, read-only market view. Not built by, affiliated with, or endorsed by the RH MACHINES team.">
 
 <style>
-  /* Palette. L'ambre est l'encre ; le bleu froid est le papier non imprimé.
-     Rien ici n'est décoratif : chaque couleur classe quelque chose. */
+  /* ══ NÉO-BRUTALISME ════════════════════════════════════════════════════════
+     Le site vendait une collection de pixel-art en aplats francs depuis un
+     terminal gris. Ici il parle la même langue qu'elle : bordures épaisses,
+     ombres portées dures, couleurs saturées, typographie lourde.
+
+     LA DISCIPLINE DE COULEUR, parce qu'un néo-brutalisme sans règle devient un
+     arc-en-ciel qui ne dit rien :
+
+       LIME   ce que le protocole te rend. Une machine qui imprime, et rien
+              d'autre. Une dormante n'en porte aucune trace.
+       ROSE   ce sur quoi on agit — l'onglet ouvert, le bouton qu'on presse.
+       JAUNE  ce qu'il faut payer ou brûler.
+       BLEU   l'état du parc, ce qui ne se décide pas.
+
+     Chaque couleur classe quelque chose. Aucune n'est là pour égayer. */
+
   :root {
-    --paper:    #0a0a0b;
-    --paper-2:  #101013;
-    --rule:     #23232a;
-    --rule-2:   #33333d;
-    /* Contraste mesuré sur le fond de la page : le petit texte demande 4.5:1.
-       --muted était à 4.34 et --dim à 2.37 — les montants en dollars et les
-       numéros de machine étaient sous le seuil, pas discrets mais illisibles. */
-    --text:     #e6e4e0;
-    --muted:    #9a9aa4;
-    --dim:      #7f7f89;
-    --ink:      #f0a41c;
-    --dormant:  #6b8ba4;
-    --alarm:    #d9564b;
-    /* Le re-encrage n'est pas une alarme et n'est pas un prix : il lui faut sa
-       propre couleur, la seule chaude qui ne serve à rien d'autre. */
-    --reink:    #ff4d3d;
-    /* La seule couleur ajoutée depuis le début, et elle porte un sens précis :
-       ce listing s'échange sous ce que le protocole lui-même en donnerait. */
-    --under:    #6fbf73;
-    --mono: ui-monospace, "SF Mono", "JetBrains Mono", "DejaVu Sans Mono", Menlo, Consolas, monospace;
+    --ink:    #111111;
+    --paper:  #FFFDF5;
+    --paper-2:#F2EFE2;
+
+    --lime:   #C9F53E;
+    --pink:   #FF4FA3;
+    --sky:    #4FC3FF;
+    --sun:    #FFCE3E;
+
+    /* L'encre diluée, pour ce qui accompagne sans porter. Mesurée sur le
+       papier : 4.5:1 minimum pour du petit texte. */
+    --ink-2:  #56534B;
+    --ink-3:  #6E6A60;
+
+    --b:      3px;
+    --shadow: 6px 6px 0 var(--ink);
+    --shadow-sm: 4px 4px 0 var(--ink);
+
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+            "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", "DejaVu Sans Mono", Menlo, monospace;
   }
 
   * { box-sizing: border-box; }
 
-  html { background: var(--paper); }
+  html { background: var(--paper); -webkit-text-size-adjust: 100%; }
 
   body {
     margin: 0;
-    padding: 20px 22px 64px;
+    /* Dix-sept pixels, pas douze et demi. Le site s'adressait à quelqu'un qui
+       déchiffre un terminal ; il s'adresse à quelqu'un qui décide. */
+    font: 17px/1.5 var(--sans);
+    color: var(--ink);
     background: var(--paper);
-    color: var(--text);
-    font-family: var(--mono);
-    font-size: 14.5px;
-    line-height: 1.45;
+    padding: 0 0 70px;
+  }
+
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 18px; }
+
+  /* Comprendre est un document, pas un tableau de bord : il se lit d'un bout à
+     l'autre. Étalé sur onze cents pixels, son texte tenait dans la moitié
+     gauche — bridé à sa largeur de lecture — et laissait l'autre moitié vide.
+     Ce n'est pas du blanc voulu, ça se lit comme une page cassée. À sa propre
+     largeur, centrée, la même prose se lit comme un choix. */
+  /* Alignée à gauche, pas centrée : centrée, elle démarrait cent soixante
+     pixels à droite de la navigation, et deux bords gauches différents sur la
+     même page se lisent comme un défaut. */
+  #pane-learn { max-width: 820px; }
+
+  a { color: inherit; }
+  /* Le focus doit se voir sur du papier : un liseré rose, jamais le contour
+     par défaut du navigateur qui disparaît sur fond clair. */
+  :focus-visible { outline: var(--b) solid var(--pink); outline-offset: 2px; }
+
+  /* ── l'en-tête ──────────────────────────────────────────────────────────── */
+  header { padding: 20px 0 0; }
+  .bar {
+    display: flex; align-items: center; justify-content: space-between; gap: 14px;
+    border: var(--b) solid var(--ink); background: var(--lime);
+    padding: 11px 17px; box-shadow: var(--shadow);
+  }
+  .bar h1 {
+    margin: 0; font-size: 25px; font-weight: 900;
+    letter-spacing: -0.045em; text-transform: uppercase;
+  }
+  .bar .right { display: flex; align-items: center; gap: 11px; }
+  .tag {
+    font-size: 11px; font-weight: 800; letter-spacing: 0.13em; text-transform: uppercase;
+    border: var(--b) solid var(--ink); background: var(--paper); padding: 3px 9px;
+    white-space: nowrap;
+  }
+  .x-link { display: inline-flex; color: var(--ink); }
+  .x-link svg { width: 19px; height: 19px; fill: currentColor; display: block; }
+
+  nav.nav { display: flex; gap: 10px; margin: 18px 0 0; flex-wrap: wrap; }
+  nav.nav a {
+    font-size: 15px; font-weight: 900; text-transform: uppercase; letter-spacing: -0.005em;
+    text-decoration: none; color: var(--ink);
+    border: var(--b) solid var(--ink); padding: 9px 21px;
+    background: var(--paper); box-shadow: var(--shadow-sm);
+  }
+  /* Rose : on est là, et c'est là qu'on agit. */
+  nav.nav a[aria-selected="true"] { background: var(--pink); color: var(--paper); }
+  nav.nav a:hover { transform: translate(1px, 1px); box-shadow: 3px 3px 0 var(--ink); }
+
+  /* ── l'ouverture ────────────────────────────────────────────────────────── */
+  .hero {
+    border: var(--b) solid var(--ink); background: var(--paper);
+    box-shadow: var(--shadow); padding: 24px 22px; margin: 0 0 26px;
+  }
+  /* Le titre occupe la largeur. Bridé à dix-sept caractères dans une boîte qui
+     prend tout l'écran, il se tassait à gauche en quatre lignes courtes et
+     laissait six cents pixels vides à sa droite — ça ne se lit pas comme du
+     blanc voulu, ça se lit comme une panne. Un titre néo-brutaliste veut être
+     énorme : à cette taille il tient en deux lignes et remplit la boîte. */
+  .hero h2 {
+    margin: 0 0 11px; font-size: clamp(30px, 5.6vw, 62px); line-height: 0.94;
+    font-weight: 900; letter-spacing: -0.05em; max-width: 26ch; text-wrap: balance;
+  }
+  /* Le fond d'un mark en ligne se peint sur la boîte de la fonte — 1,258 em
+     dans cette pile — et pas sur celle de la ligne. Avec un interlignage de
+     0,94 la fonte dépasse sa propre ligne de vingt pixels, et le jaune montait
+     mordre les jambages de la ligne du dessus. En bloc en ligne, le fond suit
+     la hauteur qu'on lui donne, et 0,86 em reste sous la ligne : la boîte se
+     referme sur les chiffres sans écarter le titre. */
+  .hero h2 mark {
+    display: inline-block; line-height: 0.84; padding: 0.06em 5px 0.02em;
+    background: var(--sun); color: var(--ink);
+  }
+  /* Deux faits dans ce titre, et ils ne se mettent pas en évidence pareil.
+     Le jaune dit ce qu'on paie — ici l'encre brûlée. Le parc n'est pas un
+     coût : lui donner le même jaune lui ferait dire ce qu'il n'est pas, et
+     deux fois la même couleur dans une phrase ne met rien en évidence du
+     tout. Il est frappé à l'encre, qui ne classe rien et n'appartient donc à
+     aucune règle de couleur. */
+  .hero h2 mark.stamp { background: var(--ink); color: var(--paper); }
+  .hero p { margin: 0; font-size: 17px; font-weight: 600; max-width: 68ch; color: var(--ink); }
+
+  /* ── les chiffres d'état ────────────────────────────────────────────────── */
+  /* La rangée s'adapte au nombre de cases qu'on lui donne. Elle était figée à
+     cinq pour la page d'accueil ; les sections de Learn en passent quatre, et
+     la cinquième colonne restait vide en rétrécissant les autres. Une grille
+     qui compte à la place de l'appelant ne se trompe pas. */
+  .stats {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+    gap: 11px; margin: 24px 0 20px;
+  }
+  .st { border: var(--b) solid var(--ink); padding: 14px 15px; box-shadow: var(--shadow-sm); }
+  .st b {
+    display: block; font-size: clamp(20px, 2.4vw, 27px); font-weight: 900;
+    letter-spacing: -0.04em; line-height: 1; font-variant-numeric: tabular-nums;
+  }
+  .st u {
+    display: block; text-decoration: none; font-size: 11px; font-weight: 800;
+    letter-spacing: 0.08em; text-transform: uppercase; margin-top: 6px;
+  }
+  .st-live { background: var(--lime); }
+  .st-pot  { background: var(--sky); }
+  .st-cost { background: var(--sun); }
+  .st-book { background: var(--paper-2); }
+
+
+  /* ── titres de section ─────────────────────────────────────────────────── */
+  h3.sec {
+    font-size: 13px; font-weight: 900; letter-spacing: 0.12em;
+    text-transform: uppercase; margin: 0 0 13px;
+  }
+  h3.sec::after { content: " \2192"; }
+  p.sub { margin: -6px 0 16px; font-size: 15px; font-weight: 600; color: var(--ink-2); max-width: 58ch; }
+
+  /* ── la vitrine ───────────────────────────────────────────────────────────
+     Sur un écran large, la moitié droite de l'ouverture était vide. Elle porte
+     maintenant la machine qui rend le plus par dollar — la question qu'un
+     espace vide laissait sans réponse est justement celle qu'on vient poser. */
+  .hero-cols { display: grid; gap: 20px; grid-template-columns: 1fr; align-items: start; }
+  /* Le pot tient dans la colonne du texte, sous la phrase qu'il complète, et
+     la vitrine tient les deux rangées à côté. Posé sous la rangée entière, il
+     attendait que la vitrine — plus haute que le paragraphe — ait fini, et
+     ouvrait cent cinquante pixels de blanc au milieu de l'ouverture. Le
+     placement est ici et pas dans le document : sur un téléphone il n'y a
+     qu'une colonne, et l'ordre de lecture y est celui du document. */
+  @media (min-width: 900px) {
+    .hero-cols { grid-template-columns: 1fr 268px; gap: 13px 26px; }
+    .hero-cols > .hero-said { grid-area: 1 / 1; }
+    .hero-cols > .pot-note  { grid-area: 2 / 1; }
+    .hero-cols > .pick      { grid-area: 1 / 2 / span 2 / 3; }
+  }
+  .hero-said { min-width: 0; }
+
+  .pick {
+    display: block; text-decoration: none; color: var(--ink);
+    border: var(--b) solid var(--ink); background: var(--paper);
+    box-shadow: var(--shadow); padding: 13px 14px 15px;
+  }
+  .pick:hover { transform: translate(2px, 2px); box-shadow: 4px 4px 0 var(--ink); }
+  .pick-lab {
+    display: block; font-size: 10.5px; font-weight: 900;
+    letter-spacing: 0.11em; text-transform: uppercase; margin-bottom: 9px;
+  }
+  .pick-art {
+    display: block; width: 100%; aspect-ratio: 1; object-fit: cover;
+    border: var(--b) solid var(--ink);
+  }
+  .pick-noart { background: var(--paper-2); }
+  .pick-id {
+    display: block; margin-top: 10px; font-size: 11.5px; font-weight: 800;
+    letter-spacing: 0.05em; text-transform: uppercase;
+  }
+  .pick-price {
+    display: block; margin-top: 2px; font-size: 25px; font-weight: 900;
+    letter-spacing: -0.04em; line-height: 1; font-variant-numeric: tabular-nums;
+  }
+  .pick-price small { display: block; font-size: 11.5px; font-weight: 600; color: var(--ink-2); margin-top: 3px; letter-spacing: 0; }
+  /* Lime : elle imprime. Une machine qui ne rend rien ne peut pas être le
+     meilleur retour, donc il n'y a pas de variante éteinte ici. */
+  .pick-back {
+    display: block; margin-top: 11px; padding: 7px 9px;
+    border: var(--b) solid var(--ink); background: var(--lime);
+    font-size: 15px; font-weight: 900; line-height: 1.15;
+  }
+  .pick-back small { display: block; font-size: 11.5px; font-weight: 600; margin-top: 3px; }
+
+  /* Ce que le pot contient et quand on le touche. Une machine allumée
+     aujourd'hui ne partage pas le tirage en cours, seulement le suivant. */
+  .pot-note {
+    margin: 0; padding: 12px 15px;
+    border: var(--b) solid var(--ink); background: var(--sky);
+    font-size: 15px; font-weight: 600; max-width: 74ch;
+  }
+  .pot-note b { font-weight: 900; }
+
+  /* ── les prix planchers ───────────────────────────────────────────────────
+     Ce que le site promettait depuis le début, et qui tenait sous six cents
+     vignettes. Les blocs sont aussi le filtre : on lit le prix et on clique
+     dessus. Un tableau qu'on regarde puis des pastilles qu'on touche disaient
+     la même chose deux fois, à deux endroits. */
+  .floors { margin-top: 20px; }
+  .floors-lab {
+    display: block; font-size: 11px; font-weight: 800;
+    letter-spacing: 0.11em; text-transform: uppercase; color: var(--ink-2);
+    margin-bottom: 9px;
+  }
+  .floors-row { display: flex; flex-wrap: wrap; gap: 9px; }
+  .fl {
+    font: inherit; cursor: pointer; text-align: left;
+    padding: 8px 13px; min-width: 92px;
+    color: var(--ink); background: var(--paper);
+    border: var(--b) solid var(--ink); box-shadow: var(--shadow-sm);
+  }
+  .fl:hover { transform: translate(1px, 1px); box-shadow: 3px 3px 0 var(--ink); }
+  .fl-cls {
+    display: block; font-size: 11.5px; font-weight: 800;
+    letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  /* Le plancher allumé est le grand chiffre : c'est celui qui rapporte. */
+  .fl b {
+    display: block; font-size: 20px; font-weight: 900;
+    letter-spacing: -0.035em; line-height: 1.1; font-variant-numeric: tabular-nums;
+  }
+  /* Le dormant, dessous et sans couleur : il ne rapporte rien tant que
+     personne n'a brûlé pour lui. */
+  .fl u {
+    display: block; text-decoration: none; font-size: 11px;
+    font-weight: 700; color: var(--ink-2); margin-top: 2px; white-space: nowrap;
+  }
+  .fl[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+  .fl[aria-pressed="true"] u { color: var(--paper-2); }
+  .fl-all b { margin-top: 1px; }
+
+  /* ── les pastilles de filtre ───────────────────────────────────────────── */
+  .chips { display: flex; flex-wrap: wrap; gap: 9px; margin: 0 0 18px; }
+  .chips button {
+    font: 900 14px var(--sans); text-transform: uppercase; letter-spacing: -0.005em;
+    padding: 8px 16px; cursor: pointer; color: var(--ink);
+    border: var(--b) solid var(--ink); background: var(--paper);
+    box-shadow: var(--shadow-sm);
+  }
+  .chips button:hover { transform: translate(1px, 1px); box-shadow: 3px 3px 0 var(--ink); }
+  .chips button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+  /* Le tri à gauche, l'état à droite : deux questions différentes sur la même
+     ligne, et l'œil ne les confond pas parce qu'elles ne se touchent pas. */
+  .chips-row {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    gap: 16px; flex-wrap: wrap; margin: 0 0 18px;
+  }
+  .chips-row .chips { margin: 0; }
+  .chips-sort button[aria-pressed="true"] { background: var(--pink); color: var(--paper); }
+  /* Le lime dirait « cette machine imprime ». Ici c'est un filtre, pas une
+     machine : il prend l'encre pleine, comme les autres commandes. */
+  .chips-state button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+
+  /* ── les cartes ────────────────────────────────────────────────────────── */
+  .grid { display: grid; gap: 16px; grid-template-columns: repeat(4, 1fr); }
+  @media (max-width: 980px) { .grid { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 720px)  { .grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 460px)  { .grid { grid-template-columns: 1fr; } }
+
+  .card {
+    display: block; text-decoration: none; color: var(--ink);
+    border: var(--b) solid var(--ink); background: var(--paper);
+    box-shadow: var(--shadow);
+  }
+  .card:hover { transform: translate(2px, 2px); box-shadow: 4px 4px 0 var(--ink); }
+  .card-frame { display: block; position: relative; }
+  .card-art {
+    display: block; width: 100%; aspect-ratio: 1; object-fit: cover;
+    border-bottom: var(--b) solid var(--ink);
+  }
+  .card-noart {
+    display: block; width: 100%; aspect-ratio: 1; background: var(--paper-2);
+    border-bottom: var(--b) solid var(--ink);
+  }
+  /* L'état, posé sur l'image. C'est la première chose qu'on cherche devant une
+     grille : lime pour ce qui travaille, papier nu pour ce qui dort — la même
+     règle que partout, et elle n'a pas besoin d'être écrite. */
+  .card-state {
+    position: absolute; top: 9px; right: 9px;
+    padding: 3px 8px;
+    font-size: 11px; font-weight: 900; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--ink); background: var(--lime);
+    border: var(--b) solid var(--ink); box-shadow: 3px 3px 0 var(--ink);
+  }
+  .card-state.off { background: var(--paper); color: var(--ink-2); }
+  /* Ces machines-là ne sont pas sur OpenSea : elles s'achètent au terminal du
+     protocole et se paient en $PRINTER. Deux marchés, deux monnaies — le dire
+     évite d'envoyer quelqu'un sur une page où elle n'est pas en vente. */
+  .card-from {
+    position: absolute; top: 9px; left: 9px;
+    padding: 3px 8px;
+    font-size: 11px; font-weight: 900; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--paper); background: var(--ink);
+    border: var(--b) solid var(--ink); box-shadow: 3px 3px 0 var(--paper);
+  }
+  .card-body { display: block; padding: 11px 13px 13px; }
+  .card-id {
+    display: block; font-size: 11.5px; font-weight: 800;
+    letter-spacing: 0.05em; text-transform: uppercase;
+  }
+  .card-id .re { color: var(--pink); }
+  .card-price {
+    display: block; font-size: 26px; font-weight: 900;
+    letter-spacing: -0.04em; line-height: 1; margin: 3px 0 9px;
     font-variant-numeric: tabular-nums;
-    -webkit-font-smoothing: antialiased;
   }
-
-  /* Une seule famille sur toute la page : la hiérarchie vient de la graisse,
-     du corps et de l'interlettrage, comme un bon de travail composé machine. */
-  .label {
-    font-size: 11px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--muted);
-    font-weight: 400;
+  .card-price small { display: block; font-size: 11.5px; font-weight: 600; color: var(--ink-2); letter-spacing: 0; margin-top: 3px; }
+  /* Lime : cette machine imprime. Une dormante n'en porte aucune trace, et
+     c'est l'information elle-même — aucune légende n'est nécessaire. */
+  .card-earn {
+    display: inline-block; border: var(--b) solid var(--ink); background: var(--lime);
+    padding: 3px 8px; font-size: 13px; font-weight: 900;
   }
+  .card-earn.off { background: var(--paper-2); color: var(--ink-2); }
+  .card-inside { display: block; margin-top: 9px; font-size: 12.5px; font-weight: 700; }
 
-  /* ---- bandeau-titre ---- */
-
-  header { border-bottom: 1px solid var(--rule-2); padding-bottom: 14px; }
-
-  .title-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
-  h1 { margin: 0; font-size: 21px; font-weight: 700; letter-spacing: -0.01em; }
-
-  /* Un lien, discret : gris comme le reste des mentions, qui s'éclaire au
-     survol. Le SVG est en ligne, donc aucune requête et rien à autoriser. */
-  .x-link { display: inline-flex; color: var(--muted); flex: none; }
-  .x-link:hover, .x-link:focus-visible { color: var(--text); }
-  .x-link svg { display: block; width: 17px; height: 17px; fill: currentColor; }
-  h1 .sep { color: var(--dim); font-weight: 400; }
-  h1 .sub { color: var(--muted); font-weight: 400; }
-
-  /* Un tampon plutôt qu'une couleur d'alerte : lisible au premier coup d'œil,
-     sans crier au danger — ce n'est pas un avertissement, c'est une provenance. */
-  .disclaimer { margin: 7px 0 0; font-size: 12px; color: var(--muted); }
-  .disclaimer .tag {
-    display: inline-block;
-    margin-right: 8px;
-    padding: 1px 6px;
-    border: 1px solid var(--muted);
-    color: var(--text);
-    font-size: 10.5px;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    vertical-align: 1px;
+  /* ── le détail d'une machine ──────────────────────────────────────────────
+     Une carte porte ce qu'il faut pour choisir ; le panneau porte ce qu'il faut
+     pour vérifier. */
+  .d-veil {
+    position: fixed; inset: 0; z-index: 50;
+    background: rgba(17, 17, 17, 0.62);
+    display: grid; place-items: start center;
+    padding: 26px 16px; overflow: auto;
   }
+  .d-panel {
+    position: relative; width: min(560px, 100%);
+    background: var(--paper); border: var(--b) solid var(--ink);
+    box-shadow: 10px 10px 0 var(--ink); padding: 20px 22px 22px;
+  }
+  .d-close {
+    position: absolute; top: 12px; right: 12px;
+    width: 34px; height: 34px; cursor: pointer;
+    font: 900 21px/1 var(--sans); color: var(--ink);
+    background: var(--paper); border: var(--b) solid var(--ink);
+    box-shadow: var(--shadow-sm);
+  }
+  .d-close:hover { background: var(--pink); color: var(--paper); }
+  .d-top { display: flex; gap: 18px; align-items: flex-start; flex-wrap: wrap; }
+  .d-art {
+    flex: none; width: 168px; aspect-ratio: 1; object-fit: cover;
+    border: var(--b) solid var(--ink); display: block;
+  }
+  .d-noart { background: var(--paper-2); }
+  .d-head { flex: 1 1 220px; min-width: 0; }
+  .d-id { font-size: 12px; font-weight: 800; letter-spacing: 0.08em; color: var(--ink-2); }
+  .d-head h3 {
+    margin: 2px 0 9px; font-size: 30px; font-weight: 900;
+    letter-spacing: -0.04em; text-transform: uppercase;
+  }
+  .d-re {
+    font-size: 11px; letter-spacing: 0.08em; vertical-align: middle;
+    border: var(--b) solid var(--ink); background: var(--pink);
+    color: var(--paper); padding: 2px 7px;
+  }
+  .d-price {
+    margin-top: 11px; font-size: 27px; font-weight: 900;
+    letter-spacing: -0.04em; line-height: 1; font-variant-numeric: tabular-nums;
+  }
+  .d-price small { display: block; font-size: 12px; font-weight: 600; color: var(--ink-2); margin-top: 4px; letter-spacing: 0; }
+  .d-buy {
+    display: inline-block; margin-top: 13px; text-decoration: none;
+    font: 900 14px var(--sans); text-transform: uppercase;
+    padding: 9px 17px; color: var(--paper); background: var(--ink);
+    border: var(--b) solid var(--ink); box-shadow: var(--shadow-sm);
+  }
+  .d-buy:hover { background: var(--pink); }
 
-  /* Sept blocs qui se replient sur deux rangs : le filet du bas ferme chaque
-     rang, celui du conteneur ferme le dernier. */
-  .context { display: flex; flex-wrap: wrap; margin-top: 14px; border: 1px solid var(--rule); border-right: 0; border-bottom: 0; }
-  .stat { flex: 1 1 195px; padding: 8px 12px; border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
-  .stat .v { font-size: 16.5px; font-weight: 600; display: block; margin-top: 2px; color: var(--ink); }
-  .stat .x { color: var(--muted); font-size: 12px; }
+  .d-block { margin-top: 22px; border-top: var(--b) solid var(--ink); padding-top: 14px; }
+  .d-block h4 { margin: 0 0 4px; font-size: 13px; font-weight: 900; letter-spacing: 0.09em; text-transform: uppercase; }
+  .d-note { margin: 0 0 9px; font-size: 13.5px; font-weight: 500; color: var(--ink-2); }
+  .d-row {
+    display: flex; justify-content: space-between; gap: 14px;
+    padding: 6px 0; border-bottom: 1px solid var(--paper-2); font-size: 14.5px;
+  }
+  .d-row:last-child { border-bottom: 0; }
+  /* Pas de mise en casse ici : les intitulés sont déjà écrits en minuscules à
+     la source, et la règle attrapait aussi les tickers — « NVDA » devenait
+     « nvda », ce qui n'est pas le nom de l'action. */
+  .d-row span { color: var(--ink-2); font-weight: 600; }
+  .d-row b { font-weight: 800; font-variant-numeric: tabular-nums; text-align: right; }
+  /* Une machine re-encrée pèse plus que sa classe ne le dit : c'est la seule
+     anomalie du carnet qui vaille une couleur. */
+  .d-row.d-hot b { color: var(--pink); }
 
-  .up   { color: var(--ink); }
-  .down { color: var(--dormant); }
+  /* ── le champ d'adresse ────────────────────────────────────────────────── */
+  .ask { display: flex; gap: 11px; margin: 20px 0 0; flex-wrap: wrap; }
+  .ask input {
+    flex: 1 1 260px; min-width: 0; font: 16px var(--mono);
+    padding: 12px 14px; color: var(--ink); background: var(--paper);
+    border: var(--b) solid var(--ink); box-shadow: inset 2px 2px 0 rgba(0,0,0,.07);
+  }
+  .ask input::placeholder { color: var(--ink-3); }
+  .ask button {
+    font: 900 15px var(--sans); text-transform: uppercase; letter-spacing: -0.005em;
+    padding: 12px 24px; cursor: pointer; color: var(--paper); background: var(--pink);
+    border: var(--b) solid var(--ink); box-shadow: var(--shadow-sm);
+  }
+  .ask button:hover { transform: translate(1px, 1px); box-shadow: 3px 3px 0 var(--ink); }
 
-  /* ---- bandeau d'alerte ---- */
+  /* ── les étapes ────────────────────────────────────────────────────────── */
+  .steps { display: grid; gap: 16px; margin: 18px 0 0; }
+  .step {
+    display: flex; gap: 15px; align-items: flex-start;
+    border: var(--b) solid var(--ink); background: var(--paper);
+    box-shadow: var(--shadow-sm); padding: 15px 17px;
+  }
+  .step-n {
+    flex: none; width: 32px; height: 32px;
+    display: grid; place-items: center;
+    border: var(--b) solid var(--ink); background: var(--sun);
+    font-size: 15px; font-weight: 900;
+  }
+  .step h4 { margin: 3px 0 4px; font-size: 17px; font-weight: 900; letter-spacing: -0.02em; }
+  .step p { margin: 0; font-size: 15.5px; font-weight: 500; color: var(--ink-2); }
+  .step b { color: var(--ink); font-weight: 800; }
 
+  /* ── les barres du vote ────────────────────────────────────────────────── */
+  .vote { display: grid; gap: 9px; }
+  .vt { border: var(--b) solid var(--ink); background: var(--paper); padding: 9px 12px; }
+  .vt-hd { display: flex; justify-content: space-between; font-size: 14px; font-weight: 800; }
+  .vt-hd u { text-decoration: none; font-variant-numeric: tabular-nums; }
+  .vt-bar { height: 10px; border: var(--b) solid var(--ink); margin-top: 6px; background: var(--paper-2); }
+  .vt-bar i { display: block; height: 100%; background: var(--sky); }
+  .vt:first-child .vt-bar i { background: var(--lime); }
+
+  /* ── blocs de prose ────────────────────────────────────────────────────── */
+  .prose { max-width: 68ch; }
+  .prose p { font-weight: 500; color: var(--ink-2); }
+  .prose b { color: var(--ink); font-weight: 800; }
+
+  .note { font-size: 14px; font-weight: 600; color: var(--ink-2); }
   .banner {
-    display: none;
-    margin-top: 14px;
-    padding: 7px 12px;
-    border-top: 1px solid var(--alarm);
-    border-bottom: 1px solid var(--alarm);
-    color: var(--alarm);
-    font-size: 13px;
+    display: none; margin: 16px 0 0; padding: 11px 15px;
+    border: var(--b) solid var(--ink); background: var(--sun);
+    font-size: 14.5px; font-weight: 700;
   }
   .banner.on { display: block; }
 
-  /* ---- les onglets ---- */
+  footer { margin-top: 46px; padding-top: 20px; border-top: var(--b) solid var(--ink); }
 
-  /* Quatre questions, quatre pages. Le mobilier explicatif ne pousse plus le
-     tableau vers le bas : il vit là où il répond à quelque chose. */
-  .tabs { display: flex; gap: 2px; margin-top: 16px; }
-  .tabs a {
-    padding: 7px 14px;
-    font-size: 12.5px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--muted);
-    text-decoration: none;
-    background: var(--paper-2);
-    border: 1px solid var(--rule);
-    border-bottom: 0;
-  }
-  .tabs a:hover { color: var(--text); }
-  /* L'onglet ouvert se raccroche à sa page : il partage son fond et perd le
-     filet qui l'en sépare. */
-  .tabs a[aria-selected="true"] {
-    color: var(--ink);
-    background: var(--paper);
-    border-color: var(--rule-2);
-    font-weight: 700;
-  }
-  /* Sans script, aucun onglet n'est marqué : la page doit alors tout montrer
-     plutôt que rien. */
-  .pane { padding-top: 18px; border-top: 1px solid var(--rule-2); margin-top: -1px; }
-  .pane[hidden] { display: none; }
-
-  /* ---- filtres par trait ---- */
-
-  /* La ligne de caisse suit directement les menus au lieu d'être poussée à
-     l'autre bout, et s'aligne sur le bas des sélecteurs plutôt que sur le haut
-     de leurs intitulés. */
-  .filter-row { display: flex; flex-wrap: wrap; gap: 22px; align-items: flex-end; }
-
-  /* La file d'attente de l'anvil : trois prix pour la même machine selon qu'on
-     la subit, qu'on la choisit ou qu'on la tire au sort. */
-  /* À plat, comme tout le reste : la page sépare par des filets et n'encadre
-     jamais rien. Un panneau bordé était le seul de son espèce et se lisait
-     comme une pièce rapportée. */
-  /* Une seule ligne, collée aux filtres : ce que coûte une machine tirée au
-     sort. Les deux autres prix de l'anvil achètent une certitude ; celui-ci
-     achète un pari, et c'est le seul qui mérite d'être ici. */
-  .crate {
-    display: flex;
-    align-items: baseline;
-    gap: 9px;
-    text-decoration: none;
-    color: inherit;
-    border-bottom: 1px solid transparent;
-    padding-bottom: 3px;
-  }
-  a.crate:hover, a.crate:focus-visible { border-bottom-color: var(--ink); }
-  .crate-what {
-    font-size: 10px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--ink);
-    white-space: nowrap;
-  }
-  .crate-price { font-weight: 700; color: var(--ink); font-size: 15.5px; }
-  .crate-unit { color: var(--muted); font-size: 10px; }
-  .crate-usd { font-weight: 600; color: var(--text); font-size: 15px; }
-  .crate-note { color: var(--muted); font-size: 11px; white-space: nowrap; }
-
-  /* Un lien, pas un bouton : souligné à l'approche, rien d'autre. */
-  .buy {
-    display: inline-block;
-    color: var(--ink);
-    text-decoration: none;
-    border-bottom: 1px solid transparent;
-    font-size: 10.5px;
-  }
-  .buy:hover, .buy:focus-visible { border-bottom-color: var(--ink); }
-  /* La vue n'est pas un filtre : elle ne retire aucune machine du tableau, elle
-     le relit dans une autre unité. Un filet la sépare des quatre menus qui,
-     eux, en enlèvent. */
-  #view { padding-right: 22px; border-right: 1px solid var(--rule-2); }
-  .fl.view .label { color: var(--ink); }
-  .fl.view select { min-width: 205px; }
-
-  /* L'activation comptée dans le chiffre : une note, pas un prix. */
-  .incl { color: var(--dim); }
-
-  #filters { display: flex; flex-wrap: wrap; gap: 18px; }
-
-  .fl { display: inline-flex; flex-direction: column; gap: 3px; }
-  .fl select {
-    font-family: inherit;
-    font-size: 13px;
-    color: var(--text);
-    background: var(--paper-2);
-    border: 1px solid var(--rule-2);
-    border-radius: 0;
-    padding: 4px 8px;
-    min-width: 190px;
-    max-width: 320px;
-  }
-  .fl select:hover { border-color: var(--muted); }
-  .fl select:focus-visible { outline: 1px solid var(--ink); outline-offset: 1px; }
-
-  #filter-summary { margin: 10px 0 0; font-size: 12.5px; color: var(--ink); }
-  /* Dite une fois, en toutes lettres : d'où vient l'argent et pourquoi il est
-     vert. Les vignettes portent le mot, cette ligne porte l'histoire. */
-  #drop-note { margin: 9px 0 0; font-size: 12.5px; color: var(--muted); max-width: 76ch; }
-  #drop-note b { color: var(--under); font-weight: 600; }
-  #drop-note:empty { display: none; }
-
-  /* ---- le détail d'une machine ---- */
-
-  /* Une vignette fait 78 pixels et porte cinq nombres ; la machine en a vingt.
-     Le panneau les montre tous, et l'image à une taille où l'on voit ce qu'on
-     achète. À plat comme le reste : des filets, aucun arrondi, aucune ombre. */
-  .d-veil {
-    position: fixed; inset: 0; z-index: 50;
-    display: flex; align-items: flex-start; justify-content: center;
-    padding: 40px 20px;
-    background: rgba(0, 0, 0, 0.78);
-    overflow-y: auto;
-  }
-  .d-veil[hidden] { display: none; }
-  .d-panel {
-    width: 100%; max-width: 760px;
-    background: var(--paper);
-    border: 1px solid var(--rule-2);
-  }
-  .d-head {
-    display: flex; align-items: baseline; gap: 14px;
-    padding: 12px 16px; border-bottom: 1px solid var(--rule-2);
-  }
-  .d-id { font-size: 19px; font-weight: 700; }
-  .d-where { flex: 1; font-size: 11px; letter-spacing: 0.13em; text-transform: uppercase; color: var(--muted); }
-  .d-close {
-    font-family: inherit; font-size: 20px; line-height: 1; color: var(--muted);
-    background: none; border: 0; padding: 0 2px; cursor: pointer;
-  }
-  .d-close:hover, .d-close:focus-visible { color: var(--text); }
-
-  .d-body { display: flex; gap: 18px; padding: 16px; flex-wrap: wrap; }
-  .d-pic { flex: none; width: 300px; max-width: 100%; }
-  .d-pic img, .d-noimg {
-    display: block; width: 100%; height: auto; aspect-ratio: 1;
-    border: 1px solid var(--rule-2); background: var(--paper-2);
-  }
-  .d-go {
-    display: block; margin-top: 10px; padding: 6px 0; text-align: center;
-    color: var(--ink); text-decoration: none; border: 1px solid var(--rule-2); font-size: 12.5px;
-  }
-  .d-go:hover, .d-go:focus-visible { border-color: var(--ink); }
-
-  /* Le contenu du compte, sous l'image : c'est la seule partie du panneau qui
-     décrit un bien changeant de main avec la machine. */
-  .d-holds { margin-top: 12px; border-top: 1px solid var(--rule-2); padding-top: 8px; }
-  .d-holds .label { display: block; }
-  .d-holds .d-x { display: block; margin-bottom: 5px; }
-  .d-holds ul { list-style: none; margin: 0; padding: 0; font-size: 12.5px; }
-  .d-holds li { display: flex; gap: 8px; padding: 2px 0; }
-  .h-sym { min-width: 52px; color: var(--text); font-weight: 600; }
-  .h-amt { flex: 1; color: var(--muted); }
-  .h-usd { color: var(--text); font-weight: 600; }
-  .d-total { display: block; margin-top: 6px; font-size: 14px; font-weight: 700; color: var(--under); }
-
-  .d-facts { flex: 1 1 300px; min-width: 0; }
-  .d-row { padding: 5px 0; border-bottom: 1px solid var(--rule); }
-  .d-row:last-child { border-bottom: 0; }
-  .d-row .label { display: block; }
-  .d-v { display: block; font-size: 15px; font-weight: 700; color: var(--ink); }
-  .d-x { display: block; font-size: 12px; color: var(--muted); }
-
-  /* ---- la page d'explication ---- */
-
-  /* Une largeur de lecture, mais pas une colonne unique perdue au milieu d'un
-     écran vide : les sections se rangent en colonnes qui remplissent la page,
-     comme les cartes du bandeau. Chacune garde ses soixante-dix caractères. */
-  .doc {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-    gap: 0 36px;
-    align-items: start;
-  }
-  /* Un titre ne doit jamais se retrouver seul au bas d'une colonne. */
-  .doc-block { break-inside: avoid; padding: 14px 0 16px; border-top: 1px solid var(--rule); }
-  .doc h2 {
-    margin: 0 0 8px;
-    font-size: 12px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--ink);
-    font-weight: 700;
-  }
-  .doc p { margin: 0 0 10px; font-size: 13.5px; color: var(--muted); line-height: 1.55; max-width: 72ch; }
-  .doc p:last-child { margin-bottom: 0; }
-  .doc b { color: var(--text); font-weight: 600; }
-  .doc .formula {
-    padding: 8px 12px;
-    border-left: 2px solid var(--ink);
-    background: var(--paper-2);
-    color: var(--text);
-    font-size: 14px;
-  }
-  .doc-table { border-collapse: collapse; margin: 0 0 10px; width: 100%; min-width: 0; }
-  .doc-table th {
-    text-align: left; vertical-align: top; white-space: nowrap;
-    padding: 5px 14px 5px 0; color: var(--text); font-weight: 700; font-size: 13px;
-  }
-  .doc-table td { padding: 5px 0; color: var(--muted); font-size: 13.5px; line-height: 1.5; }
-  .doc-table tr { border-bottom: 1px solid var(--rule); }
-
-  /* ---- le dépouillement ---- */
-
-  /* Seize desks, et ce que chacun a tiré. Les barres se mesurent sur le premier
-     plutôt que sur cent : à 38% le vainqueur remplirait à peine un tiers, et
-     l'écart entre les seconds deviendrait illisible. */
-  .ballot { list-style: none; margin: 14px 0 0; padding: 0; font-size: 12.5px; }
-  .ballot li { display: flex; align-items: center; gap: 12px; padding: 4px 0; border-bottom: 1px solid var(--rule); }
-  .b-name { min-width: 72px; font-weight: 700; color: var(--ink); }
-  /* Largeur fixe, pas un plancher : `min-width` laisse la colonne grandir avec
-     son texte, et « 116 coins · 2 graduated » poussait la barre de NVDA trente
-     pixels plus loin que celle de PRINTER. Les deux seules lignes décalées
-     étaient les deux qui portent une graduation. */
-  .b-sector {
-    flex: none; width: 130px; color: var(--dim); font-size: 11.5px;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  }
-  .b-bar { flex: 1; height: 9px; background: var(--paper-2); }
-  .b-bar span { display: block; height: 100%; background: var(--ink); }
-  .b-pct { min-width: 72px; text-align: right; color: var(--text); font-weight: 600; }
-  .b-w { min-width: 82px; text-align: right; color: var(--muted); font-size: 11.5px; }
-  /* Un desk absent du bulletin n'a pas perdu : on n'a pas pu voter pour lui. */
-  .ballot .b-off .b-name { color: var(--dim); font-weight: 400; }
-  .ballot .b-off .b-bar { display: none; }
-  .ballot .b-off .b-pct { color: var(--dim); font-weight: 400; font-size: 11.5px; min-width: 0; flex: 1; text-align: left; }
-
-  /* ---- le portefeuille du visiteur ---- */
-
-  /* Posé juste au-dessus de l'en-tête du tableau, et bâti comme les filtres :
-     même intitulé, même champ, même bordure. C'est une commande de plus, pas
-     un encart — en carte marquée dans le bandeau il se lisait comme une
-     publicité au milieu des chiffres. */
-  /* Aligné sur le milieu, pas sur le bas : ailleurs sur la page l'intitulé est
-     au-dessus de sa commande, donc `flex-end` les met à la même base. Ici il
-     est à côté, et la même règle le faisait plonger sous la boîte de saisie. */
-  .wallet-line { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
-  .wallet-line .label { flex: none; }
-  #wallet-input {
-    font-family: inherit; font-size: 13px; color: var(--text);
-    background: var(--paper-2); border: 1px solid var(--rule-2); border-radius: 0;
-    padding: 4px 8px; min-width: 400px; max-width: 100%;
-  }
-  #wallet-input:hover { border-color: var(--muted); }
-  #wallet-input:focus-visible { outline: 1px solid var(--ink); outline-offset: 1px; }
-  .wallet-line form { display: flex; gap: 10px; align-items: center; }
-  /* Le même bouton discret que « clear » : bordé, pas rempli. */
-  .w-go, .w-again {
-    font-family: inherit; font-size: 12px; color: var(--muted);
-    background: transparent; border: 1px solid var(--rule-2); border-radius: 0;
-    padding: 3px 10px; cursor: pointer; white-space: nowrap;
-  }
-  .w-go:hover, .w-again:hover, .w-go:focus-visible, .w-again:focus-visible {
-    color: var(--text); border-color: var(--muted);
-  }
-  /* Le verdict s'écrit sur la même ligne, à la suite du champ. */
-  .w-said { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; font-size: 13px; }
-  /* Le portefeuille lu : ambre, comme tout ce sur quoi on agit. Les chiffres
-     qui l'accompagnaient sont partis dans les cartes, qui les disaient déjà. */
-  .w-said .v { font-size: 17px; font-weight: 700; color: var(--ink); }
-  .w-said .x { color: var(--muted); font-size: 12.5px; }
-
-  /* Le détail, sous la ligne, et seulement s'il y a quelque chose à dire. */
-  #wallet-out { margin-top: 10px; }
-  #wallet-out:empty { display: none; }
-  .w-who { color: var(--muted); font-size: 13px; margin: 0 0 5px; }
-  .w-who b { color: var(--text); font-weight: 600; }
-  .w-small { margin: 0 0 10px; font-size: 12.5px; color: var(--muted); max-width: 86ch; }
-  .w-small b { color: var(--text); font-weight: 600; }
-
-
-  /* Deux questions, deux cartes : ce que ça vaut, et quoi en faire. Elles se
-     lisaient l'une après l'autre en travers de toute la page, montants à mille
-     neuf cents pixels de leurs intitulés. */
-  .w-cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-    gap: 0;
-    margin-top: 12px;
-    border-top: 1px solid var(--rule-2);
-  }
-  .w-card { padding: 12px 22px 14px 0; }
-  .w-card + .w-card { padding-left: 22px; border-left: 1px solid var(--rule); }
-  .w-big { display: block; font-size: 30px; font-weight: 700; color: var(--under); line-height: 1.15; margin-top: 2px; }
-  .w-card .w-big.w-none { color: var(--dim); font-size: 22px; }
-  .w-card ul { list-style: none; margin: 10px 0 0; padding: 0; font-size: 12.5px; }
-  .w-card li {
-    display: grid; grid-template-columns: 1fr auto; column-gap: 14px;
-    padding: 4px 0; border-bottom: 1px solid var(--rule);
-  }
-  .ww-k { color: var(--text); font-weight: 600; }
-  .ww-v { color: var(--text); font-weight: 600; text-align: right; }
-  .ww-x { grid-column: 1 / -1; color: var(--muted); font-size: 11.5px; line-height: 1.4; }
-  .w-card .w-small { margin: 9px 0 0; }
-  .w-mine { display: block; margin-top: 20px; }
-
-  /* Les machines du portefeuille, en vignettes comme au marché. Le badge du
-     bas porte leur desk plutôt que leur classe : sur cette page on cherche
-     lesquelles farment quoi, pas leur rareté. */
-  .w-strip { margin-top: 10px; }
-  .w-strip .cls-badge { font-size: 9px; letter-spacing: 0.02em; }
-
-  .w-list { list-style: none; margin: 0; padding: 0; font-size: 12.5px; }
-  .w-list li { display: flex; gap: 14px; padding: 3px 0; border-bottom: 1px solid var(--rule); }
-  .w-list a { color: var(--ink); text-decoration: none; min-width: 62px; }
-  .w-list a:hover { text-decoration: underline; }
-  .w-w { min-width: 52px; color: var(--text); font-weight: 600; }
-  .w-desk { flex: 1; color: var(--muted); }
-  .w-earn { color: var(--under); font-weight: 600; }
-
-  #filter-summary:empty { display: none; }
-  .clear {
-    font-family: inherit;
-    font-size: 12px;
-    color: var(--muted);
-    background: transparent;
-    border: 1px solid var(--rule-2);
-    padding: 1px 8px;
-    margin-left: 8px;
-    cursor: pointer;
-  }
-  .clear:hover, .clear:focus-visible { color: var(--text); border-color: var(--muted); }
-
-  /* ---- la légende ---- */
-
-  /* Trois couleurs et deux badges portent tout le tableau, et rien ne les
-     présentait. « x2 » à côté de « 4x » se lisait « inkée deux fois » alors
-     qu'il s'agit d'une x2 arrivée à 4x. */
-  .key {
-    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px;
-    margin-top: 20px; padding: 10px 0;
-    border-top: 1px solid var(--rule);
-    border-bottom: 1px solid var(--rule);
-    font-size: 11.5px; color: var(--muted);
-  }
-  .key-label {
-    font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
-    color: var(--dim); flex: none;
-  }
-  .key-item { display: inline-flex; align-items: center; gap: 7px; }
-  .key-badge {
-    padding: 0 4px; font-size: 10.5px; font-weight: 700; line-height: 1.6;
-    color: var(--paper); flex: none;
-  }
-  .key-badge.cls { background: var(--text); }
-  .key-badge.re  { background: var(--reink); }
-  .key-badge.hold {
-    background: var(--paper-2); color: var(--text);
-    border-left: 2px solid var(--under);
-  }
-  .key-swatch { width: 11px; height: 11px; flex: none; }
-  .key-swatch.amber { background: var(--ink); }
-  .key-swatch.green { background: var(--under); }
-  .key-swatch.blue  { background: var(--dormant); }
-
-  /* ---- la grille : classe, inkées, dormantes ---- */
-
-  .scroll { overflow-x: auto; margin-top: 18px; }
-
-  table { border-collapse: collapse; width: 100%; min-width: 900px; }
-
-
-  th, td { padding: 13px 15px; text-align: left; vertical-align: top; }
-  th:first-child, td:first-child { padding-left: 0; }
-
-  thead th { font-weight: 400; border-bottom: 1px solid var(--rule-2); padding-bottom: 5px; }
-  thead th.g-ink     { color: var(--ink);     border-bottom-color: var(--ink); }
-  thead th.g-dormant { color: var(--dormant); border-bottom-color: var(--dormant); }
-
-  tbody tr { border-bottom: 1px solid var(--rule); }
-  tbody tr:nth-child(even) { background: var(--paper-2); }
-
-  /* La frontière entre colonnes est un filet, pas un aplat : elle sépare sans crier. */
-  .edge { border-left: 1px solid var(--rule-2); }
-
-  .cls-cell { width: 158px; }
-  .grants { display: block; font-size: 12px; color: var(--text); margin-top: 2px; line-height: 1.25; }
-  .cls { font-size: 24px; font-weight: 700; display: block; letter-spacing: -0.02em; line-height: 1.1; }
-  /* Le prix qui range la ligne. Il vaut la peine d'être gros : c'est le seul
-     chiffre de la colonne de gauche qui explique l'ordre du tableau. */
-  .cls-point { display: block; margin: 5px 0 6px; line-height: 1.15; }
-  .cls-point .per,
-  .cls-point .from {
-    display: block; font-size: 9.5px; letter-spacing: 0.13em;
-    text-transform: uppercase; font-weight: 400;
-  }
-  .cls-point { font-size: 21px; font-weight: 700; color: var(--ink); }
-  .cls-point .per { color: var(--muted); }
-  .cls-point .from { color: var(--dim); }
-
-  .census { color: var(--dim); font-size: 11.5px; }
-
-  /* La bande de tête. Elle traverse les deux colonnes parce qu'elle ne parle ni
-     d'une classe ni d'un état : c'est le seul endroit du tableau où une x1 et
-     une x10 se comparent. Un filet plus marqué la sépare des sept lignes de
-     rareté, sans quoi elle se lirait comme une huitième classe. */
-  .best-row td { border-bottom: 2px solid var(--rule-2); }
-  /* « Best ROI » est deux fois plus long que « x1.5 » : sans ça il se coupe en
-     deux lignes et la bande n'a plus le même en-tête que les sept autres. */
-  .best-row .cls { color: var(--under); font-size: 20px; white-space: nowrap; }
-  .best-row .cls-point { color: var(--under); }
-  td.half.best { border-left: 0; }
-  .census.mismatch { color: var(--alarm); }
-
-  td.half { width: 46%; }
-
-  /* Le chiffre qu'on vient chercher : il se perdait parmi huit vignettes de
-     même taille, il ouvre maintenant la case. */
-  .cell-floor { display: block; line-height: 1.15; }
-  .cell-floor .label { margin-right: 9px; }
-  .cell-floor .price { font-size: 25.5px; font-weight: 700; letter-spacing: -0.025em; }
-  .cell-floor .unit { font-size: 11px; }
-  .cell-floor .usd-big { font-size: 17px; font-weight: 600; color: var(--text); margin-left: 8px; }
-  td.g-ink     .cell-floor .price { color: var(--ink); }
-  td.g-dormant .cell-floor .price { color: var(--dormant); }
-
-  .depth { display: block; font-size: 12px; color: var(--muted); margin-top: 1px; }
-  .depth b { color: var(--text); font-weight: 600; }
-  .absent { color: var(--dim); }
-
-  /* ---- la bande de machines en vente, la moins chère d'abord ---- */
-
-  .strip { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 8px; }
-
-  .chip { display: block; width: 78px; text-decoration: none; color: inherit; }
-
-  /* Les badges s'ancrent sur l'image, pas sur la vignette entière : ancrés sur
-     le bloc, celui du bas retombait sur la ligne du prix et la recouvrait. */
-  .thumb { display: block; position: relative; width: 78px; height: 78px; }
-
-  /* Un listing sur cent porte ce badge, et quand il le porte la machine pèse le
-     double de ce que sa ligne annonce. Ambre sur fond sombre : minuscule, mais
-     impossible à manquer. */
-  /* Un seul badge, en bas à gauche, qu'il dise une classe ou un parcours. Il y
-     en avait deux, en vis-à-vis, avec deux notations qui ne différaient que par
-     la place du x — on lisait « x2 inkée deux fois » au lieu de « née x2,
-     arrivée à 4x ». */
-  .reink {
-    position: absolute;
-    bottom: 0; left: 0;
-    padding: 0 3px;
-    background: var(--reink);
-    color: var(--paper);
-    font-size: 10.5px;
-    font-weight: 700;
-    line-height: 1.5;
+  [hidden] { display: none !important; }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip: rect(0 0 0 0); white-space: nowrap;
   }
 
-  /* Une x3 qui pèse comme une x6 se noyait au milieu des x3 au même prix. Elle
-     est cerclée : le badge dit combien, le cercle dit qu'il y a quelque chose à
-     lire. C'est la seule chose entourée de toute la page. */
-  .chip.is-reinked img, .chip.is-reinked .noimg {
-    border: 2px solid var(--reink);
-    outline: 1px solid var(--reink);
-    outline-offset: 1px;
-  }
-  .chip.is-reinked .tok { color: var(--reink); font-weight: 700; }
-  /* La classe, en bas à gauche, face au badge de re-encrage. Neutre exprès :
-     le rouge dit « re-inkée » et l'ambre dit « un prix » — la rareté n'est ni
-     l'un ni l'autre, elle est un fait de naissance. */
-  .cls-badge {
-    position: absolute;
-    bottom: 0; left: 0;
-    padding: 0 3px;
-    background: var(--paper);
-    color: var(--text);
-    font-size: 10px;
-    font-weight: 700;
-    line-height: 1.5;
-  }
-
-  .chip img, .chip .noimg {
-    display: block;
-    width: 78px; height: 78px;
-    border: 1px solid var(--rule-2);
-    background: var(--paper-2);
-    object-fit: cover;
-  }
-  .chip .noimg { background: repeating-linear-gradient(45deg, var(--paper-2) 0 4px, var(--paper) 4px 8px); }
-  .chip .price { display: block; font-size: 13px; font-weight: 600; margin-top: 4px; }
-  .chip .usd   { display: block; font-size: 12.5px; color: var(--text); }
-  /* Ce que la machine rapporte, distinct de ce qu'elle coûte : le vert est déjà
-     la couleur de ce que le protocole verse, il ne peut pas se lire comme un
-     prix de plus. */
-  .chip .earns { display: block; font-size: 13.5px; font-weight: 700; color: var(--under); margin-top: 3px; }
-  /* Le chiffre vert ne se devine pas : sans ce mot, c'est un troisième nombre
-     empilé sous deux prix, dont deux en dollars. Il se nomme lui-même, partout
-     où on le regarde, plutôt que de compter sur une légende lue une fois. */
-  .chip .per {
-    display: block;
-    font-size: 9.5px;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--under);
-    opacity: 0.72;
-    line-height: 1.3;
-  }
-  /* Ce que la machine contient. Le compte appartient au jeton : cela part avec
-     elle à la vente, donc ce n'est ni un prix ni un revenu — c'est un contenu,
-     et il porte sa propre couleur. */
-  .chip .holds {
-    display: block; font-size: 10.5px; font-weight: 700;
-    color: var(--text); background: var(--paper-2);
-    border-left: 2px solid var(--under);
-    padding: 0 3px; margin-top: 3px;
-  }
-  .chip .tok   { display: block; font-size: 11px; color: var(--dim); }
-  /* L'estimation n'est pas un revenu : elle porte la couleur neutre des prix,
-     pas le vert de ce que le protocole verse. */
-  .chip .per.est { color: var(--muted); }
-  .chip .price.none { color: var(--dim); font-weight: 400; }
-
-  /* ---- PRINTER.FUN ----
-     Les chiffres de tête. Six, sur une grille qui se replie : à trois cent
-     soixante pixels ils se rangent par deux plutôt que de se serrer à six. */
-  .p-lede { max-width: 92ch; }
-  /* Ce qui bouge, en tête : la seule partie de la page qui sera différente
-     demain. Le reste est un recensement. */
-  .p-when {
-    display: inline-block; margin-left: 10px; font-size: 9.5px; letter-spacing: 0.1em;
-    text-transform: uppercase; color: var(--muted);
-  }
-  .p-move { margin-bottom: 16px; }
-  .p-cols {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-    gap: 0 26px; margin-bottom: 18px;
-  }
-  .p-movers { max-width: 460px; margin-top: 8px; }
-  .p-movers .b-name { flex: none; width: 88px; }
-  .p-movers .b-sector { width: 74px; }
-  /* D'où elle vient, où elle est. La flèche est la moitié de l'information. */
-  .p-arc { flex: 1; color: var(--muted); font-size: 11.5px; }
-  .p-arc i { font-style: normal; color: var(--dim); margin: 0 5px; }
-  .p-delta { min-width: 78px; text-align: right; font-weight: 700; font-size: 12.5px; }
-  .p-up { color: var(--under); }
-  .p-down { color: var(--reink); }
-  /* Onze lignes étalées sur toute la largeur d'un écran : le montant se
-     retrouvait à mille neuf cents pixels de l'action qu'il chiffre, et cinq
-     barres sous les vingt dollars ne montraient plus rien du tout. */
-  .p-bases { max-width: 880px; }
-  .p-bases .b-name { flex: none; width: 90px; }
-  /* « 116 coins · 2 graduated » : vingt-trois caractères, la plus longue que
-     cette colonne ait à porter ici. */
-  .p-bases .b-sector { width: 168px; }
-  /* Le plancher est posé dans le balisage — un pour cent dès qu'il y a un
-     dollar, zéro sinon — parce que lui seul sait laquelle des deux c'est. */
-  .p-figs {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 0; margin: 14px 0 4px; border-top: 1px solid var(--rule-2);
-  }
-  .p-fig { padding: 11px 18px 12px 0; }
-  .p-fig + .p-fig { padding-left: 18px; border-left: 1px solid var(--rule); }
-  .p-v { display: block; font-size: 26px; font-weight: 700; color: var(--under); line-height: 1.15; }
-  .p-k {
-    display: block; font-size: 9.5px; letter-spacing: 0.12em;
-    text-transform: uppercase; color: var(--text); margin-top: 2px;
-  }
-  .p-x { display: block; font-size: 11px; color: var(--muted); line-height: 1.4; margin-top: 2px; }
-
-  /* Le classement. Deux cent soixante-quatorze lignes : la table défile dans
-     sa propre boîte plutôt que d'allonger la page à perte de vue. */
-  .p-wrap { max-height: 70vh; overflow: auto; border-top: 1px solid var(--rule-2); margin-top: 8px; }
-  .p-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-  .p-table thead th {
-    position: sticky; top: 0; background: var(--paper); text-align: left;
-    font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase;
-    color: var(--muted); font-weight: 400; padding: 7px 10px 6px 0;
-    border-bottom: 1px solid var(--rule-2);
-  }
-  .p-table td { padding: 5px 10px 5px 0; border-bottom: 1px solid var(--rule); vertical-align: middle; }
-  .p-n { color: var(--dim); font-size: 11px; width: 34px; }
-  .p-sym { font-weight: 700; color: var(--ink); white-space: nowrap; }
-  .p-sym a { color: inherit; text-decoration: none; }
-  .p-sym a:hover .p-go, .p-sym a:focus-visible .p-go { color: var(--paper); background: var(--ink); }
-  /* Le graphique d'une graduée, chez DexTools : c'est ce qu'on vient chercher
-     dès qu'une pièce s'échange pour de bon. */
-  /* ---- d'où vient chaque chiffre ----
-     Trois colonnes : lu, servi, calculé. La séparation est l'information — pas
-     « fiable / douteux », mais « refaisable / à croire / de notre fait ». */
-  .src-cols {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 0 26px; margin-top: 10px;
-  }
-  .src-group { padding-bottom: 14px; }
-  .src-blurb { margin: 3px 0 8px; font-size: 11.5px; color: var(--muted); line-height: 1.45; }
-  .src-list { list-style: none; margin: 0; padding: 0; }
-  .src-list li { padding: 6px 0; border-bottom: 1px solid var(--rule); }
-  .src-what { display: block; font-size: 12.5px; color: var(--text); font-weight: 600; }
-  .src-from { display: block; font-size: 11px; color: var(--muted); margin-top: 1px; }
-  .src-note { display: block; font-size: 11px; color: var(--dim); line-height: 1.45; margin-top: 3px; }
-
-  /* ---- ce qui quitte la circulation ----
-     Une barre pour la part enfermée, une barre empilée pour le sort de l'offre
-     de jetons. Les mêmes couleurs que partout : ambre pour ce qui a été
-     consommé, vert pour ce qui reste au porteur. */
-  .sc-bar {
-    height: 10px; background: var(--paper-2); margin: 2px 0 10px; max-width: 880px;
-    border: 1px solid var(--rule-2);
-  }
-  .sc-bar span { display: block; height: 100%; background: var(--reink); }
-  .sc-stack {
-    display: flex; height: 14px; margin: 2px 0 8px; max-width: 880px;
-    border: 1px solid var(--rule-2); overflow: hidden;
-  }
-  .sc-stack span { display: block; height: 100%; }
-  .sc-stack .sc-ink  { background: var(--ink); }
-  .sc-stack .sc-oth  { background: var(--reink); }
-  .sc-stack .sc-left { background: var(--paper-2); }
-  .sc-key { margin: 0 0 16px; font-size: 11px; color: var(--muted); }
-  .sc-key i { display: inline-block; width: 9px; height: 9px; margin: 0 5px 0 14px; }
-  .sc-key i:first-child { margin-left: 0; }
-  .sc-key i.sc-ink { background: var(--ink); }
-  .sc-key i.sc-oth { background: var(--reink); }
-  .sc-key i.sc-left { background: var(--paper-2); border: 1px solid var(--rule-2); }
-  /* Ce qui a été perdu ou détruit ne porte pas le vert de ce qu'on encaisse. */
-  .p-v.sc-down { color: var(--reink); }
-  .sc-foot { color: var(--dim); margin-top: 18px; }
-
-  /* Le cimetière : lancées, jamais échangées. Un nom et un lien suffisent —
-     il n'y a rien d'autre à en dire, et une ligne de tableau par pièce le
-     disait cent soixante-quatorze fois. */
-  .p-dead { display: flex; flex-wrap: wrap; gap: 5px; margin: 4px 0 18px; }
-  .p-dead a {
-    font-size: 11px; color: var(--dim); text-decoration: none;
-    border: 1px solid var(--rule-2); padding: 2px 6px; white-space: nowrap;
-  }
-  .p-dead a:hover, .p-dead a:focus-visible { color: var(--ink); border-color: var(--ink); }
-  .p-dead i { font-style: normal; color: var(--reink); margin-left: 4px; font-size: 9px; }
-
-  /* Le premier à porter un nom, et ceux qui le reprennent. Dix-sept lignes
-     « ZEUB » avec un bouton d'achat chacune sont un piège, pas un tableau. */
-  .p-first, .p-dupe {
-    margin-left: 7px; font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase;
-    font-weight: 700; padding: 1px 4px; white-space: nowrap;
-  }
-  .p-first { color: var(--paper); background: var(--under); }
-  .p-dupe { color: var(--reink); border: 1px solid var(--reink); }
-  .p-go {
-    margin-left: 7px; font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;
-    font-weight: 700; color: var(--ink); border: 1px solid var(--ink); padding: 1px 4px;
-  }
-  .p-name { display: block; font-weight: 400; color: var(--muted); font-size: 11px; max-width: 26ch;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .p-base { color: var(--text); font-size: 11.5px; white-space: nowrap; }
-  .p-table .p-num { text-align: right; font-weight: 600; color: var(--text); white-space: nowrap; }
-  .p-table .p-dim { font-weight: 400; color: var(--muted); }
-  .p-prog { display: flex; align-items: center; gap: 9px; min-width: 190px; }
-  .p-pct { min-width: 86px; font-size: 11px; color: var(--muted); }
-  /* Courbe pleine, pool pas encore déployée : c'est un état, pas un palier. */
-  .p-pct.p-full { color: var(--ink); font-weight: 600; min-width: 156px; }
-  /* Une pièce graduée a quitté la courbe : la mention vaut mieux qu'une barre
-     pleine, qu'on lirait comme « sur le point de ». */
-  .p-tag {
-    margin-left: 6px; font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;
-    color: var(--paper); background: var(--under); padding: 1px 4px; font-weight: 700;
-  }
-
-  /* Le badge porte l'écart ; la phrase au-dessus de la bande dit ce qu'il veut
-     dire. Deux mots de jargon ne portaient pas l'idée. */
-  .under-note {
-    display: block;
-    margin-top: 5px;
-    font-size: 11.5px;
-    color: var(--under);
-  }
-
-  /* Ce que la machine contient. Le compte appartient au jeton : cela part avec
-     elle à la vente, donc ce n'est ni un prix ni un revenu — c'est un contenu,
-     et il porte sa propre couleur. */
-  .chip .holds {
-    display: block; font-size: 10.5px; font-weight: 700;
-    color: var(--text); background: var(--paper-2);
-    border-left: 2px solid var(--under);
-    padding: 0 3px; margin-top: 3px;
-  }
-  .chip .tok   { display: block; font-size: 11px; color: var(--dim); }
-  /* L'estimation n'est pas un revenu : elle porte la couleur neutre des prix,
-     pas le vert de ce que le protocole verse. */
-  .chip .per.est { color: var(--muted); }
-  .chip .price.none { color: var(--dim); font-weight: 400; }
-
-  /* Le badge porte l'écart ; la phrase au-dessus de la bande dit ce qu'il veut
-     dire. Deux mots de jargon ne portaient pas l'idée. */
-  .under-note {
-    display: block;
-    margin-top: 5px;
-    font-size: 11.5px;
-    color: var(--under);
-  }
-
-  /* En haut à gauche : le badge de classe et celui du parcours occupent le bas.
-     Un écart en argent est plus large qu'un pourcentage et se chevauchait. */
-  .under {
-    position: absolute;
-    left: 0; top: 0;
-    padding: 0 3px;
-    background: var(--under);
-    color: var(--paper);
-    font-size: 9.5px;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-    line-height: 1.5;
-  }
-  .chip.is-under img, .chip.is-under .noimg { border-color: var(--under); }
-  .chip:hover img, .chip:focus-visible img, .chip:hover .noimg { border-color: var(--text); }
-
-  /* La moins chère est la seule que le tableau désignait avant : elle garde un
-     repère, pour qu'on la retrouve dans la bande. */
-  .chip.floor img, .chip.floor .noimg { border-color: currentColor; }
-  td.g-ink     .chip .price, td.g-ink     .chip.floor { color: var(--ink); }
-  td.g-dormant .chip .price, td.g-dormant .chip.floor { color: var(--dormant); }
-
-  /* Le rayon de l'anvil : sa propre bande, séparée par un filet et annoncée par
-     son en-tête. Deux marchés dans deux monnaies ne se mélangent pas. */
-  .shelf { display: block; margin-top: 12px; padding-top: 9px; border-top: 1px dashed var(--rule-2); }
-  /* Une case contient deux marchés : chacun porte son nom, du même poids et
-     avec le même filet, pour qu'on voie une section et pas un empilement. */
-  .market {
-    display: block;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    color: var(--text);
-    border-bottom: 1px solid var(--rule-2);
-    padding-bottom: 5px;
-    margin-bottom: 9px;
-  }
-  /* L'état, à côté du marché. Il prend la couleur de sa colonne : l'ambre est
-     l'encre, le bleu froid le papier non imprimé — la même règle que partout. */
-  .market .st { font-weight: 700; }
-  td.g-ink     .market .st { color: var(--ink); }
-  td.g-dormant .market .st { color: var(--dormant); }
-
-  td.g-ink     .market { border-bottom-color: var(--ink); }
-  td.g-dormant .market { border-bottom-color: var(--dormant); }
-  /* Le prix du rayon est libellé en $PRINTER : il s'annonce comme un prix, au
-     même rang que le floor, et dans la couleur de l'encre puisque c'est la
-     monnaie du jeton. */
-  .shelf-price { display: block; line-height: 1.15; }
-  .shelf-price .label { margin-right: 9px; }
-  .shelf-price .price { font-size: 25.5px; font-weight: 700; letter-spacing: -0.025em; color: var(--ink); }
-  .shelf-price .unit { font-size: 11px; color: var(--muted); }
-  .shelf-price .usd-big { font-size: 17px; font-weight: 600; color: var(--text); margin-left: 8px; }
-  .shelf .depth { margin-top: 1px; }
-  .shelf .strip { margin-top: 7px; }
-  .chip.anvil .price { font-size: 11px; }
-  .chip.anvil img, .chip.anvil .noimg { border-style: dashed; }
-
-  .more {
-    display: inline-block;
-    margin-top: 9px;
-    padding: 3px 9px;
-    font-family: inherit;
-    font-size: 12px;
-    color: var(--muted);
-    background: transparent;
-    border: 1px solid var(--rule-2);
-    cursor: pointer;
-  }
-  .more:hover, .more:focus-visible { color: var(--text); border-color: var(--muted); }
-
-  /* ---- la légende des raretés ---- */
-
-  .legend-section { margin-top: 30px; border-top: 1px solid var(--rule-2); padding-top: 14px; }
-  .legend-section h2 { margin: 0 0 3px; font-size: 11px; }
-  .legend-section .note { color: var(--muted); font-size: 12.5px; margin: 0 0 12px; max-width: 82ch; }
-
-  .lg { border: 1px solid var(--rule); border-bottom: 0; max-width: 900px; }
-  .lg-row { display: flex; align-items: baseline; gap: 14px; padding: 6px 12px; border-bottom: 1px solid var(--rule); }
-  .lg-row:nth-child(even) { background: var(--paper-2); }
-  .lg-class { width: 46px; flex: none; font-weight: 700; font-size: 15.5px; }
-  .lg-hw { flex: 1; }
-  .hw { display: inline-block; margin: 0 10px 0 0; color: var(--text); font-size: 13px; }
-  .lg-n { flex: none; color: var(--dim); font-size: 12px; }
-  .lg-warn { color: var(--alarm); font-size: 12.5px; margin: 10px 0 0; }
-
-  /* ---- pied ---- */
-
-  footer { margin-top: 26px; border-top: 1px solid var(--rule); padding-top: 12px; }
-  footer p { margin: 0 0 6px; color: var(--muted); font-size: 12.5px; max-width: 82ch; }
-  footer b { color: var(--text); font-weight: 600; }
-
-  a:focus-visible, .more:focus-visible { outline: 1px solid var(--ink); outline-offset: 2px; }
-
-  /* ---- mobile ----
-     Trois colonnes côte à côte n'ont pas de sens sur 390 px, et un tableau qu'on
-     fait défiler latéralement au doigt n'est pas une réponse. Chaque classe
-     devient une carte : son nom en en-tête, puis l'inkée, puis la dormante,
-     empilées. L'en-tête du tableau disparaît, donc chaque moitié annonce
-     elle-même de quel côté elle parle. */
-  @media (max-width: 760px) {
-    body { padding: 14px 12px 48px; font-size: 14.5px; }
-
-    h1 { font-size: 18.5px; }
-    .stat { flex: 1 1 47%; }
-
-    .fl { width: 100%; }
-    .fl select { width: 100%; min-width: 0; max-width: none; }
-    .tabs { flex-wrap: wrap; }
-    .tabs a { flex: 1 1 auto; text-align: center; padding: 7px 8px; font-size: 11.5px; }
-    .d-veil { padding: 14px 10px; }
-    .d-pic { width: 100%; }
-    #wallet-input { min-width: 0; width: 100%; }
-    .wallet form { gap: 10px; }
-    .w-ticker { font-size: 26px; }
-    #filters { gap: 10px; }
-    /* Empilés, le filet vertical ne sépare plus rien : il devient horizontal. */
-    .tabs { flex-wrap: wrap; }
-    .tabs a { flex: 1 1 auto; text-align: center; padding: 7px 8px; font-size: 11.5px; }
-    .d-veil { padding: 14px 10px; }
-    .d-pic { width: 100%; }
-    #wallet-input { min-width: 0; width: 100%; }
-    .wallet-line form { width: 100%; }
-    #view {
-      width: 100%; padding-right: 0; padding-bottom: 12px;
-      border-right: none; border-bottom: 1px solid var(--rule-2);
-    }
-
-    /* La table dépliée perd son entête, donc chaque cellule porte son nom :
-       sans quoi une fiche est une colonne de montants sans légende. */
-    .p-table td[data-k] {
-      display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
-    }
-    .p-table td[data-k]::before {
-      content: attr(data-k);
-      flex: none;
-      color: var(--muted); font-weight: 400;
-      font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase;
-    }
-    /* La barre garde sa place entre le nom et le pourcentage. */
-    .p-table td.p-prog { gap: 10px; }
-    .p-prog .b-bar { flex: 1; }
-    .p-pct { min-width: 0; text-align: right; }
-    /* Deux cent et quelques fiches dans un cadre de 70vh font un défilement
-       dans un défilement. Sur téléphone, la page défile, un point c'est tout. */
-    .p-wrap { max-height: none; overflow: visible; }
-    .p-cols { gap: 0; }
-
-    /* Plus rien à faire défiler : la table se déplie en blocs. */
-    .scroll { overflow-x: visible; margin-top: 14px; }
-    table { min-width: 0; }
-    thead { display: none; }
-    table, tbody, tr, td { display: block; width: auto; }
-
-    tbody tr {
-      border: 1px solid var(--rule-2);
-      margin-bottom: 16px;
-      background: transparent;
-    }
-    tbody tr:nth-child(even) { background: transparent; }
-
-    td, th { padding: 11px 12px; }
-    td:first-child { padding-left: 12px; }
-
-    .cls-cell {
-      width: auto;
-      background: var(--paper-2);
-      border-bottom: 1px solid var(--rule-2);
-      padding: 8px 12px;
-    }
-    .cls { display: inline; font-size: 21px; margin-right: 9px; }
-    .grants { display: inline; margin-right: 9px; }
-    /* L'en-tête de carte est une ligne : le prix qui range la classe s'y range
-       aussi, plutôt que d'empiler trois lignes au-dessus des vignettes. */
-    .cls-point, .cls-point .per, .cls-point .from { display: inline; }
-    .cls-point { font-size: 18px; margin: 0 9px 0 0; }
-    .cls-point .per, .cls-point .from { margin-left: 4px; }
-
-    /* Le filet vertical séparait des colonnes qui n'existent plus. */
-    .edge { border-left: 0; }
-    /* `td.half { width: 46% }` du desktop est plus spécifique que la règle
-       groupée ci-dessus : sans ce rappel, chaque moitié garde 46% de la carte
-       et la bande de vignettes tombe à deux par rangée. */
-    td.half { width: auto; border-top: 1px solid var(--rule); }
-    /* La moitié qui suit directement l'en-tête de carte : son filet ferait
-       doublon avec celui de l'en-tête. */
-    .cls-cell + td.half { border-top: 0; }
-
-    td.half::before {
-      content: attr(data-state);
-      display: block;
-      margin-bottom: 7px;
-      font-size: 11px;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-    }
-    td.g-ink::before     { color: var(--ink); }
-    td.g-dormant::before { color: var(--dormant); }
-
-    .lg-row { gap: 10px; }
-    .lg-class { width: 38px; }
-  }
-
-  @media (max-width: 420px) {
-    .stat { flex: 1 1 100%; }
-    .chip, .chip img, .chip .noimg, .thumb { width: 53px; }
-    .chip img, .chip .noimg, .thumb { height: 53px; }
+  /* Une ombre portée dure qui glisse au survol suffit ; rien d'autre ne bouge
+     sur cette page, et qui refuse le mouvement ne perd aucune information. */
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+    .card:hover, .chips button:hover, nav.nav a:hover, .ask button:hover { transform: none; }
   }
 </style>
 
-<header>
-  <div class="title-row">
-    <h1>RH MACHINES <span class="sep">/</span> <span class="sub">floors by rarity and ink state</span></h1>
-    <a class="x-link" href="https://x.com/Theroxat" target="_blank" rel="noopener" aria-label="Theroxat on X">
-      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-    </a>
-  </div>
-  <p class="disclaimer"><span class="tag">Unofficial</span>An independent tool, not built by, affiliated with, or endorsed by the RH MACHINES team.</p>
-
-  <!-- Les onglets. Le choix vit dans l'adresse : un lien partagé rouvre la
-       même page, et un rechargement ne renvoie pas au marché. -->
-  <nav class="tabs" id="tabs" role="tablist">
-    <a href="#market" role="tab" data-tab="market">Market</a>
-    <a href="#wallet" role="tab" data-tab="wallet">My wallet</a>
-    <a href="#vote"   role="tab" data-tab="vote">The vote</a>
-    <a href="#pad"    role="tab" data-tab="pad">PRINTER.FUN</a>
-    <a href="#scarcity" role="tab" data-tab="scarcity">Scarcity</a>
-    <a href="#how"    role="tab" data-tab="how">How it works</a>
-  </nav>
-  <div class="banner" id="banner" role="status"></div>
-</header>
-
-<!-- Le panneau de détail. Vide et masqué tant qu'on n'a cliqué sur rien. -->
-<div class="d-veil" id="detail" hidden>
-  <div class="d-panel" role="dialog" aria-modal="true" aria-label="Machine detail" id="detail-panel"></div>
-</div>
-
-<!-- ═══ MARCHÉ ═══ -->
-<section class="pane" id="pane-market">
-  <div class="context" id="context"></div>
-
-  <div class="filter-row">
-    <div id="view"></div>
-    <div id="filters"></div>
-    <div id="queue"></div>
-  </div>
-  <p id="filter-summary"></p>
-
-  <!-- La légende. Statique : elle ne dépend d'aucune donnée, donc elle ne peut
-       ni se tromper ni disparaître si un balayage échoue. -->
-  <div class="key">
-    <span class="key-label">Reading a machine</span>
-    <span class="key-item"><span class="key-badge cls">x3</span>born a x3 — its sealed class</span>
-    <span class="key-item"><span class="key-badge re">x3&#8594;6x</span>re-inked: it burned 4× the base ink to weigh double, since weight follows a square root</span>
-    <span class="key-item"><span class="key-swatch amber"></span>what it costs</span>
-    <span class="key-item"><span class="key-swatch green"></span>its share of the pot waiting now — not a rate, the pot has never paid out yet</span>
-    <span class="key-item"><span class="key-swatch blue"></span>dormant — never inked, so it earns and votes nothing</span>
-    <span class="key-item"><span class="key-badge hold">+$12 inside</span>stock sitting in the machine's own account, which goes with it if it sells</span>
-  </div>
-
-  <div class="scroll">
-    <table>
-      <thead>
-        <tr class="label">
-          <th>Rarity</th>
-          <th class="g-ink edge">Inked — carries burned $PRINTER</th>
-          <th class="g-dormant edge">Dormant — never activated</th>
-        </tr>
-      </thead>
-      <tbody id="rows"></tbody>
-    </table>
-  </div>
-</section>
-
-<!-- ═══ PORTEFEUILLE ═══ -->
-<section class="pane" id="pane-wallet">
-  <!-- Le champ est chez lui : cette page ne répond qu'à « qu'est-ce que je
-       possède », et la question comme la réponse y tiennent ensemble. -->
-  <div class="wallet-line" id="wallet-card"></div>
-  <div id="wallet-out"></div>
-</section>
-
-<!-- ═══ LE VOTE ═══ -->
-<section class="pane" id="pane-vote">
-  <div class="context" id="vote-context"></div>
-  <p id="drop-note"></p>
-  <div id="ballot"></div>
-</section>
-
-<!-- ═══ PRINTER.FUN ═══
-     L'autre produit de l'écosystème : un memepad où l'on lance une pièce
-     adossée à une action tokenisée. Lu sur les deux factories, pas sur le
-     tableau du site — celui-ci annonce zéro volume horaire dans le même
-     payload que vingt-cinq échanges horodatés. -->
-<section class="pane" id="pane-pad">
-  <p class="w-small p-lede">Launch a memecoin paired against a tokenised Robinhood stock and trade it
-  on a bonding curve priced in that stock. It is run by the same team as the Machines, on the same
-  chain, and it is where <b>$PRINTER</b> gets bought back and burned.
-  <a href="https://www.printer.fun/" target="_blank" rel="noopener">printer.fun</a></p>
-  <div id="pad"></div>
-</section>
-
-<!-- ═══ CE QUI QUITTE LA CIRCULATION ═══
-     Deux disparitions de nature différente : le $PRINTER brûle et ne revient
-     pas ; les machines partent au coffre du Proton, d'où un propriétaire peut
-     les ressortir. La page ne doit jamais laisser lire l'un pour l'autre. -->
-<section class="pane" id="pane-scarcity">
-  <p class="w-small p-lede">Two things leave circulation here, and they do not leave the same way.
-  <b>$PRINTER</b> burns — destroyed, gone, the supply drops. <b>Machines</b> do not: fusing one sends
-  it to a vault, where it still exists and can still be taken back out. This page counts both, and
-  keeps them apart.</p>
-  <div id="scarcity"></div>
-</section>
-
-<!-- ═══ COMMENT ÇA MARCHE ═══ -->
-<section class="pane" id="pane-how">
-
-  <div class="doc">
-    <div class="doc-block">
-    <h2>What a Machine is</h2>
-    <p>Ten thousand of them, and two things about each are sealed at mint and never change.
-    Its <b>rarity</b> — x1 through x10 — which is read off its <b>headwear</b>. And its <b>desk</b>,
-    one of sixteen, which decides which stock it earns double on.</p>
+<div class="wrap">
+  <header>
+    <div class="bar">
+      <h1>RH Machines</h1>
+      <span class="right">
+        <span class="tag">Unofficial</span>
+        <a class="x-link" href="https://x.com/Theroxat" target="_blank" rel="noopener" aria-label="Theroxat on X">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+        </a>
+      </span>
     </div>
-    <div class="doc-block">
-    <h2>Weight is the only thing that pays</h2>
-    <p>A Machine with no ink weighs nothing. It earns nothing and it cannot vote. Burning
-    <b>5,000 $PRINTER</b> switches it on — 4,250 of that becomes ink, 750 is an operating charge —
-    and it then weighs its class. A x2 weighs 2.</p>
-    <p class="formula">weight = class × √( ink ÷ 4,250 )</p>
-    <p>Burn more and it weighs more, but along a square root, so <b>four times the ink buys twice
-    the weight</b> and nine times buys three. A ceiling common to the whole fleet caps the
-    multiplier, and it rises as the community burns. Past it, a burn is refused rather than
-    quietly clipped.</p>
-    <p>Everything else follows weight. Your share of every payout is your weight over the fleet's,
-    and you vote with your weight rather than one vote per Machine.</p>
-    </div>
-    <div class="doc-block">
-    <h2>Three states, and they are not interchangeable</h2>
-    <table class="doc-table">
-      <tr><th>Dormant</th><td>no ink. Earns nothing, votes on nothing.</td></tr>
-      <tr><th>Lit</th><td>inked during this epoch. It starts earning at the <b>next</b> one — so a
-        Machine bought and switched on today takes no part in the pot that is waiting.</td></tr>
-      <tr><th>Earning</th><td>active for a full epoch. Earns, votes, counted for the drop.</td></tr>
-    </table>
-    </div>
-    <div class="doc-block">
-    <h2>Where the money comes from</h2>
-    <p>Selling $PRINTER costs a fee, and that fee is collected in USDG. Trading the NFTs now feeds
-    it too. The money piles up until a ballot closes, and then it is spent buying stock.</p>
-    <p>This means the pot and the token price pull in opposite directions: a calm market fills it
-    slowly. It also means the figure on the Market tab is <b>an amount waiting, not a rate</b> —
-    nothing has been paid at a regular interval, and the next drop will be worth whatever the
-    following days of trading put into it.</p>
-    </div>
-    <div class="doc-block">
-    <h2>The vote decides who gets bought</h2>
-    <p>Once an epoch, a ballot opens for 48 hours. Every awake Machine votes with its weight for one
-    of sixteen desks. The pot is then cut between the desks <b>in proportion to the votes they
-    drew</b> — nothing is winner-takes-all, and a desk nobody voted for gets nothing.</p>
-    <p>Inside each slice, every Machine is paid its weight over the fleet's, and a Machine sitting
-    on that slice's desk <b>counts twice</b>. So you receive every stock that was bought, whatever
-    your desk; your own desk only doubles your share of its own slice. That is the reason to vote
-    your own desk rather than the one you think will win.</p>
-    <p>A stock the protocol cannot buy — no pool on this chain — has its slice paid out in the
-    winning stock instead, keeping the same structure. Its desk's Machines still double.</p>
-    </div>
-    <div class="doc-block">
-    <h2>The stock lands inside the Machine</h2>
-    <p>Every Machine owns an account of its own, and that is where its stock is deposited. The
-    account belongs to the token, not to you: <b>sell the Machine and whatever is inside goes with
-    it</b>, unless you withdraw first. Buying one that is still loaded means buying its contents
-    too, which is why every listing here shows what it is carrying.</p>
-    </div>
-    <div class="doc-block">
-    <h2>The Anvil</h2>
-    <p>A market maker run by the protocol. It publishes a standing bid — the same amount for any
-    Machine, whatever its rarity — and it pays in $PRINTER, net of the sell fee. It also holds a
-    shelf of Machines it will sell, and a crate you can open for one drawn at random.</p>
-    <p>Because its bid is denominated in $PRINTER while listings are priced in ETH, the two drift
-    apart whenever the token moves. When the bid climbs above a listing, this page says so.</p>
-    </div>
-    <div class="doc-block">
-    <h2>What this page measures, and what it cannot</h2>
-    <table class="doc-table">
-      <tr><th>Floor price</th><td>the cheapest asking price in a class and state. An asking price is
-        not a price obtained.</td></tr>
-      <tr><th>Price per weight point</th><td>what one x1 point of weight costs here. It is the only
-        figure that compares a x1 to a x10, since seven floors side by side price seven different
-        things. A dormant Machine carries its activation.</td></tr>
-      <tr><th>Best ROI</th><td>the pot share plus the stock already inside, over the price. It
-        counts what a buyer receives, not what the Machine will earn later.</td></tr>
-      <tr><th>Wallet worth</th><td>each Machine at the better of its class floor and the Anvil's
-        bid, plus the stock inside, plus what the wallet itself holds.</td></tr>
-    </table>
-    </div>
-    <div class="doc-block">
-    <h2>Where the numbers come from</h2>
-    <p>Not all of it is read from the chain, and the difference decides what you can conclude from
-    it. Anything that cannot be read is shown as unknown rather than as zero — a zero and a failed
-    read are not the same thing, and confusing them is how a dashboard lies quietly. The book is
-    swept every minute, ink every ten, the pad every two, the Proton every ten.</p>
-    <p>The full split is set out below, line by line.</p>
-  </div>
-    </div>
-  </div>
 
-  <!-- La provenance, ligne par ligne. Rendue depuis src/sources.js, et un test
-       compare cette liste aux URL réellement appelées : une source ajoutée sans
-       être déclarée casse la suite plutôt que de laisser la page mentir par
-       omission. -->
-  <h2 class="label">Where every number comes from</h2>
-  <p class="note">A price in dollars cannot come from the chain — it knows a pool's reserves, never a
-    rate. Neither can an order book: OpenSea orders are signed off-chain and only touch the chain
-    when someone buys. Those are limits, not shortcuts, and this page names them rather than letting
-    a figure pass for something it is not.</p>
-  <div id="sources"></div>
+    <nav class="nav" id="nav" role="tablist">
+      <a href="#buy"    role="tab" data-tab="buy">Buy</a>
+      <a href="#wallet" role="tab" data-tab="wallet">My wallet</a>
+      <a href="#learn"  role="tab" data-tab="learn">Learn</a>
+    </nav>
 
-  <h2 class="label">Which headwear grants which rarity</h2>
-  <p class="note">A Machine's rarity is sealed on chain, and it always matches the <b>Headwear</b> it
-    wears. This table is derived from the collection itself on every boot, not written down — if a headwear
-    ever appeared under two different rarities, it would be named here rather than filed under one of them.</p>
-  <div id="legend"></div>
+    <div class="banner" id="banner" role="status"></div>
+  </header>
+
+  <main>
+    <!-- ═══ ACHETER ═══ -->
+    <section id="pane-buy">
+      <!-- L'état du protocole d'abord : quatre faits qu'on lit sans rien
+           chercher, juste sous la navigation. La phrase d'ouverture et les
+           prix planchers viennent après — on regarde ce qui est vrai avant
+           de lire ce qu'on en dit. -->
+      <div class="stats" id="stats"></div>
+      <div id="hero"></div>
+      <h3 class="sec" id="buy-title">Most back per dollar</h3>
+      <p class="sub" id="buy-sub"></p>
+      <div id="chips"></div>
+      <div class="grid" id="cards"></div>
+      <p class="note" id="more-note" style="margin-top:16px"></p>
+    </section>
+
+    <!-- ═══ CE QUE JE POSSÈDE ═══ -->
+    <section id="pane-wallet" hidden>
+      <div class="hero">
+        <h2>What do you <mark>own</mark>?</h2>
+        <p>Paste an address. Nothing to sign, nothing to connect — this only reads.</p>
+        <form class="ask" id="ask">
+          <input id="addr" type="text" inputmode="latin" spellcheck="false"
+                 placeholder="0x…" aria-label="Wallet address" autocomplete="off">
+          <button type="submit">Look it up</button>
+        </form>
+      </div>
+      <div id="wallet-out"></div>
+    </section>
+
+    <!-- ═══ COMPRENDRE ═══
+         Cinq étapes, puis ce qui décide de l'argent, puis ce qui disparaît de
+         la circulation, puis le memepad, puis d'où viennent les chiffres. -->
+    <section id="pane-learn" hidden>
+      <div id="learn-steps"></div>
+      <h3 class="sec" style="margin-top:44px">The vote decides who gets bought</h3>
+      <p class="sub" id="vote-sub"></p>
+      <div class="vote" id="vote"></div>
+      <h3 class="sec" style="margin-top:44px">What leaves circulation</h3>
+      <div id="scarcity"></div>
+      <h3 class="sec" style="margin-top:44px">PRINTER.FUN</h3>
+      <div id="pad"></div>
+      <h3 class="sec" style="margin-top:44px">Where every number comes from</h3>
+      <div id="sources"></div>
+    </section>
+  </main>
+
+  <!-- Le panneau de détail. Vide et masqué tant qu'on n'a cliqué sur rien. -->
+  <div class="d-veil" id="detail" hidden></div>
 
   <footer>
-    <p class="disclaimer"><span class="tag">Unofficial</span><b>An independent tool.</b> It is not built by,
-      affiliated with, or endorsed by the RH MACHINES team, and nothing here is an official source. It is
-      read-only: it holds no keys, signs nothing, places no orders, and gives no advice. Prices come from
-      public OpenSea listings and public Robinhood Chain state, and can be wrong or stale — verify every price
-      on OpenSea before buying.</p>
+    <p class="note">Not built by, affiliated with, or endorsed by the RH MACHINES team.
+    Every figure here is read from the chain or from public APIs, and this site never asks
+    you to connect a wallet or sign anything.</p>
   </footer>
-</section>
+</div>
 
 <script type="module" src="/app.js"></script>

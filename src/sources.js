@@ -29,8 +29,8 @@ export const SOURCES = Object.freeze([
   { what: "Who owns every Machine", kind: "chain", from: "Machines contract" },
   { what: "Each Machine's desk", kind: "chain", from: "Machines contract" },
   { what: "The ballot and its tally", kind: "chain", from: "Vote contract" },
-  { what: "The pot waiting to buy stock", kind: "chain", from: "USDG balance of the swapper" },
-  { what: "The Anvil's bid, shelf and crate", kind: "chain", from: "Vault contract" },
+  { what: "USDG already converted and ready to buy", kind: "chain", from: "balance of the swapper" },
+  { what: "The Anvil's bid, and the Machines on its shelf", kind: "chain", from: "Vault contract" },
   { what: "The stock held inside each Machine", kind: "chain", from: "each Machine's 6551 account" },
   { what: "Epoch, activation cost, sell fee", kind: "chain", from: "MINE contract" },
   { what: "Every coin on PRINTER.FUN", kind: "chain", from: "both pad factories" },
@@ -54,6 +54,13 @@ export const SOURCES = Object.freeze([
       "ETH 5% wrong.",
   },
   { what: "Pool, cap and volume of graduated coins", kind: "api", from: "DexScreener" },
+  {
+    what: "The size of the pot, and how it splits",
+    kind: "api", from: "the protocol's own service",
+    note: "No contract exposes a view that adds the pot up — it is summed off-chain across four " +
+      "contracts. Reproducing that sum here reaches about 80% of it, so the figure is taken from " +
+      "the protocol and cross-checked against the USDG we read ourselves.",
+  },
 
   // --- notre travail ---
   {
@@ -79,6 +86,7 @@ export const SOURCE_KINDS = Object.freeze({
 /** Les hôtes tiers réellement interrogés. Un test compare cette liste au code :
  *  une source ajoutée sans être déclarée ici fait échouer la suite. */
 export const THIRD_PARTY_HOSTS = Object.freeze([
+  "www.rhmachines.com",
   "api.opensea.io",
   "api.dexscreener.com",
   "api.coingecko.com",
