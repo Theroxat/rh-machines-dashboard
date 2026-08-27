@@ -264,13 +264,19 @@ export const SORTS = Object.freeze([
  * porte l'allumage — sans quoi elle passerait devant à prix égal en ne
  * rapportant rien.
  */
-export function pickMachines(d, { klass = null, limit = 24, sort = SORTS[0].key } = {}) {
+export const STATES = Object.freeze([
+  { key: "lit", label: "Printing" },
+  { key: "dormant", label: "Dormant" },
+]);
+
+export function pickMachines(d, { klass = null, state = null, limit = 24, sort = SORTS[0].key } = {}) {
   const eth = d?.eth?.usd;
   const light = d?.ink?.activationTotalUsd ?? 0;
   const out = [];
   for (const r of d?.rows ?? []) {
     if (klass && r.classLabel !== klass) continue;
     for (const [lit, cell] of [[true, r.inked], [false, r.dormant]]) {
+      if (state && lit !== (state === "lit")) continue;
       for (const e of cell?.entries ?? []) {
         const priceUsd = eth ? e.priceEth * eth : null;
         const cost = priceUsd === null ? null : priceUsd + (lit ? 0 : light);
@@ -349,11 +355,23 @@ export function cardHtml(m, { light = 0 } = {}) {
 }
 
 /** Les classes en pastilles, et le tri sur sa propre ligne. */
-/** Le tri, et lui seul : la classe se choisit sur les blocs de plancher. */
-export function chipsHtml(d, active, sort = SORTS[0].key) {
-  return `<div class="chips chips-sort">` + SORTS.map((o) =>
+/**
+ * Le tri et l'état. La classe, elle, se choisit sur les blocs de plancher.
+ *
+ * Deux boutons pour trois états : aucun enfoncé montre tout, un enfoncé ne
+ * montre que celui-là, et le renfoncer revient à tout. Un troisième bouton
+ * « All » ferait une rangée de cinq pour une question qui en compte deux.
+ */
+export function chipsHtml(d, active, sort = SORTS[0].key, state = null) {
+  const sorts = SORTS.map((o) =>
     `<button type="button" data-s="${o.key}" aria-pressed="${sort === o.key ? "true" : "false"}">${
-      esc(o.label)}</button>`).join("") + `</div>`;
+      esc(o.label)}</button>`).join("");
+  const states = STATES.map((o) =>
+    `<button type="button" data-st="${o.key}" aria-pressed="${state === o.key ? "true" : "false"}">${
+      esc(o.label)}</button>`).join("");
+  return `<div class="chips-row">` +
+    `<div class="chips chips-sort">${sorts}</div>` +
+    `<div class="chips chips-state">${states}</div></div>`;
 }
 
 /**
@@ -676,6 +694,7 @@ if (typeof document !== "undefined") {
   // Le carnet ouvre sur le prix : « combien ça coûte » vient avant « combien
   // ça rend », et c'est aussi le seul tri qui montre les dormantes.
   let sort = SORTS[0].key;
+  let state = null;
   let mine = null;
   let learnPainted = false;
 
@@ -693,9 +712,9 @@ if (typeof document !== "undefined") {
   const paintBuy = () => {
     if (!data) return;
     const light = data.ink?.activationTotalUsd ?? 0;
-    const picked = pickMachines(data, { klass, sort });
+    const picked = pickMachines(data, { klass, state, sort });
     $("hero").innerHTML = heroHtml(data, klass);
-    $("chips").innerHTML = chipsHtml(data, klass, sort);
+    $("chips").innerHTML = chipsHtml(data, klass, sort, state);
     $("cards").innerHTML = picked.length
       ? picked.map((m) => cardHtml(m, { light })).join("")
       : `<p class="note">Nothing listed in that class right now.</p>`;
@@ -703,10 +722,14 @@ if (typeof document !== "undefined") {
     $("buy-sub").textContent = sort === "cheap"
       ? "What costs least to get in. Dormant ones are cheaper because they earn nothing yet."
       : "What each Machine returns — its share of the pot, plus the stock already sitting in it — against what it costs.";
-    const total = (data.rows ?? []).reduce((a, r) =>
-      a + (r.inked?.listed ?? 0) + (r.dormant?.listed ?? 0), 0);
+    // Le total doit compter la même chose que la liste, filtre compris :
+    // « 24 sur 757 » sous une grille filtrée sur les dormantes est faux.
+    const total = pickMachines(data, { klass, state, limit: Infinity }).length;
+    const of = state === "lit" ? "printing and for sale"
+      : state === "dormant" ? "dormant and for sale"
+      : "for sale";
     $("more-note").textContent = picked.length && total > picked.length
-      ? `Showing ${picked.length} of ${total} for sale.` : "";
+      ? `Showing ${picked.length} of ${total} ${of}.` : "";
   };
 
   /**
@@ -732,6 +755,7 @@ if (typeof document !== "undefined") {
     let found = null;
     for (const r of data.rows ?? []) {
       for (const [lit, cell] of [[true, r.inked], [false, r.dormant]]) {
+      if (state && lit !== (state === "lit")) continue;
         const e = (cell?.entries ?? []).find((x) => x.tokenId === tokenId);
         if (e) found = { ...e, lit, classLabel: r.classLabel };
       }
@@ -772,6 +796,9 @@ if (typeof document !== "undefined") {
     const b = e.target.closest("button");
     if (!b) return;
     if (b.dataset.s) sort = b.dataset.s;
+    // Renfoncer le bouton actif revient à tout montrer : deux boutons, trois
+    // états, et pas de troisième bouton pour dire « les deux ».
+    else if (b.dataset.st) state = state === b.dataset.st ? null : b.dataset.st;
     else if ("k" in b.dataset) klass = b.dataset.k || null;
     else return;
     paintBuy();

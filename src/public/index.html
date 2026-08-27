@@ -244,8 +244,17 @@
   }
   .chips button:hover { transform: translate(1px, 1px); box-shadow: 3px 3px 0 var(--ink); }
   .chips button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+  /* Le tri à gauche, l'état à droite : deux questions différentes sur la même
+     ligne, et l'œil ne les confond pas parce qu'elles ne se touchent pas. */
+  .chips-row {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    gap: 16px; flex-wrap: wrap; margin: 0 0 18px;
+  }
+  .chips-row .chips { margin: 0; }
   .chips-sort button[aria-pressed="true"] { background: var(--pink); color: var(--paper); }
-  .chips-sort { margin-top: -8px; }
+  /* Le lime dirait « cette machine imprime ». Ici c'est un filtre, pas une
+     machine : il prend l'encre pleine, comme les autres commandes. */
+  .chips-state button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
 
   /* ── les cartes ────────────────────────────────────────────────────────── */
   .grid { display: grid; gap: 16px; grid-template-columns: repeat(4, 1fr); }

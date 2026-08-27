@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import {
   heroHtml, statsHtml, cardHtml, chipsHtml, floorsHtml, detailHtml, bestPick, pickMachines, mineHtml,
   stepsHtml, voteHtml, scarcityHtml, padHtml, sourcesHtml, bannerMessage, potNote,
-  setContract, itemUrl, esc, ADDRESS_RE, SORTS,
+  setContract, itemUrl, esc, ADDRESS_RE, SORTS, STATES,
 } from "../src/public/app.js";
 
 const page = readFileSync(new URL("../src/public/index.html", import.meta.url), "utf8");
@@ -672,4 +672,49 @@ test("sorting by price compares dollars, since the two markets differ", () => {
   for (let i = 1; i < prices.length; i++) {
     assert.ok(prices[i] >= prices[i - 1], "le classement par prix doit être croissant en dollars");
   }
+});
+
+/* ── le filtre d'état ──────────────────────────────────────────────────────
+   Deux boutons pour trois états : aucun enfoncé montre tout, un enfoncé ne
+   montre que celui-là, et le renfoncer revient à tout. Un troisième bouton
+   « All » ferait une rangée de cinq pour une question qui en compte deux. */
+test("the state filter narrows the book to one side or the other", () => {
+  const lit = pickMachines(DATA, { state: "lit", limit: 99 });
+  const off = pickMachines(DATA, { state: "dormant", limit: 99 });
+  const all = pickMachines(DATA, { limit: 99 });
+  assert.ok(lit.length && off.length, "le décor doit contenir les deux états");
+  assert.ok(lit.every((m) => m.lit), "« printing » ne doit rendre que des allumées");
+  assert.ok(off.every((m) => !m.lit), "« dormant » ne doit rendre que des dormantes");
+  assert.equal(lit.length + off.length, all.length, "les deux moitiés doivent faire le tout");
+});
+
+test("the two buttons say which one is on, and neither means everything", () => {
+  assert.deepEqual(STATES.map((s) => s.key), ["lit", "dormant"]);
+  assert.match(chipsHtml(DATA, null, "cheap", "lit"), /data-st="lit" aria-pressed="true"/);
+  assert.match(chipsHtml(DATA, null, "cheap", "lit"), /data-st="dormant" aria-pressed="false"/);
+  const none = chipsHtml(DATA, null, "cheap", null);
+  assert.doesNotMatch(none, /aria-pressed="true"[^>]*>Printing/);
+  assert.doesNotMatch(none, /aria-pressed="true"[^>]*>Dormant/);
+});
+
+// Renfoncer le bouton actif revient à tout montrer. Sans ça, un filtre posé
+// par erreur ne se retire plus.
+test("pressing the active state again clears it", () => {
+  const app = readFileSync(new URL("../src/public/app.js", import.meta.url), "utf8");
+  assert.match(app, /state = state === b\.dataset\.st \? null : b\.dataset\.st/);
+});
+
+// Le lime ne dit qu'une chose : cette machine imprime. Un filtre n'est pas une
+// machine, il prend l'encre pleine comme les autres commandes.
+test("the state filter does not steal the live colour", () => {
+  assert.match(css, /\.chips-state button\[aria-pressed="true"\] \{[^}]*var\(--ink\)/);
+  assert.doesNotMatch(css, /\.chips-state[^{]*\{[^}]*var\(--lime\)/);
+});
+
+// « 24 sur 757 » sous une grille filtrée sur les dormantes est faux : le total
+// doit compter la même chose que la liste.
+test("the count under the grid counts what the grid is showing", () => {
+  const app = readFileSync(new URL("../src/public/app.js", import.meta.url), "utf8");
+  assert.match(app, /const total = pickMachines\(data, \{ klass, state, limit: Infinity \}\)\.length/);
+  assert.match(app, /dormant and for sale/);
 });
