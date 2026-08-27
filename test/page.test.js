@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import {
   heroHtml, statsHtml, cardHtml, chipsHtml, floorsHtml, detailHtml, bestPick, pickMachines, mineHtml,
   stepsHtml, voteHtml, scarcityHtml, padHtml, sourcesHtml, bannerMessage, potNote,
-  setContract, itemUrl, esc, ADDRESS_RE, SORTS, STATES,
+  setContract, itemUrl, esc, ADDRESS_RE, SORTS, STATES, fmtBig,
 } from "../src/public/app.js";
 
 const page = readFileSync(new URL("../src/public/index.html", import.meta.url), "utf8");
@@ -182,12 +182,37 @@ test("with nothing read the page says so rather than showing zeros", () => {
   assert.equal(bannerMessage({ data: {}, at: Date.now() }), "");
 });
 
-test("four figures, and each carries the colour of what it classifies", () => {
-  const html = statsHtml(DATA);
+/* ── les chiffres d'état ───────────────────────────────────────────────────
+   Ils étaient quatre. Le prix du $PRINTER manquait, alors que c'est lui qui
+   décide de ce que coûte un allumage : la case « to switch one on » bougeait
+   de trente pour cent en deux jours sans que rien n'explique pourquoi. */
+test("six figures, and each carries the colour of what it classifies", () => {
+  const html = statsHtml({ ...DATA, printer: { usd: 0.0188, change24h: -24.1, marketCap: 2915894 } });
   assert.match(html, /st-live"><b>7,504<\/b><u>printing now/);
   assert.match(html, /st-pot"><b>\$32k<\/b><u>in the pot/);
+  assert.match(html, /st-book"><b>\$2\.92M<\/b><u>\$PRINTER market/);
+  assert.match(html, /st-cost"><b>\$0\.0188<\/b><u>a \$PRINTER<\/u><i>−24% in a day/);
   assert.match(html, /st-cost"><b>\$151<\/b><u>to switch one on/);
   assert.match(html, /st-book"><b>\$177<\/b><u>cheapest way in/);
+  assert.equal((html.match(/class="st /g) ?? []).length, 6);
+});
+
+test("a figure that could not be read shows a dash, never a zero", () => {
+  const html = statsHtml({ ...DATA, printer: {}, ink: {} });
+  assert.match(html, /<b>—<\/b><u>\$PRINTER market/);
+  assert.match(html, /<b>—<\/b><u>a \$PRINTER/);
+  assert.match(html, /<b>—<\/b><u>to switch one on/);
+  // Et pas de variation inventée sous un prix qu'on n'a pas.
+  assert.doesNotMatch(html, /in a day/);
+});
+
+// « $2,915,894 » dans une case de cent pixels se lit moins vite que « $2.92M ».
+test("a market is written at the scale it is read", () => {
+  assert.equal(fmtBig(2915894), "$2.92M");
+  assert.equal(fmtBig(1570297), "$1.57M");
+  assert.equal(fmtBig(63496), "$63k");
+  assert.equal(fmtBig(1.4e9), "$1.40B");
+  assert.equal(fmtBig(null), "—");
 });
 
 /* ── le classement ───────────────────────────────────────────────────────── */
@@ -729,4 +754,24 @@ test("the line under the title describes the grid actually on screen", () => {
   const app = readFileSync(new URL("../src/public/app.js", import.meta.url), "utf8");
   assert.match(app, /What costs least among the Machines already printing/);
   assert.match(app, /These earn nothing until someone burns ink for them/);
+});
+
+// Le carburant vaut plus cher que ce qu'il alimente. Observation d'analyse :
+// elle vit sur Learn, pas sur la page où l'on vient acheter.
+test("the fuel is weighed against the fleet it burns for, on Learn", () => {
+  const html = scarcityHtml({ ...SC, market: { printerCap: 2915894, collectionCap: 1570297 } });
+  assert.match(html, /\$PRINTER is a <b>\$2\.92M<\/b> market/);
+  assert.match(html, /worth <b>\$1\.57M<\/b> all together/);
+  assert.match(html, /priced at <b>1\.86×<\/b> the fleet it burns for/);
+  // Deux marchés indépendants : le rapport bouge, et le dire évite qu'il se
+  // lise comme un jugement.
+  assert.match(html, /Both move on their own, and the ratio with them/);
+  // Et rien de tout ça sur la page d'accueil.
+  assert.doesNotMatch(heroHtml(DATA), /the fleet it burns for/);
+});
+
+test("with either market unread the comparison is not attempted", () => {
+  assert.doesNotMatch(scarcityHtml({ ...SC, market: { printerCap: 2915894, collectionCap: null } }),
+    /the fleet it burns for/);
+  assert.doesNotMatch(scarcityHtml(SC), /the fleet it burns for/);
 });

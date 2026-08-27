@@ -231,22 +231,48 @@ export function floorsHtml(d, active = null) {
     `</div></div>`;
 }
 
-/** Quatre chiffres, et chacun porte sa couleur parce qu'il porte un rôle. */
+/**
+ * Six chiffres, et chacun porte la couleur de ce qu'il classe.
+ *
+ * Ils étaient quatre. Le prix du $PRINTER manquait, alors que c'est lui qui
+ * décide de ce que coûte un allumage — la case « to switch one on » bougeait
+ * de trente pour cent en deux jours sans que rien n'explique pourquoi. Et la
+ * capitalisation manquait aussi, alors que le jeton est le carburant de tout.
+ */
 export function statsHtml(d) {
   if (!d) return "";
   const x1 = (d.rows ?? []).find((r) => r.classValue === 100);
   const cheapest = x1?.inked?.floorEth && d.eth?.usd ? x1.inked.floorEth * d.eth.usd : null;
-  const cell = (cls, value, label) =>
-    `<div class="st ${cls}"><b>${value}</b><u>${label}</u></div>`;
+  const p = d.printer ?? {};
+  const cap = p.marketCap ?? p.fdv ?? null;
+
+  const cell = (cls, value, label, sub = "") =>
+    `<div class="st ${cls}"><b>${value}</b><u>${label}</u>` +
+    (sub ? `<i>${sub}</i>` : "") + `</div>`;
+
+  // Une variation de vingt-quatre pour cent en un jour n'est pas un détail
+  // pour quelqu'un qui s'apprête à brûler cinq mille jetons.
+  const move = typeof p.change24h === "number"
+    ? `${p.change24h > 0 ? "+" : "\u2212"}${Math.abs(p.change24h).toFixed(0)}% in a day`
+    : "";
+
   return [
     cell("st-live", fmtInt(d.totals?.inked ?? 0), "printing now"),
-    // Le pot entier, pas seulement la part déjà convertie. Il se lit chez le
-    // protocole, faute d'un contrat qui l'additionne — et il retombe sur
-    // l'USDG qu'on lit nous-mêmes si leur service ne répond pas.
     cell("st-pot", fmtUsdShort(d.official?.potUsd ?? d.pot?.usd ?? 0), "in the pot"),
+    cell("st-book", cap === null ? "—" : fmtBig(cap), "$PRINTER market"),
+    cell("st-cost", p.usd ? `$${p.usd.toFixed(4)}` : "—", "a $PRINTER", move),
     cell("st-cost", d.ink?.activationTotalUsd ? fmtUsdRound(d.ink.activationTotalUsd) : "—", "to switch one on"),
     cell("st-book", cheapest === null ? "—" : fmtUsdRound(cheapest), "cheapest way in"),
   ].join("");
+}
+
+/** Un montant à l'échelle du million, écrit court. « $2,915,894 » dans une
+ *  case de cent pixels se lit moins vite que « $2.9M ». */
+export function fmtBig(v) {
+  if (v === null || v === undefined) return "—";
+  if (v >= 1e9) return `$${(v / 1e9).toFixed(2)}B`;
+  if (v >= 1e6) return `$${(v / 1e6).toFixed(2)}M`;
+  return fmtUsdShort(v);
 }
 
 /** L'ordre des deux boutons est celui de la page : le prix d'abord, parce
@@ -595,6 +621,15 @@ export function scarcityHtml(sc) {
       `<p>Of the <b>${fmtInt(b.minted)}</b> $PRINTER ever minted, ${fmtInt(Math.round(b.ink))} ` +
       `burned as ink switching Machines on, and ${fmtInt(Math.round(b.other))} burned elsewhere` +
       `${b.proton ? ` — ${fmtInt(Math.round(b.proton))} of it by the Proton` : ""}.</p>`) +
+    // Le carburant vaut plus cher que ce qu'il alimente. C'est une observation
+    // d'analyse, pas une donnée d'achat : elle vit ici, où l'on vient
+    // comprendre, et pas sur la page où l'on vient acheter.
+    (sc.market?.printerCap && sc.market?.collectionCap
+      ? `<p>$PRINTER is a <b>${fmtBig(sc.market.printerCap)}</b> market. The ten thousand ` +
+        `Machines it fuels are worth <b>${fmtBig(sc.market.collectionCap)}</b> all together — ` +
+        `so the fuel is priced at <b>${fmtExact(sc.market.printerCap / sc.market.collectionCap)}×</b> ` +
+        `the fleet it burns for. Both move on their own, and the ratio with them.</p>`
+      : "") +
     (!o ? "" :
       `<p>The Proton claims <b>${fmtRatio(1 - o.claimedFailRate)}</b> success. So far ` +
       `<b>${fmtRatio(o.failRate)}</b> of ${fmtInt(o.done)} rolls have failed, against ` +
@@ -846,7 +881,18 @@ if (typeof document !== "undefined") {
     ]) {
       try {
         const res = await fetch(path);
-        $(id).innerHTML = render(res.ok ? await res.json() : null);
+        const body = res.ok ? await res.json() : null;
+        // La rareté a besoin des deux capitalisations pour les comparer, et
+        // elles vivent dans le snapshot. On les lui passe plutôt que de lui
+        // faire redemander ce qu'on a déjà.
+        $(id).innerHTML = render(
+          body && id === "scarcity"
+            ? { ...body, market: {
+                printerCap: data?.printer?.marketCap ?? data?.printer?.fdv ?? null,
+                collectionCap: data?.collection?.marketCapUsd ?? null,
+              } }
+            : body,
+        );
       } catch {
         extrasAt = 0;
       }
