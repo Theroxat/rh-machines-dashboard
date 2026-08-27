@@ -68,6 +68,16 @@
 
   .wrap { max-width: 1180px; margin: 0 auto; padding: 0 18px; }
 
+  /* Comprendre est un document, pas un tableau de bord : il se lit d'un bout à
+     l'autre. Étalé sur onze cents pixels, son texte tenait dans la moitié
+     gauche — bridé à sa largeur de lecture — et laissait l'autre moitié vide.
+     Ce n'est pas du blanc voulu, ça se lit comme une page cassée. À sa propre
+     largeur, centrée, la même prose se lit comme un choix. */
+  /* Alignée à gauche, pas centrée : centrée, elle démarrait cent soixante
+     pixels à droite de la navigation, et deux bords gauches différents sur la
+     même page se lisent comme un défaut. */
+  #pane-learn { max-width: 820px; }
+
   a { color: inherit; }
   /* Le focus doit se voir sur du papier : un liseré rose, jamais le contour
      par défaut du navigateur qui disparaît sur fond clair. */
@@ -122,12 +132,14 @@
   .hero p { margin: 0; font-size: 17px; font-weight: 600; max-width: 68ch; color: var(--ink); }
 
   /* ── les chiffres d'état ────────────────────────────────────────────────── */
-  /* Cinq cases sur une ligne. Le montant le plus long est la capitalisation,
-     et « $2.96M » tient dans une colonne de deux cents pixels — c'est le prix
-     du jeton, à sept caractères après la virgule, qui imposait deux rangées.
-     Il est parti : ce qui compte à l'achat est le coût d'allumage, déjà
-     converti dans la case voisine. */
-  .stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 11px; margin: 24px 0 20px; }
+  /* La rangée s'adapte au nombre de cases qu'on lui donne. Elle était figée à
+     cinq pour la page d'accueil ; les sections de Learn en passent quatre, et
+     la cinquième colonne restait vide en rétrécissant les autres. Une grille
+     qui compte à la place de l'appelant ne se trompe pas. */
+  .stats {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+    gap: 11px; margin: 24px 0 20px;
+  }
   .st { border: var(--b) solid var(--ink); padding: 14px 15px; box-shadow: var(--shadow-sm); }
   .st b {
     display: block; font-size: clamp(20px, 2.4vw, 27px); font-weight: 900;
@@ -141,8 +153,7 @@
   .st-pot  { background: var(--sky); }
   .st-cost { background: var(--sun); }
   .st-book { background: var(--paper-2); }
-  @media (max-width: 1040px) { .stats { grid-template-columns: repeat(3, 1fr); } }
-  @media (max-width: 600px)  { .stats { grid-template-columns: repeat(2, 1fr); } }
+
 
   /* ── titres de section ─────────────────────────────────────────────────── */
   h3.sec {
@@ -410,7 +421,7 @@
   .ask button:hover { transform: translate(1px, 1px); box-shadow: 3px 3px 0 var(--ink); }
 
   /* ── les étapes ────────────────────────────────────────────────────────── */
-  .steps { display: grid; gap: 16px; margin: 18px 0 0; max-width: 74ch; }
+  .steps { display: grid; gap: 16px; margin: 18px 0 0; }
   .step {
     display: flex; gap: 15px; align-items: flex-start;
     border: var(--b) solid var(--ink); background: var(--paper);
@@ -427,7 +438,7 @@
   .step b { color: var(--ink); font-weight: 800; }
 
   /* ── les barres du vote ────────────────────────────────────────────────── */
-  .vote { display: grid; gap: 9px; max-width: 640px; }
+  .vote { display: grid; gap: 9px; }
   .vt { border: var(--b) solid var(--ink); background: var(--paper); padding: 9px 12px; }
   .vt-hd { display: flex; justify-content: space-between; font-size: 14px; font-weight: 800; }
   .vt-hd u { text-decoration: none; font-variant-numeric: tabular-nums; }

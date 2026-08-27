@@ -806,3 +806,30 @@ test("no machine appears twice in the book as it stands", () => {
     seen.add(m.tokenId);
   }
 });
+
+/* ── la grille des chiffres ────────────────────────────────────────────────
+   Elle était figée à cinq colonnes pour la page d'achat. Les sections de Learn
+   lui en passent quatre : la cinquième colonne restait vide et rétrécissait
+   les autres, sur une page qui n'avait rien demandé. */
+test("the figure grid counts its own cells instead of being told five", () => {
+  const rule = css.match(/\.stats \{[^}]*\}/)[0];
+  assert.match(rule, /repeat\(auto-fit, minmax\([\d.]+px, 1fr\)\)/);
+  assert.doesNotMatch(rule, /repeat\(\d+, 1fr\)/);
+  // Et les sections qui s'en servent n'en passent pas toutes le même nombre.
+  const buy = (statsHtml(DATA).match(/class="st /g) ?? []).length;
+  const learn = (scarcityHtml(SC).match(/class="st /g) ?? []).length;
+  assert.notEqual(buy, learn, "le décor doit prouver que les deux comptes diffèrent");
+});
+
+// Comprendre est un document : il se lit d'un bout à l'autre. Étalé sur la
+// largeur d'un tableau de bord, son texte tenait dans la moitié gauche et
+// laissait l'autre vide — ce qui se lit comme une page cassée, pas comme un
+// choix de composition.
+test("the Learn page is set at a reading width, not a dashboard width", () => {
+  const rule = css.match(/#pane-learn \{[^}]*\}/)[0];
+  assert.match(rule, /max-width: \d+px/);
+  // Alignée à gauche : centrée, elle démarrait cent soixante pixels à droite
+  // de la navigation, et deux bords gauches sur la même page se lisent comme
+  // un défaut.
+  assert.doesNotMatch(rule, /margin: 0 auto/);
+});
