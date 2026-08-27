@@ -29,6 +29,7 @@ import { buildGrid } from "./floors.js";
 import { composeSnapshot } from "./snapshot.js";
 import { createStore } from "./store.js";
 import { assetHash, assetPath, stampPage, cacheHeaders, securityHeaders, etagOf } from "./http.js";
+import { readBalances } from "./balances.js";
 import { multicallOf } from "./multicall.js";
 import { readPad, readPools, priceCoin, padStats, padMovement, markNamesakes } from "./pad.js";
 import { readProton } from "./proton.js";
@@ -444,30 +445,58 @@ function loop(name, fn, intervalMs, { runNow = true } = {}) {
  * retirées des comptes de ses machines. Lus à la demande — une adresse par
  * requête, jamais dix mille à chaque balayage.
  */
-const ERC20_BAL = new ethers.Interface(["function balanceOf(address) view returns (uint256)"]);
-
 async function readWalletBalances(address) {
-  const bal = async (token, decimals) => {
-    try {
-      const raw = await provider.call({ to: token, data: ERC20_BAL.encodeFunctionData("balanceOf", [address]) });
-      return raw === "0x" ? 0 : Number(ethers.formatUnits(ERC20_BAL.decodeFunctionResult("balanceOf", raw)[0], decimals));
-    } catch {
-      return 0;
-    }
-  };
-  const printer = await bal(ADDRESSES.TOKEN, 18);
+  // Le $PRINTER en tête, les actions ensuite : un seul multicall pour les
+  // dix-sept. Lus un par un, ils coûtaient dix-sept allers-retours par requête
+  // HTTP sur une route que personne n'authentifie ni ne limite.
+  const tokens = [{ address: ADDRESSES.TOKEN, decimals: 18 }, ...stockTokens];
+  const amounts = await readBalances({
+    aggregate3: multicallOf(provider, ADDRESSES.MULTICALL3),
+    address, tokens,
+  }).catch(() => []);
+
   const stock = [];
-  for (const t of stockTokens) {
-    const amount = await bal(t.address, t.decimals);
-    if (!amount) continue;
+  stockTokens.forEach((t, i) => {
+    const amount = amounts[i + 1] ?? 0;
+    if (!amount) return;
     const price = stockPrices.get(t.symbol) ?? null;
     stock.push({ symbol: t.symbol, amount, usd: price === null ? null : amount * price });
-  }
-  return { printer, stock };
+  });
+  return { printer: amounts[0] ?? 0, stock };
 }
 
+/**
+ * Combien de lectures de portefeuille peuvent tenir la ligne en même temps.
+ *
+ * Chacune ouvre un multicall et garde sa connexion le temps qu'il revienne.
+ * Sans plafond, il suffit d'en lancer mille pour saturer le RPC — et le RPC
+ * est ce qui alimente le reste du site, pas seulement cette route. Refuser
+ * tout de suite vaut mieux qu'accepter une file que personne ne videra : le
+ * visiteur relance, l'attaquant n'obtient rien.
+ */
+const WALLET_MAX_INFLIGHT = 8;
+let walletInflight = 0;
+
 const server = createServer(async (req, res) => {
-  if (req.url === "/api/snapshot") {
+  // L'adresse se compare par son chemin, pas par sa chaîne entière.
+  //
+  // Comparée entière, `/?utm_source=twitter` ne valait pas `/` : tout lien
+  // partagé avec un paramètre de suivi — et il s'en ajoute sur la moitié des
+  // plateformes — tombait sur « not found ». Le site avait l'air mort à qui
+  // n'avait rien fait de mal.
+  const url = new URL(req.url, "http://x");
+  const path = url.pathname;
+
+  // Ce service ne fait que lire. Sans ce test, un POST sur n'importe quelle
+  // route rendait 200 avec le corps entier : un scanner, un cache ou un
+  // intermédiaire pouvait en conclure qu'une écriture avait été acceptée.
+  if (req.method !== "GET" && req.method !== "HEAD") {
+    res.writeHead(405, { "content-type": "text/plain", allow: "GET, HEAD", ...securityHeaders() });
+    res.end("method not allowed");
+    return;
+  }
+
+  if (path === "/api/snapshot") {
     const p = apiPayload();
     const headers = {
       "content-type": "application/json",
@@ -491,7 +520,7 @@ const server = createServer(async (req, res) => {
   // voyagé trente-neuf fois sur quarante pour rien.
   // Ce qui quitte la circulation : le coffre du Proton et le $PRINTER brûlé.
   // Sa propre route, comme le pad : il ne bouge qu'aux dix minutes.
-  if (req.url === "/api/scarcity") {
+  if (path === "/api/scarcity") {
     const body = JSON.stringify(scarcity ?? null);
     const etag = etagOf(body);
     const headers = { "content-type": "application/json", etag, ...cacheHeaders("api"), ...securityHeaders() };
@@ -504,7 +533,7 @@ const server = createServer(async (req, res) => {
     res.end(body);
     return;
   }
-  if (req.url === "/api/pad") {
+  if (path === "/api/pad") {
     const body = JSON.stringify(pad ?? null);
     const etag = etagOf(body);
     const headers = {
@@ -520,11 +549,26 @@ const server = createServer(async (req, res) => {
     res.end(body);
     return;
   }
-  // Le portefeuille d'un visiteur. Tout est déjà en mémoire : l'index des
-  // propriétaires, les poids, les desks, le dépouillement. La requête ne
-  // touche pas la chaîne, donc elle ne peut pas servir à la marteler.
-  if (req.url.startsWith("/api/wallet")) {
-    const address = new URL(req.url, "http://x").searchParams.get("address");
+  /**
+   * Le portefeuille d'un visiteur.
+   *
+   * L'index des propriétaires, les poids, les desks et le dépouillement sont
+   * en mémoire. Les avoirs des comptes de machines et les soldes du porteur,
+   * eux, se lisent sur la chaîne à chaque requête — et c'est ce qui rend cette
+   * route différente de toutes les autres.
+   *
+   * Le commentaire qui tenait ici jurait que la requête ne touchait pas la
+   * chaîne « donc ne pouvait pas servir à la marteler ». C'était vrai le jour
+   * où il a été écrit ; `readHoldings` et `readWalletBalances` sont arrivés
+   * après, et personne n'est revenu le relire. Un invariant affirmé en
+   * commentaire est plus dangereux qu'un silence : un relecteur s'y fie.
+   *
+   * Deux garde-fous, donc, et ils sont dans le code plutôt que dans une
+   * phrase : un seul multicall par requête, et un plafond de requêtes
+   * simultanées.
+   */
+  if (path === "/api/wallet") {
+    const address = url.searchParams.get("address");
     const headers = { "content-type": "application/json", ...cacheHeaders("api"), ...securityHeaders() };
     // Ce qui entre ici interroge un index et ressort dans du balisage : une
     // adresse, quarante hexadécimaux, rien d'autre.
@@ -533,6 +577,16 @@ const server = createServer(async (req, res) => {
       res.end(JSON.stringify({ error: "not an address" }));
       return;
     }
+    // Valider l'adresse ne protège de rien : il en existe 2^160 de valides, et
+    // qui veut marteler en tire une nouvelle à chaque coup. C'est le nombre de
+    // lectures simultanées qu'il faut borner, pas leur forme.
+    if (walletInflight >= WALLET_MAX_INFLIGHT) {
+      res.writeHead(503, { ...headers, "retry-after": "2" });
+      res.end(JSON.stringify({ error: "busy reading the chain — try again in a moment" }));
+      return;
+    }
+    walletInflight++;
+    try {
     const snap = store.get().data;
     // Les avoirs des machines du portefeuille : lus une fois, servis à la
     // fois aux vignettes et au calcul de valeur.
@@ -594,28 +648,38 @@ const server = createServer(async (req, res) => {
     res.writeHead(200, headers);
     res.end(JSON.stringify({ ...body, worth, sectors: SECTORS, closesAt: snap?.vote?.closesAt ?? null }));
     return;
+    } finally {
+      // Dans un `finally` et pas après le `res.end` : un lancer au milieu de la
+      // lecture laisserait sinon le compteur en l'air, et huit erreurs
+      // suffiraient à fermer la route pour tout le monde, définitivement.
+      walletInflight--;
+    }
   }
-  if (req.url === appPath) {
+  if (path === appPath) {
     res.writeHead(200, { "content-type": "text/javascript; charset=utf-8", ...cacheHeaders("asset"), ...securityHeaders() });
     res.end(app);
     return;
   }
-  if (req.url === "/favicon.svg") {
+  if (path === "/favicon.svg") {
     res.writeHead(200, { "content-type": "image/svg+xml", ...cacheHeaders("page"), ...securityHeaders() });
     res.end(favicon);
     return;
   }
-  if (req.url === "/app.js") {
+  if (path === "/app.js") {
     res.writeHead(200, { "content-type": "text/javascript; charset=utf-8", ...cacheHeaders("asset-unversioned"), ...securityHeaders() });
     res.end(app);
     return;
   }
-  if (req.url === "/" || req.url === "/index.html") {
+  if (path === "/" || path === "/index.html") {
     res.writeHead(200, { "content-type": "text/html; charset=utf-8", ...cacheHeaders("page"), ...securityHeaders() });
     res.end(page);
     return;
   }
-  res.writeHead(404, { "content-type": "text/plain" });
+  // La seule sortie du service qui échappait à la règle : pas de CSP, pas de
+  // nosniff, pas de refus d'encadrement. Le corps est du texte brut, donc le
+  // risque était mince — mais une exception qu'on n'explique pas est une
+  // exception que le prochain élargira.
+  res.writeHead(404, { "content-type": "text/plain; charset=utf-8", ...securityHeaders() });
   res.end("not found");
 });
 

@@ -82,8 +82,17 @@ export const ANVIL_URL = "https://www.rhmachines.com/#anvil";
 
 /** Tout ce qui vient du réseau entre dans du balisage, et rien n'est écrit
  *  sans passer par ici. */
-export const esc = (s) => String(s).replace(/[&<>"]/g,
-  (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+/**
+ * Rien de ce qui vient de la chaîne, d'OpenSea ou du pad n'entre dans du
+ * balisage sans passer par ici.
+ *
+ * L'apostrophe simple est échappée alors qu'aucun attribut du projet n'en
+ * utilise. C'est exactement pour ça : le jour où quelqu'un écrit `class='…'`,
+ * cette fonction doit déjà tenir. Un échappement qui dépend d'une convention
+ * de guillemets n'en est pas un.
+ */
+export const esc = (s) => String(s).replace(/[&<>"']/g,
+  (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 /* ══ ACHETER ═══════════════════════════════════════════════════════════════ */
 

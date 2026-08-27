@@ -9,6 +9,16 @@ services:
     # qu'à 0.0.0.0 : le dashboard reste sur l'interface LAN.
     ports:
       - "192.168.0.11:3050:3050"
+    # Le service lit du réseau et écrit deux fichiers de cache. Il tourne déjà
+    # en non-root ; ces trois lignes lui retirent ce qu'il n'a jamais utilisé.
+    # `read_only` demande un tmpfs : node:22-alpine écrit dans /tmp au démarrage.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
     volumes:
       - ./data:/app/data
 
@@ -38,6 +48,16 @@ services:
       DISCORD_WEBHOOK: ""
     ports:
       - "192.168.0.11:3051:3050"
+    # Le service lit du réseau et écrit deux fichiers de cache. Il tourne déjà
+    # en non-root ; ces trois lignes lui retirent ce qu'il n'a jamais utilisé.
+    # `read_only` demande un tmpfs : node:22-alpine écrit dans /tmp au démarrage.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
     volumes:
       - ./data-staging:/app/data
 
@@ -71,5 +91,15 @@ services:
       DISCORD_WEBHOOK: ""
     ports:
       - "192.168.0.11:3052:3050"
+    # Le service lit du réseau et écrit deux fichiers de cache. Il tourne déjà
+    # en non-root ; ces trois lignes lui retirent ce qu'il n'a jamais utilisé.
+    # `read_only` demande un tmpfs : node:22-alpine écrit dans /tmp au démarrage.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
     volumes:
       - ./data-legacy:/app/data

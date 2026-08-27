@@ -533,6 +533,19 @@ test("the way out of this version is a link, and does not read as a label", () =
   assert.doesNotMatch(rule, /var\(--lime\)|var\(--pink\)|var\(--sun\)|var\(--sky\)/);
 });
 
+// L'apostrophe simple est échappée alors qu'aucun attribut du projet n'en
+// utilise. C'est la raison même : le jour où quelqu'un écrit class='…', la
+// fonction doit déjà tenir. Un échappement qui dépend d'une convention de
+// guillemets n'en est pas un.
+test("escaping does not depend on which quote the markup happens to use", () => {
+  assert.equal(esc(`<a href='x' title="y">&</a>`),
+    "&lt;a href=&#39;x&#39; title=&quot;y&quot;&gt;&amp;&lt;/a&gt;");
+  for (const c of ["<", ">", '"', "'", "&"]) {
+    assert.doesNotMatch(esc(`a${c}b`), new RegExp(`[<>"'&](?!#?\\w+;)`),
+      `${c} ressort tel quel`);
+  }
+});
+
 // Le mot vit dans le titre et dans les balises de partage : un lien envoyé sur
 // Discord l'affiche avant que qui que ce soit n'ouvre la page.
 test("the page says it is unofficial before anyone opens it", () => {
