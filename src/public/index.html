@@ -128,7 +128,23 @@
     margin: 0 0 11px; font-size: clamp(30px, 5.6vw, 62px); line-height: 0.94;
     font-weight: 900; letter-spacing: -0.05em; max-width: 26ch; text-wrap: balance;
   }
-  .hero h2 mark { background: var(--sun); color: var(--ink); padding: 0 5px; }
+  /* Le fond d'un mark en ligne se peint sur la boîte de la fonte — 1,258 em
+     dans cette pile — et pas sur celle de la ligne. Avec un interlignage de
+     0,94 la fonte dépasse sa propre ligne de vingt pixels, et le jaune montait
+     mordre les jambages de la ligne du dessus. En bloc en ligne, le fond suit
+     la hauteur qu'on lui donne, et 0,86 em reste sous la ligne : la boîte se
+     referme sur les chiffres sans écarter le titre. */
+  .hero h2 mark {
+    display: inline-block; line-height: 0.84; padding: 0.06em 5px 0.02em;
+    background: var(--sun); color: var(--ink);
+  }
+  /* Deux faits dans ce titre, et ils ne se mettent pas en évidence pareil.
+     Le jaune dit ce qu'on paie — ici l'encre brûlée. Le parc n'est pas un
+     coût : lui donner le même jaune lui ferait dire ce qu'il n'est pas, et
+     deux fois la même couleur dans une phrase ne met rien en évidence du
+     tout. Il est frappé à l'encre, qui ne classe rien et n'appartient donc à
+     aucune règle de couleur. */
+  .hero h2 mark.stamp { background: var(--ink); color: var(--paper); }
   .hero p { margin: 0; font-size: 17px; font-weight: 600; max-width: 68ch; color: var(--ink); }
 
   /* ── les chiffres d'état ────────────────────────────────────────────────── */

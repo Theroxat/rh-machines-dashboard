@@ -118,7 +118,7 @@ test("the page opens on the fleet and on what has been burned for good", () => {
   const html = heroHtml(DATA);
   // Le nombre qui compte n'est pas celui qui a été frappé, c'est celui qu'on
   // peut encore acheter : le coffre du Proton en avale une à chaque fusion.
-  assert.match(html, /9,744 Machines still out there\. <mark>22\.5%<\/mark> of the \$PRINTER already burned/);
+  assert.match(html, /<mark class="stamp">9,744<\/mark> Machines still out there\. <mark>22\.5%<\/mark> of the \$PRINTER already burned/);
   assert.match(html, /45,000,000 of the 200,000,000 ever minted are gone for good/);
   assert.match(html, /43,285,199 of it as ink/);
   assert.match(html, /there is no way to mint more/);
@@ -157,9 +157,35 @@ test("with nothing in the vault the page says the whole fleet is still out there
 // « en circulation » qu'on n'a pas mesuré.
 test("with no vault reading, the minted count is used and nothing is claimed about it", () => {
   const html = heroHtml({ ...DATA, fleet: null, collection: { machines: 10000 } });
-  assert.match(html, /10,000 Machines\. <mark>/);
+  assert.match(html, /<mark class="stamp">10,000<\/mark> Machines\. <mark>/);
   assert.doesNotMatch(html, /still out there/);
   assert.doesNotMatch(html, /vault/);
+});
+
+/* Le titre porte deux faits, et ils ne se mettent pas en évidence pareil.
+   Le jaune dit ce qu'on paie — ici l'encre brûlée ; le parc n'est pas un coût.
+   Deux fois la même couleur dans une phrase ne met rien en évidence. */
+test("the two facts in the headline are marked apart, not twice the same", () => {
+  const html = heroHtml(DATA);
+  assert.match(html, /<mark class="stamp">9,744<\/mark>/);
+  assert.match(html, /<mark>22\.5%<\/mark>/);
+  assert.match(css, /\.hero h2 mark\.stamp \{[^}]*background: var\(--ink\)/);
+  assert.match(css, /\.hero h2 mark\.stamp \{[^}]*color: var\(--paper\)/);
+  // Le jaune reste ce qu'on paie : le parc ne doit pas le porter.
+  assert.doesNotMatch(css, /\.hero h2 mark\.stamp \{[^}]*var\(--sun\)/);
+});
+
+/* Le fond d'un mark en ligne se peint sur la boîte de la fonte, pas sur celle
+   de la ligne : à 0,94 d'interlignage il débordait de vingt pixels sur la
+   ligne du dessus. En bloc en ligne, le fond suit la hauteur donnée. */
+test("the highlight box is contained by the line it belongs to", () => {
+  const rule = css.match(/\.hero h2 mark \{[^}]*\}/)[0];
+  assert.match(rule, /display: inline-block/);
+  const lh = Number(rule.match(/line-height: ([\d.]+)/)[1]);
+  const h2 = Number(css.match(/\.hero h2 \{[^}]*line-height: ([\d.]+)/)[1]);
+  const pad = [...rule.matchAll(/padding: ([\d.]+)em [^;]*? ([\d.]+)em/g)][0];
+  const total = lh + Number(pad[1]) + Number(pad[2]);
+  assert.ok(total <= h2, `la boîte fait ${total}em pour une ligne de ${h2}em`);
 });
 
 test("with no supply read it still says no Machine was ever destroyed", () => {
@@ -170,8 +196,8 @@ test("with no supply read it still says no Machine was ever destroyed", () => {
 // qu'on sait, et rien de plus.
 test("with no supply read, no burn share is invented", () => {
   const html = heroHtml({ ...DATA, burn: null });
-  assert.match(html, /9,744 Machines still out there, and a \$PRINTER supply that only ever falls/);
-  assert.doesNotMatch(html, /%<\/mark>/);
+  assert.match(html, /<mark class="stamp">9,744<\/mark> Machines still out there, and a \$PRINTER supply that only ever falls/);
+  assert.doesNotMatch(html, /[\d.]+%<\/mark>/);
   assert.doesNotMatch(html, /gone for good/);
 });
 

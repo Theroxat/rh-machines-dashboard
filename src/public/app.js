@@ -112,10 +112,11 @@ export function heroHtml(d, active = null) {
   // mot se rattache aussi au premier membre et la phrase annonce dix mille
   // machines brûlées. Il n'en existe aucune : `totalSupply` n'a jamais bougé.
   const noun = f ? "Machines still out there" : "Machines";
+  const fleet = `<mark class="stamp">${fmtInt(total)}</mark>`;
   const head = b
-    ? `<h2>${fmtInt(total)} ${noun}. <mark>${fmtRatio(b.share)}</mark> of the ` +
+    ? `<h2>${fleet} ${noun}. <mark>${fmtRatio(b.share)}</mark> of the ` +
       `$PRINTER already burned.</h2>`
-    : `<h2>${fmtInt(total)} ${noun}, and a $PRINTER supply that only ever falls.</h2>`;
+    : `<h2>${fleet} ${noun}, and a $PRINTER supply that only ever falls.</h2>`;
 
   // « Hors circulation » n'est pas « détruite » : le coffre du Proton a un
   // propriétaire qui peut ressortir ce qu'il garde. La phrase compte les deux
