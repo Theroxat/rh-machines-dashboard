@@ -7,8 +7,11 @@ data/history-*.db*
 # Captures pour les tweets : des livrables, pas du code.
 tweet-*.png
 
-# La base du banc d essai : jetable, jamais versionnée.
+# Les bases du banc et de l'archive : jetables, jamais versionnées. Chaque
+# service a son volume, et aucun de ces répertoires ne contient de source —
+# seulement ce que la chaîne a rendu.
 data-staging/
+data-legacy/
 shop-*.png
 idee-*.png
 nb-*.png
