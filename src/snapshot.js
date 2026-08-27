@@ -4,6 +4,7 @@ import { deskShares } from "./vote.js";
 import { deskName } from "./desks.js";
 import { epochUsd } from "./pot.js";
 import { valueHoldings } from "./holdings.js";
+import { crossCheck } from "./official.js";
 import { SOURCES, SOURCE_KINDS } from "./sources.js";
 
 /** Assemblage pur de tout ce dont la page a besoin. Une dérivation qui
@@ -59,7 +60,7 @@ export function fleetHeadline(off) {
 export function composeSnapshot({
   grid, printer, eth, protocol, stats, book, inkMeta, meta, legend, ink, weights, anvil,
   deskIndex, vote, potUsd, sectorWeight, tickers, holdings, stockPrices, ownerOf, now,
-  offCirculation,
+  offCirculation, official,
 }) {
   const activationPrinter = protocol?.activationInk
     ? Number(BigInt(protocol.activationInk) / 10n ** 15n) / 1000
@@ -279,6 +280,12 @@ export function composeSnapshot({
     // soustraction, pas une estimation.
     burn: burnHeadline(protocol),
     fleet: fleetHeadline(offCirculation),
+    // Ce que le protocole publie de son propre pot, et le recoupement contre ce
+    // qu'on lit nous-mêmes. La page relaie un chiffre qu'elle ne dérive pas :
+    // elle doit pouvoir dire quand il cesse de tenir.
+    official: official
+      ? { ...official, check: crossCheck({ official, swapperUsdg: potUsd }) }
+      : null,
     // Le scrutin décide de la taille des parts du pot, donc du coefficient qui
     // s'applique par desk. Illisible, il vaut null : la page dira qu'elle ne
     // sait pas plutôt que d'annoncer seize parts égales, qu'elles ne sont pas.

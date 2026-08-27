@@ -130,7 +130,36 @@ export function heroHtml(d, active = null) {
     : `<p>Burning $PRINTER is how a Machine is switched on, and none of it ever ` +
       `comes back.${gone}</p>`;
 
-  return `<div class="hero">` + head + said + floorsHtml(d, active) + `</div>`;
+  return `<div class="hero">` + head + said + potNote(d) + floorsHtml(d, active) + `</div>`;
+}
+
+/**
+ * Ce que le pot contient, et ce qu'on en touchera quand.
+ *
+ * Le protocole le coupe en deux, et la distinction vaut de l'argent : `locked`
+ * est la part que le vote en cours est en train de diviser, `building` est ce
+ * qui s'accumule pour le tirage suivant. Une machine allumée aujourd'hui ne
+ * touche pas la première — elle ne compte qu'à partir de l'epoch d'après, donc
+ * c'est la seconde qui la concerne.
+ */
+export function potNote(d) {
+  const o = d?.official;
+  if (!o?.potUsd) return "";
+  const split = o.lockedUsd && o.buildingUsd
+    ? ` <b>${fmtUsdShort(o.lockedUsd)}</b> of it is locked for this drop and the vote is ` +
+      `dividing it now; <b>${fmtUsdShort(o.buildingUsd)}</b> is building toward the next one — ` +
+      `which is the half a Machine lit today will share in.`
+    : "";
+  const paid = o.distributedUsd
+    ? ` <b>${fmtUsdShort(o.distributedUsd)}</b> has already been paid out in earlier drops.`
+    : "";
+  // On relaie un chiffre qu'on ne dérive pas : quand il cesse de tenir contre
+  // ce qu'on lit soi-même, on le dit plutôt que de le répéter.
+  const warn = o.check?.disagrees
+    ? ` <b>These two do not agree right now</b> — we read ${fmtUsdShort(o.check.swapperUsdg)} of ` +
+      `converted USDG, which cannot exceed the pot it belongs to.`
+    : "";
+  return `<p class="pot-note">The pot holds <b>${fmtUsdShort(o.potUsd)}</b>.${split}${paid}${warn}</p>`;
 }
 
 /**
@@ -176,7 +205,10 @@ export function statsHtml(d) {
     `<div class="st ${cls}"><b>${value}</b><u>${label}</u></div>`;
   return [
     cell("st-live", fmtInt(d.totals?.inked ?? 0), "printing now"),
-    cell("st-pot", fmtUsdShort(d.pot?.usd ?? 0), "in the pot"),
+    // Le pot entier, pas seulement la part déjà convertie. Il se lit chez le
+    // protocole, faute d'un contrat qui l'additionne — et il retombe sur
+    // l'USDG qu'on lit nous-mêmes si leur service ne répond pas.
+    cell("st-pot", fmtUsdShort(d.official?.potUsd ?? d.pot?.usd ?? 0), "in the pot"),
     cell("st-cost", d.ink?.activationTotalUsd ? fmtUsdRound(d.ink.activationTotalUsd) : "—", "to switch one on"),
     cell("st-book", cheapest === null ? "—" : fmtUsdRound(cheapest), "cheapest way in"),
   ].join("");
@@ -225,9 +257,16 @@ export function pickMachines(d, { klass = null, limit = 24, sort = SORTS[0].key 
 /** Une machine, une carte, un seul geste : aller l'acheter. */
 export function cardHtml(m, { light = 0 } = {}) {
   const reinked = m.inkMult > 1.0001 && m.weight;
-  const art = m.machine?.image
-    ? `<img class="card-art" src="${esc(m.machine.image)}" alt="" loading="lazy">`
-    : `<span class="card-noart"></span>`;
+  // L'état se lit sur l'image, avant même le prix. Il était en bas de carte,
+  // sous deux lignes de chiffres : on scrutait quatre vignettes avant de savoir
+  // laquelle travaille.
+  const art =
+    `<span class="card-frame">` +
+    (m.machine?.image
+      ? `<img class="card-art" src="${esc(m.machine.image)}" alt="" loading="lazy">`
+      : `<span class="card-noart"></span>`) +
+    `<span class="card-state${m.lit ? "" : " off"}">${m.lit ? "Printing" : "Dormant"}</span>` +
+    `</span>`;
   // Lime : cette machine imprime. Une dormante n'en porte aucune trace, et
   // c'est l'information elle-même.
   const earns = m.lit

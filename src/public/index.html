@@ -90,6 +90,10 @@
     border: var(--b) solid var(--ink); background: var(--paper); padding: 3px 9px;
     white-space: nowrap;
   }
+  /* La porte de sortie vers l'ancienne page. Même forme que le tampon
+     « unofficial » : c'est une mention, pas une action principale. */
+  .tag-link { text-decoration: none; }
+  .tag-link:hover { background: var(--ink); color: var(--paper); }
   .x-link { display: inline-flex; color: var(--ink); }
   .x-link svg { width: 19px; height: 19px; fill: currentColor; display: block; }
 
@@ -145,6 +149,15 @@
   }
   h3.sec::after { content: " \2192"; }
   p.sub { margin: -6px 0 16px; font-size: 15px; font-weight: 600; color: var(--ink-2); max-width: 58ch; }
+
+  /* Ce que le pot contient et quand on le touche. Une machine allumée
+     aujourd'hui ne partage pas le tirage en cours, seulement le suivant. */
+  .pot-note {
+    margin: 14px 0 0; padding: 12px 15px;
+    border: var(--b) solid var(--ink); background: var(--sky);
+    font-size: 15px; font-weight: 600; max-width: 74ch;
+  }
+  .pot-note b { font-weight: 900; }
 
   /* ── les prix planchers ───────────────────────────────────────────────────
      Ce que le site promettait depuis le début, et qui tenait sous six cents
@@ -209,6 +222,7 @@
     box-shadow: var(--shadow);
   }
   .card:hover { transform: translate(2px, 2px); box-shadow: 4px 4px 0 var(--ink); }
+  .card-frame { display: block; position: relative; }
   .card-art {
     display: block; width: 100%; aspect-ratio: 1; object-fit: cover;
     border-bottom: var(--b) solid var(--ink);
@@ -217,6 +231,17 @@
     display: block; width: 100%; aspect-ratio: 1; background: var(--paper-2);
     border-bottom: var(--b) solid var(--ink);
   }
+  /* L'état, posé sur l'image. C'est la première chose qu'on cherche devant une
+     grille : lime pour ce qui travaille, papier nu pour ce qui dort — la même
+     règle que partout, et elle n'a pas besoin d'être écrite. */
+  .card-state {
+    position: absolute; top: 9px; right: 9px;
+    padding: 3px 8px;
+    font-size: 11px; font-weight: 900; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--ink); background: var(--lime);
+    border: var(--b) solid var(--ink); box-shadow: 3px 3px 0 var(--ink);
+  }
+  .card-state.off { background: var(--paper); color: var(--ink-2); }
   .card-body { display: block; padding: 11px 13px 13px; }
   .card-id {
     display: block; font-size: 11.5px; font-weight: 800;
@@ -382,6 +407,9 @@
     <div class="bar">
       <h1>RH Machines</h1>
       <span class="right">
+        <!-- Une porte de sortie. Des gens ont appris à lire l'ancienne page ;
+             la leur retirer d'un coup n'est pas une amélioration. -->
+        <a class="tag tag-link" href="/classic">Old version</a>
         <span class="tag">Unofficial</span>
         <a class="x-link" href="https://x.com/Theroxat" target="_blank" rel="noopener" aria-label="Theroxat on X">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>

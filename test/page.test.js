@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   heroHtml, statsHtml, cardHtml, chipsHtml, floorsHtml, detailHtml, pickMachines, mineHtml,
-  stepsHtml, voteHtml, scarcityHtml, padHtml, sourcesHtml, bannerMessage,
+  stepsHtml, voteHtml, scarcityHtml, padHtml, sourcesHtml, bannerMessage, potNote,
   setContract, itemUrl, esc, ADDRESS_RE, SORTS,
 } from "../src/public/app.js";
 
@@ -40,6 +40,21 @@ const DATA = {
    Le lime ne dit qu'une chose : cette machine imprime. L'employer pour l'état
    d'un bouton lui volerait exactement ce qui lui donne du sens, et la page
    redeviendrait un arc-en-ciel qu'il faut apprendre à lire. */
+// L'état se lit sur l'image, avant le prix. En bas de carte, sous deux lignes
+// de chiffres, il fallait scruter quatre vignettes pour savoir laquelle
+// travaille.
+test("a card says on its face whether the Machine is printing", () => {
+  const lit = cardHtml({ ...entry(), lit: true, classLabel: "x1", priceUsd: 214 });
+  const off = cardHtml({ ...entry({ epochUsd: 0, weight: 0 }), lit: false, classLabel: "x1", priceUsd: 177 });
+  assert.match(lit, /class="card-state">Printing</);
+  assert.match(off, /class="card-state off">Dormant</);
+  // Sur l'image, pas sous les chiffres.
+  assert.ok(lit.indexOf("card-state") < lit.indexOf("card-price"));
+  // Et la même règle de couleur qu'ailleurs : le lime ne dit que « ça imprime ».
+  assert.match(css, /\.card-state \{[^}]*var\(--lime\)/);
+  assert.match(css, /\.card-state\.off \{[^}]*var\(--paper\)/);
+});
+
 test("green marks a Machine that prints, and a dormant card carries none", () => {
   const lit = cardHtml({ ...entry(), lit: true, classLabel: "x1", priceUsd: 214 });
   const off = cardHtml({ ...entry({ epochUsd: 0, weight: 0 }), lit: false, classLabel: "x1", priceUsd: 177 }, { light: 151 });
@@ -54,7 +69,7 @@ test("nothing but an earning Machine wears the live colour", () => {
   // ce qu'il faut payer, le bleu l'état du parc — chacun une seule fois.
   const uses = [...css.matchAll(/([^\n{]*)\{[^}]*var\(--lime\)[^}]*\}/g)].map((m) => m[1].trim());
   for (const u of uses) {
-    assert.match(u, /card-earn|st-live|\.bar\b|vt:first-child/,
+    assert.match(u, /card-earn|card-state|st-live|\.bar\b|vt:first-child/,
       `--lime employé hors de son rôle : ${u}`);
   }
 });
@@ -527,4 +542,51 @@ test("a modified click still goes to the marketplace", () => {
   assert.match(app, /e\.key === "Escape" && !veil\.hidden/);
   assert.match(app, /lastFocus\?\.focus\?\.\(\)/);
   assert.match(page, /id="detail" hidden/);
+});
+
+/* ── le pot ────────────────────────────────────────────────────────────────
+   Il ne se lit pas entièrement sur la chaîne : aucun contrat ne l'additionne.
+   Le chiffre vient du protocole, et la page le coupe comme lui — parce que la
+   coupe vaut de l'argent. */
+const OFFICIAL = {
+  potUsd: 63496, lockedUsd: 18805, buildingUsd: 44690,
+  distributedUsd: 189350, check: { swapperUsdg: 38686, potUsd: 63496, ratio: 0.61, disagrees: false },
+};
+
+test("the pot is the whole pot, not just the part already converted", () => {
+  const html = statsHtml({ ...DATA, official: OFFICIAL });
+  assert.match(html, /st-pot"><b>\$63k<\/b><u>in the pot/);
+  // Sans le service, on retombe sur ce qu'on lit soi-même plutôt que sur zéro.
+  assert.match(statsHtml({ ...DATA, official: null }), /st-pot"><b>\$32k<\/b>/);
+});
+
+// Une machine allumée aujourd'hui ne partage pas le tirage en cours : elle ne
+// compte qu'à partir de l'epoch suivante. C'est la moitié « building » qui la
+// concerne, et confondre les deux fait attendre un versement qui ne viendra pas.
+test("the two halves of the pot are told apart, and so is which one you get", () => {
+  const html = potNote({ official: OFFICIAL });
+  assert.match(html, /The pot holds <b>\$63k<\/b>/);
+  assert.match(html, /<b>\$19k<\/b> of it is locked for this drop/);
+  assert.match(html, /<b>\$45k<\/b> is building toward the next one/);
+  assert.match(html, /the half a Machine lit today will share in/);
+});
+
+// Le site a longtemps annoncé « nobody has been paid yet ». C'était vrai, puis
+// ça a cessé de l'être.
+test("what has already been paid out is stated, not left implied", () => {
+  assert.match(potNote({ official: OFFICIAL }), /<b>\$189k<\/b> has already been paid out/);
+});
+
+// On relaie un chiffre qu'on ne dérive pas. Quand il cesse de tenir contre ce
+// qu'on lit soi-même, on le dit plutôt que de le répéter.
+test("a pot smaller than the USDG we can see is called out, not relayed", () => {
+  const html = potNote({ official: { ...OFFICIAL,
+    check: { swapperUsdg: 70000, potUsd: 63496, ratio: 1.1, disagrees: true } } });
+  assert.match(html, /These two do not agree right now/);
+  assert.match(html, /cannot exceed the pot it belongs to/);
+});
+
+test("with no official reading there is no note at all", () => {
+  assert.equal(potNote({ official: null }), "");
+  assert.equal(potNote({}), "");
 });

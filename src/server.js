@@ -32,12 +32,28 @@ import { assetHash, assetPath, stampPage, cacheHeaders, securityHeaders, etagOf 
 import { multicallOf } from "./multicall.js";
 import { readPad, readPools, priceCoin, padStats, padMovement, markNamesakes } from "./pad.js";
 import { readProton } from "./proton.js";
+import { readOfficial, crossCheck } from "./official.js";
 import { burnSplit, lockUp, fuseOdds } from "./scarcity.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const cfg = loadConfig(process.env, JSON.parse(readFileSync(join(here, "..", "config.json"), "utf8")));
 const app = readFileSync(join(here, "public", "app.js"), "utf8");
 const favicon = readFileSync(join(here, "public", "favicon.svg"), "utf8");
+
+/**
+ * La page précédente, figée.
+ *
+ * Elle est servie telle qu'elle l'était le jour du remplacement, contre la même
+ * API — tous les champs dont elle dépend sont encore là, et un test l'exige.
+ * Elle ne recevra plus de correction : c'est une archive, pas une seconde
+ * version à maintenir.
+ *
+ * Elle existe parce qu'un changement de cette ampleur mérite une porte de
+ * sortie. Des gens ont appris à lire l'ancienne page ; leur retirer d'un coup
+ * n'est pas une amélioration.
+ */
+const classicPage = readFileSync(join(here, "public", "classic", "index.html"), "utf8");
+const classicApp = readFileSync(join(here, "public", "classic", "app.js"), "utf8");
 const appHash = assetHash(app);
 const appPath = assetPath(appHash);
 // La page part avec l'adresse du script qu'elle a été construite pour exécuter.
@@ -285,7 +301,7 @@ async function sweepScarcity() {
 }
 
 async function sweepBook() {
-  const [book, printer, eth, protocol, stats, offCirculation] = await Promise.all([
+  const [book, printer, eth, protocol, stats, offCirculation, official] = await Promise.all([
     fetchListings({ apiKey: cfg.openseaApiKey, maxPages: cfg.maxBookPages }),
     fetchPrinter(),
     fetchEthUsd(),
@@ -297,6 +313,10 @@ async function sweepBook() {
     // par balayage : c'est un chiffre de tête, il ne peut pas dépendre d'une
     // route chargée à la demande.
     readOffCirculation(provider),
+    // Le pot ne se lit pas entièrement sur la chaîne : aucun contrat ne
+    // l'additionne. On prend le chiffre du protocole et on le recoupe contre
+    // l'USDG qu'on lit nous-mêmes.
+    readOfficial().catch(() => null),
   ]);
 
   // Le scrutin se lit après le protocole, qui seul dit de quelle epoch il
@@ -365,6 +385,7 @@ async function sweepBook() {
     inkMeta, meta, legend, ink, weights, anvil, deskIndex, vote, potUsd, sectorWeight, tickers,
     holdings: held?.holdings, stockPrices, ownerOf: owners.byToken, now: Date.now(),
     offCirculation,
+    official,
   });
   store.succeed(composed);
 
@@ -584,6 +605,16 @@ const server = createServer(async (req, res) => {
   if (req.url === appPath) {
     res.writeHead(200, { "content-type": "text/javascript; charset=utf-8", ...cacheHeaders("asset"), ...securityHeaders() });
     res.end(app);
+    return;
+  }
+  if (req.url === "/classic" || req.url === "/classic/") {
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8", ...cacheHeaders("page"), ...securityHeaders() });
+    res.end(classicPage);
+    return;
+  }
+  if (req.url === "/classic/app.js") {
+    res.writeHead(200, { "content-type": "text/javascript; charset=utf-8", ...cacheHeaders("asset-unversioned"), ...securityHeaders() });
+    res.end(classicApp);
     return;
   }
   if (req.url === "/favicon.svg") {
