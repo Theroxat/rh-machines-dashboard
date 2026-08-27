@@ -30,6 +30,15 @@ const DATA = {
       // Une dormante se vend moins cher qu'une allumée : elle ne rapporte rien
       // tant que personne n'a brûlé pour elle.
       dormant: { floorEth: 0.070, listed: 200, entries: [entry({ tokenId: 8630, priceEth: 0.070, epochUsd: 0, weight: 0, holds: null })] } },
+    { classValue: 200, classLabel: "x2",
+      // Le rayon de l'anvil : achetable, libellé en $PRINTER, et absent
+      // d'OpenSea. Il ne figurait nulle part sur la page.
+      inked: { floorEth: 0.09, listed: 5, entries: [],
+        anvilEntries: [{ tokenId: 584, askPrinter: 9113.6, askUsd: 174, askEth: 0.0699,
+          weight: 200, inkMult: 1, epochUsd: 5.2, machine: { image: "https://i2c.seadn.io/a.webp" } }] },
+      dormant: { floorEth: 0.08, listed: 2, entries: [],
+        anvilEntries: [{ tokenId: 2461, askPrinter: 9113.6, askUsd: 174, askEth: 0.0699,
+          weight: 0, inkMult: 1, epochUsd: 0, machine: null }] } },
     { classValue: 400, classLabel: "x4",
       inked:   { floorEth: 0.26, listed: 40, entries: [entry({ tokenId: 7866, priceEth: 0.26, weight: 800, epochUsd: 14.4, inkMult: 2 })] },
       dormant: { floorEth: 0.20, listed: 4, entries: [] } },
@@ -625,4 +634,42 @@ test("with nothing returning anything there is no featured machine", () => {
   const empty = { ...DATA, rows: [{ classValue: 100, classLabel: "x1",
     inked: { floorEth: 0.07, listed: 1, entries: [] }, dormant: { listed: 0, entries: [] } }] };
   assert.doesNotMatch(heroHtml(empty), /Best return on the book/);
+});
+
+/* ── le rayon de l'anvil ───────────────────────────────────────────────────
+   Dix machines achetables qui n'apparaissaient nulle part. Elles ne sont pas
+   sur OpenSea : elles se paient en $PRINTER au terminal du protocole. */
+test("machines on the Anvil's shelf are part of the book", () => {
+  const all = pickMachines(DATA, { limit: 99 });
+  const shelf = all.filter((m) => m.from === "anvil");
+  assert.equal(shelf.length, 2, "le rayon doit figurer dans le carnet");
+  assert.ok(all.some((m) => m.from === "opensea"), "et les annonces OpenSea avec lui");
+});
+
+test("a shelf machine sends you where it is actually for sale", () => {
+  const m = pickMachines(DATA, { limit: 99 }).find((x) => x.from === "anvil");
+  const html = cardHtml(m, { light: 151 });
+  assert.match(html, /href="https:\/\/www\.rhmachines\.com\/#anvil"/);
+  assert.doesNotMatch(html, /opensea\.io/);
+  assert.match(html, /class="card-from">Anvil</);
+  // Et dans la monnaie où elle se paie, pas dans celle du reste du carnet.
+  assert.match(html, /class="card-price">\$174<small>9,114 \$PRINTER<\/small>/);
+});
+
+test("an OpenSea listing still goes to OpenSea, priced in ETH", () => {
+  const m = pickMachines(DATA, { limit: 99 }).find((x) => x.from === "opensea");
+  const html = cardHtml(m, { light: 151 });
+  assert.match(html, /href="https:\/\/opensea\.io/);
+  assert.doesNotMatch(html, /card-from/);
+  assert.match(html, /ETH<\/small>/);
+});
+
+// Deux monnaies ne se classent pas l'une contre l'autre : le rayon est en
+// $PRINTER, le carnet en ETH. Trier sur l'ETH mettait le rayon nulle part.
+test("sorting by price compares dollars, since the two markets differ", () => {
+  const cheap = pickMachines(DATA, { sort: "cheap", limit: 99 });
+  const prices = cheap.map((m) => m.priceUsd).filter((v) => v !== null);
+  for (let i = 1; i < prices.length; i++) {
+    assert.ok(prices[i] >= prices[i - 1], "le classement par prix doit être croissant en dollars");
+  }
 });

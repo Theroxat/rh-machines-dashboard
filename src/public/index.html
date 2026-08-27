@@ -279,6 +279,16 @@
     border: var(--b) solid var(--ink); box-shadow: 3px 3px 0 var(--ink);
   }
   .card-state.off { background: var(--paper); color: var(--ink-2); }
+  /* Ces machines-là ne sont pas sur OpenSea : elles s'achètent au terminal du
+     protocole et se paient en $PRINTER. Deux marchés, deux monnaies — le dire
+     évite d'envoyer quelqu'un sur une page où elle n'est pas en vente. */
+  .card-from {
+    position: absolute; top: 9px; left: 9px;
+    padding: 3px 8px;
+    font-size: 11px; font-weight: 900; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--paper); background: var(--ink);
+    border: var(--b) solid var(--ink); box-shadow: 3px 3px 0 var(--paper);
+  }
   .card-body { display: block; padding: 11px 13px 13px; }
   .card-id {
     display: block; font-size: 11.5px; font-weight: 800;

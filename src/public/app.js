@@ -75,6 +75,11 @@ let MACHINES = "0xb509e195bcb3e4461e235ff152c68d66915f67b5";
 export const setContract = (addr) => { if (addr) MACHINES = String(addr).toLowerCase(); };
 export const itemUrl = (id) => `https://opensea.io/assets/robinhood/${MACHINES}/${id}`;
 
+/** Le rayon de l'anvil ne se vend pas sur OpenSea : il s'achète au terminal du
+ *  protocole, et il se paie en $PRINTER. Ce sont deux transactions différentes,
+ *  donc deux liens différents. */
+export const ANVIL_URL = "https://www.rhmachines.com/#anvil";
+
 /** Tout ce qui vient du réseau entre dans du balisage, et rien n'est écrit
  *  sans passer par ici. */
 export const esc = (s) => String(s).replace(/[&<>"]/g,
@@ -270,7 +275,20 @@ export function pickMachines(d, { klass = null, limit = 24, sort = SORTS[0].key 
         const priceUsd = eth ? e.priceEth * eth : null;
         const cost = priceUsd === null ? null : priceUsd + (lit ? 0 : light);
         const back = (e.epochUsd ?? 0) + (e.holds?.usd ?? 0);
-        out.push({ ...e, lit, classLabel: r.classLabel, priceUsd, cost, back, ratio: cost ? back / cost : 0 });
+        out.push({ ...e, lit, classLabel: r.classLabel, priceUsd, cost, back,
+          ratio: cost ? back / cost : 0, from: "opensea" });
+      }
+      // Le rayon de l'anvil. Ces machines sont achetables et n'apparaissaient
+      // nulle part : elles ne sont pas sur OpenSea, elles se paient en $PRINTER
+      // au terminal du protocole. Les taire revenait à cacher une partie du
+      // marché à quelqu'un venu comparer les prix.
+      for (const e of cell?.anvilEntries ?? []) {
+        const priceUsd = e.askUsd ?? null;
+        const cost = priceUsd === null ? null : priceUsd + (lit ? 0 : light);
+        const back = (e.epochUsd ?? 0) + (e.holds?.usd ?? 0);
+        out.push({ ...e, lit, classLabel: r.classLabel,
+          priceEth: e.askEth ?? null, priceUsd, cost, back,
+          ratio: cost ? back / cost : 0, from: "anvil" });
       }
     }
   }
@@ -278,8 +296,11 @@ export function pickMachines(d, { klass = null, limit = 24, sort = SORTS[0].key 
   // machines. Le retour met les allumées devant, forcément : une dormante rend
   // zéro. Sans le tri par prix, aucune dormante n'apparaîtrait jamais — et
   // c'est justement l'entrée la moins chère.
+  // Le tri par prix compare des dollars, pas des ETH : le rayon de l'anvil est
+  // libellé en $PRINTER, et deux monnaies ne se classent pas l'une contre
+  // l'autre sans passer par une troisième.
   const by = sort === "cheap"
-    ? (a, b) => (a.priceEth ?? Infinity) - (b.priceEth ?? Infinity)
+    ? (a, b) => (a.priceUsd ?? Infinity) - (b.priceUsd ?? Infinity)
     : (a, b) => b.ratio - a.ratio;
   return out.sort(by).slice(0, limit);
 }
@@ -296,6 +317,7 @@ export function cardHtml(m, { light = 0 } = {}) {
       ? `<img class="card-art" src="${esc(m.machine.image)}" alt="" loading="lazy">`
       : `<span class="card-noart"></span>`) +
     `<span class="card-state${m.lit ? "" : " off"}">${m.lit ? "Printing" : "Dormant"}</span>` +
+    (m.from === "anvil" ? `<span class="card-from">Anvil</span>` : "") +
     `</span>`;
   // Lime : cette machine imprime. Une dormante n'en porte aucune trace, et
   // c'est l'information elle-même.
@@ -305,15 +327,22 @@ export function cardHtml(m, { light = 0 } = {}) {
   const price = m.priceUsd === null || m.priceUsd === undefined
     ? fmtEth(m.priceEth)
     : fmtUsdRound(m.priceUsd);
+  // Deux marchés, deux monnaies, deux liens. Une machine du rayon se paie en
+  // $PRINTER au terminal du protocole : envoyer quelqu'un sur OpenSea pour
+  // l'acheter serait l'envoyer sur une page où elle n'est pas en vente.
+  const anvil = m.from === "anvil";
+  const sub = anvil
+    ? `${fmtInt(Math.round(m.askPrinter ?? 0))} $PRINTER`
+    : m.priceEth ? `${fmtEth(m.priceEth)} ETH` : "";
 
-  return `<a class="card" data-id="${m.tokenId}" href="${itemUrl(m.tokenId)}" ` +
+  return `<a class="card" data-id="${m.tokenId}" href="${anvil ? ANVIL_URL : itemUrl(m.tokenId)}" ` +
     `target="_blank" rel="noopener">` +
     art +
     `<span class="card-body">` +
       `<span class="card-id">#${m.tokenId} &middot; ${esc(m.classLabel ?? "")}` +
         `${reinked ? ` <span class="re">re-inked</span>` : ""}</span>` +
       `<span class="card-price">${price}` +
-        (m.priceEth ? `<small>${fmtEth(m.priceEth)} ETH</small>` : "") + `</span>` +
+        (sub ? `<small>${sub}</small>` : "") + `</span>` +
       earns +
       (m.holds?.usd ? `<span class="card-inside">carrying ${fmtUsd(m.holds.usd)} of stock</span>` : "") +
     `</span></a>`;

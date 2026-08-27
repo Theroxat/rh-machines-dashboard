@@ -30,7 +30,7 @@ export const SOURCES = Object.freeze([
   { what: "Each Machine's desk", kind: "chain", from: "Machines contract" },
   { what: "The ballot and its tally", kind: "chain", from: "Vote contract" },
   { what: "USDG already converted and ready to buy", kind: "chain", from: "balance of the swapper" },
-  { what: "The Anvil's bid, shelf and crate", kind: "chain", from: "Vault contract" },
+  { what: "The Anvil's bid, and the Machines on its shelf", kind: "chain", from: "Vault contract" },
   { what: "The stock held inside each Machine", kind: "chain", from: "each Machine's 6551 account" },
   { what: "Epoch, activation cost, sell fee", kind: "chain", from: "MINE contract" },
   { what: "Every coin on PRINTER.FUN", kind: "chain", from: "both pad factories" },
