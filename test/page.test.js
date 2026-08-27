@@ -186,24 +186,31 @@ test("with nothing read the page says so rather than showing zeros", () => {
    Ils étaient quatre. Le prix du $PRINTER manquait, alors que c'est lui qui
    décide de ce que coûte un allumage : la case « to switch one on » bougeait
    de trente pour cent en deux jours sans que rien n'explique pourquoi. */
-test("six figures, and each carries the colour of what it classifies", () => {
+test("five figures on one line, each carrying the colour of what it classifies", () => {
   const html = statsHtml({ ...DATA, printer: { usd: 0.0188, change24h: -24.1, marketCap: 2915894 } });
   assert.match(html, /st-live"><b>7,504<\/b><u>printing now/);
   assert.match(html, /st-pot"><b>\$32k<\/b><u>in the pot/);
-  assert.match(html, /st-book"><b>\$2\.92M<\/b><u>\$PRINTER market/);
-  assert.match(html, /st-cost"><b>\$0\.0188<\/b><u>a \$PRINTER<\/u><i>−24% in a day/);
-  assert.match(html, /st-cost"><b>\$151<\/b><u>to switch one on/);
   assert.match(html, /st-book"><b>\$177<\/b><u>cheapest way in/);
-  assert.equal((html.match(/class="st /g) ?? []).length, 6);
+  assert.match(html, /st-cost"><b>\$151<\/b><u>to switch one on/);
+  assert.match(html, /st-book"><b>\$2\.92M<\/b><u>\$PRINTER market/);
+  assert.equal((html.match(/class="st /g) ?? []).length, 5);
+  // Le marché du jeton ferme la ligne : c'est un contexte, pas une décision.
+  assert.ok(html.lastIndexOf("$PRINTER market") > html.lastIndexOf("to switch one on"));
+});
+
+// Le cours brut du jeton a disparu : ce qui compte à l'achat est ce que
+// l'allumage coûte, et cette case est juste à côté, déjà convertie.
+test("the raw token price is gone, its converted cost is not", () => {
+  const html = statsHtml({ ...DATA, printer: { usd: 0.0188, change24h: -24.1, marketCap: 2915894 } });
+  assert.doesNotMatch(html, /a \$PRINTER<\/u>/);
+  assert.doesNotMatch(html, /in a day/);
+  assert.match(html, /to switch one on/);
 });
 
 test("a figure that could not be read shows a dash, never a zero", () => {
   const html = statsHtml({ ...DATA, printer: {}, ink: {} });
   assert.match(html, /<b>—<\/b><u>\$PRINTER market/);
-  assert.match(html, /<b>—<\/b><u>a \$PRINTER/);
   assert.match(html, /<b>—<\/b><u>to switch one on/);
-  // Et pas de variation inventée sous un prix qu'on n'a pas.
-  assert.doesNotMatch(html, /in a day/);
 });
 
 // « $2,915,894 » dans une case de cent pixels se lit moins vite que « $2.92M ».

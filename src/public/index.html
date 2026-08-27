@@ -122,30 +122,27 @@
   .hero p { margin: 0; font-size: 17px; font-weight: 600; max-width: 68ch; color: var(--ink); }
 
   /* ── les chiffres d'état ────────────────────────────────────────────────── */
-  /* Six cases : trois par rangée sur un écran, deux sur un téléphone. À
-     quatre de front elles devenaient des colonnes de cent pixels, et un
-     montant à sept chiffres n'y tient pas. */
-  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 13px; margin: 24px 0 20px; }
+  /* Cinq cases sur une ligne. Le montant le plus long est la capitalisation,
+     et « $2.96M » tient dans une colonne de deux cents pixels — c'est le prix
+     du jeton, à sept caractères après la virgule, qui imposait deux rangées.
+     Il est parti : ce qui compte à l'achat est le coût d'allumage, déjà
+     converti dans la case voisine. */
+  .stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 11px; margin: 24px 0 20px; }
   .st { border: var(--b) solid var(--ink); padding: 14px 15px; box-shadow: var(--shadow-sm); }
   .st b {
-    display: block; font-size: clamp(22px, 3vw, 30px); font-weight: 900;
+    display: block; font-size: clamp(20px, 2.4vw, 27px); font-weight: 900;
     letter-spacing: -0.04em; line-height: 1; font-variant-numeric: tabular-nums;
   }
   .st u {
     display: block; text-decoration: none; font-size: 11px; font-weight: 800;
     letter-spacing: 0.08em; text-transform: uppercase; margin-top: 6px;
   }
-  /* La variation du jour, sous l'étiquette. Vingt-quatre pour cent en un jour
-     n'est pas un détail pour qui s'apprête à brûler cinq mille jetons. */
-  .st i {
-    display: block; font-style: normal; font-size: 11px; font-weight: 700;
-    margin-top: 2px; opacity: 0.72;
-  }
   .st-live { background: var(--lime); }
   .st-pot  { background: var(--sky); }
   .st-cost { background: var(--sun); }
   .st-book { background: var(--paper-2); }
-  @media (max-width: 780px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 1040px) { .stats { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 600px)  { .stats { grid-template-columns: repeat(2, 1fr); } }
 
   /* ── titres de section ─────────────────────────────────────────────────── */
   h3.sec {

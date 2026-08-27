@@ -250,19 +250,19 @@ export function statsHtml(d) {
     `<div class="st ${cls}"><b>${value}</b><u>${label}</u>` +
     (sub ? `<i>${sub}</i>` : "") + `</div>`;
 
-  // Une variation de vingt-quatre pour cent en un jour n'est pas un détail
-  // pour quelqu'un qui s'apprête à brûler cinq mille jetons.
-  const move = typeof p.change24h === "number"
-    ? `${p.change24h > 0 ? "+" : "\u2212"}${Math.abs(p.change24h).toFixed(0)}% in a day`
-    : "";
-
+  // Le prix du jeton a été retiré : ce qui compte à quelqu'un qui achète, c'est
+  // ce que l'allumage lui coûte — et cette case-là est juste à côté, déjà
+  // convertie. Le cours brut ne servait qu'à expliquer ses variations.
+  //
+  // L'ordre suit celui des questions : combien tournent, combien attend,
+  // combien coûte d'entrer, combien d'allumer — et la taille du marché du
+  // jeton en dernier, parce que c'est un contexte, pas une décision.
   return [
     cell("st-live", fmtInt(d.totals?.inked ?? 0), "printing now"),
     cell("st-pot", fmtUsdShort(d.official?.potUsd ?? d.pot?.usd ?? 0), "in the pot"),
-    cell("st-book", cap === null ? "—" : fmtBig(cap), "$PRINTER market"),
-    cell("st-cost", p.usd ? `$${p.usd.toFixed(4)}` : "—", "a $PRINTER", move),
-    cell("st-cost", d.ink?.activationTotalUsd ? fmtUsdRound(d.ink.activationTotalUsd) : "—", "to switch one on"),
     cell("st-book", cheapest === null ? "—" : fmtUsdRound(cheapest), "cheapest way in"),
+    cell("st-cost", d.ink?.activationTotalUsd ? fmtUsdRound(d.ink.activationTotalUsd) : "—", "to switch one on"),
+    cell("st-book", cap === null ? "—" : fmtBig(cap), "$PRINTER market"),
   ].join("");
 }
 
