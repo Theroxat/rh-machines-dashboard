@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
-  heroHtml, statsHtml, cardHtml, chipsHtml, floorsHtml, detailHtml, pickMachines, mineHtml,
+  heroHtml, statsHtml, cardHtml, chipsHtml, floorsHtml, detailHtml, bestPick, pickMachines, mineHtml,
   stepsHtml, voteHtml, scarcityHtml, padHtml, sourcesHtml, bannerMessage, potNote,
   setContract, itemUrl, esc, ADDRESS_RE, SORTS,
 } from "../src/public/app.js";
@@ -34,6 +34,11 @@ const DATA = {
       inked:   { floorEth: 0.26, listed: 40, entries: [entry({ tokenId: 7866, priceEth: 0.26, weight: 800, epochUsd: 14.4, inkMult: 2 })] },
       dormant: { floorEth: 0.20, listed: 4, entries: [] } },
   ],
+};
+
+const OFFICIAL = {
+  potUsd: 63496, lockedUsd: 18805, buildingUsd: 44690,
+  distributedUsd: 189350, check: { swapperUsdg: 38686, potUsd: 63496, ratio: 0.61, disagrees: false },
 };
 
 /* ── la seule règle de couleur ─────────────────────────────────────────────
@@ -69,7 +74,7 @@ test("nothing but an earning Machine wears the live colour", () => {
   // ce qu'il faut payer, le bleu l'état du parc — chacun une seule fois.
   const uses = [...css.matchAll(/([^\n{]*)\{[^}]*var\(--lime\)[^}]*\}/g)].map((m) => m[1].trim());
   for (const u of uses) {
-    assert.match(u, /card-earn|card-state|st-live|\.bar\b|vt:first-child/,
+    assert.match(u, /card-earn|card-state|pick-back|st-live|\.bar\b|vt:first-child/,
       `--lime employé hors de son rôle : ${u}`);
   }
 });
@@ -548,10 +553,6 @@ test("a modified click still goes to the marketplace", () => {
    Il ne se lit pas entièrement sur la chaîne : aucun contrat ne l'additionne.
    Le chiffre vient du protocole, et la page le coupe comme lui — parce que la
    coupe vaut de l'argent. */
-const OFFICIAL = {
-  potUsd: 63496, lockedUsd: 18805, buildingUsd: 44690,
-  distributedUsd: 189350, check: { swapperUsdg: 38686, potUsd: 63496, ratio: 0.61, disagrees: false },
-};
 
 test("the pot is the whole pot, not just the part already converted", () => {
   const html = statsHtml({ ...DATA, official: OFFICIAL });
@@ -589,4 +590,39 @@ test("a pot smaller than the USDG we can see is called out, not relayed", () => 
 test("with no official reading there is no note at all", () => {
   assert.equal(potNote({ official: null }), "");
   assert.equal(potNote({}), "");
+});
+
+/* ── la vitrine ────────────────────────────────────────────────────────────
+   La moitié droite de l'ouverture était vide sur un écran large. Elle porte la
+   machine qui rend le plus par dollar — et le taux en toutes lettres, parce que
+   « best return » ne se devine pas d'un prix et d'un montant. */
+test("the hero features the single best machine on the book", () => {
+  const html = heroHtml(DATA);
+  const best = pickMachines(DATA, { sort: "back", limit: 1 })[0];
+  assert.match(html, /Best return on the book/);
+  assert.match(html, new RegExp(`#${best.tokenId} &middot;`));
+  // La vitrine précède le pot et les planchers : c'est la réponse, pas le décor.
+  const withPot = heroHtml({ ...DATA, official: OFFICIAL });
+  assert.ok(withPot.includes("pot-note"), "le décor doit contenir la note du pot pour que l'ordre se teste");
+  assert.ok(withPot.indexOf("pick-lab") < withPot.indexOf("pot-note"));
+  assert.ok(withPot.indexOf("pick-lab") < withPot.indexOf("floors-row"));
+});
+
+test("the featured machine says what its return actually is, as a rate", () => {
+  const m = { tokenId: 7866, classLabel: "x4", priceEth: 0.26, priceUsd: 640,
+    epochUsd: 14.43, cost: 640, back: 14.43, machine: { image: "https://i2c.seadn.io/x.webp" } };
+  const html = bestPick(m, DATA);
+  assert.match(html, /\$14\.43 a drop/);
+  assert.match(html, /2\.3% of what it costs, every drop/);
+  assert.match(html, /class="pick-price">\$640<small>0\.2600 ETH/);
+});
+
+// Une machine qui ne rend rien ne peut pas être le meilleur retour : il n'y a
+// pas de vitrine à montrer plutôt qu'une vitrine vide.
+test("with nothing returning anything there is no featured machine", () => {
+  assert.equal(bestPick({ tokenId: 1, cost: 100, back: 0 }, DATA), "");
+  assert.equal(bestPick(null, DATA), "");
+  const empty = { ...DATA, rows: [{ classValue: 100, classLabel: "x1",
+    inked: { floorEth: 0.07, listed: 1, entries: [] }, dormant: { listed: 0, entries: [] } }] };
+  assert.doesNotMatch(heroHtml(empty), /Best return on the book/);
 });

@@ -40,20 +40,6 @@ const cfg = loadConfig(process.env, JSON.parse(readFileSync(join(here, "..", "co
 const app = readFileSync(join(here, "public", "app.js"), "utf8");
 const favicon = readFileSync(join(here, "public", "favicon.svg"), "utf8");
 
-/**
- * La page précédente, figée.
- *
- * Elle est servie telle qu'elle l'était le jour du remplacement, contre la même
- * API — tous les champs dont elle dépend sont encore là, et un test l'exige.
- * Elle ne recevra plus de correction : c'est une archive, pas une seconde
- * version à maintenir.
- *
- * Elle existe parce qu'un changement de cette ampleur mérite une porte de
- * sortie. Des gens ont appris à lire l'ancienne page ; leur retirer d'un coup
- * n'est pas une amélioration.
- */
-const classicPage = readFileSync(join(here, "public", "classic", "index.html"), "utf8");
-const classicApp = readFileSync(join(here, "public", "classic", "app.js"), "utf8");
 const appHash = assetHash(app);
 const appPath = assetPath(appHash);
 // La page part avec l'adresse du script qu'elle a été construite pour exécuter.
@@ -605,16 +591,6 @@ const server = createServer(async (req, res) => {
   if (req.url === appPath) {
     res.writeHead(200, { "content-type": "text/javascript; charset=utf-8", ...cacheHeaders("asset"), ...securityHeaders() });
     res.end(app);
-    return;
-  }
-  if (req.url === "/classic" || req.url === "/classic/") {
-    res.writeHead(200, { "content-type": "text/html; charset=utf-8", ...cacheHeaders("page"), ...securityHeaders() });
-    res.end(classicPage);
-    return;
-  }
-  if (req.url === "/classic/app.js") {
-    res.writeHead(200, { "content-type": "text/javascript; charset=utf-8", ...cacheHeaders("asset-unversioned"), ...securityHeaders() });
-    res.end(classicApp);
     return;
   }
   if (req.url === "/favicon.svg") {

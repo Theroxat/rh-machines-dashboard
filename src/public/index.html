@@ -90,10 +90,6 @@
     border: var(--b) solid var(--ink); background: var(--paper); padding: 3px 9px;
     white-space: nowrap;
   }
-  /* La porte de sortie vers l'ancienne page. Même forme que le tampon
-     « unofficial » : c'est une mention, pas une action principale. */
-  .tag-link { text-decoration: none; }
-  .tag-link:hover { background: var(--ink); color: var(--paper); }
   .x-link { display: inline-flex; color: var(--ink); }
   .x-link svg { width: 19px; height: 19px; fill: currentColor; display: block; }
 
@@ -149,6 +145,47 @@
   }
   h3.sec::after { content: " \2192"; }
   p.sub { margin: -6px 0 16px; font-size: 15px; font-weight: 600; color: var(--ink-2); max-width: 58ch; }
+
+  /* ── la vitrine ───────────────────────────────────────────────────────────
+     Sur un écran large, la moitié droite de l'ouverture était vide. Elle porte
+     maintenant la machine qui rend le plus par dollar — la question qu'un
+     espace vide laissait sans réponse est justement celle qu'on vient poser. */
+  .hero-cols { display: grid; gap: 26px; grid-template-columns: 1fr; align-items: start; }
+  @media (min-width: 900px) { .hero-cols { grid-template-columns: 1fr 268px; } }
+  .hero-said { min-width: 0; }
+
+  .pick {
+    display: block; text-decoration: none; color: var(--ink);
+    border: var(--b) solid var(--ink); background: var(--paper);
+    box-shadow: var(--shadow); padding: 13px 14px 15px;
+  }
+  .pick:hover { transform: translate(2px, 2px); box-shadow: 4px 4px 0 var(--ink); }
+  .pick-lab {
+    display: block; font-size: 10.5px; font-weight: 900;
+    letter-spacing: 0.11em; text-transform: uppercase; margin-bottom: 9px;
+  }
+  .pick-art {
+    display: block; width: 100%; aspect-ratio: 1; object-fit: cover;
+    border: var(--b) solid var(--ink);
+  }
+  .pick-noart { background: var(--paper-2); }
+  .pick-id {
+    display: block; margin-top: 10px; font-size: 11.5px; font-weight: 800;
+    letter-spacing: 0.05em; text-transform: uppercase;
+  }
+  .pick-price {
+    display: block; margin-top: 2px; font-size: 25px; font-weight: 900;
+    letter-spacing: -0.04em; line-height: 1; font-variant-numeric: tabular-nums;
+  }
+  .pick-price small { display: block; font-size: 11.5px; font-weight: 600; color: var(--ink-2); margin-top: 3px; letter-spacing: 0; }
+  /* Lime : elle imprime. Une machine qui ne rend rien ne peut pas être le
+     meilleur retour, donc il n'y a pas de variante éteinte ici. */
+  .pick-back {
+    display: block; margin-top: 11px; padding: 7px 9px;
+    border: var(--b) solid var(--ink); background: var(--lime);
+    font-size: 15px; font-weight: 900; line-height: 1.15;
+  }
+  .pick-back small { display: block; font-size: 11.5px; font-weight: 600; margin-top: 3px; }
 
   /* Ce que le pot contient et quand on le touche. Une machine allumée
      aujourd'hui ne partage pas le tirage en cours, seulement le suivant. */
@@ -407,9 +444,6 @@
     <div class="bar">
       <h1>RH Machines</h1>
       <span class="right">
-        <!-- Une porte de sortie. Des gens ont appris à lire l'ancienne page ;
-             la leur retirer d'un coup n'est pas une amélioration. -->
-        <a class="tag tag-link" href="/classic">Old version</a>
         <span class="tag">Unofficial</span>
         <a class="x-link" href="https://x.com/Theroxat" target="_blank" rel="noopener" aria-label="Theroxat on X">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>

@@ -130,7 +130,37 @@ export function heroHtml(d, active = null) {
     : `<p>Burning $PRINTER is how a Machine is switched on, and none of it ever ` +
       `comes back.${gone}</p>`;
 
-  return `<div class="hero">` + head + said + potNote(d) + floorsHtml(d, active) + `</div>`;
+  // Le meilleur retour du carnet, en vitrine. Cette moitié de la boîte était
+  // vide sur un écran large — et la question qu'elle laissait sans réponse est
+  // justement celle qu'on vient poser.
+  const best = pickMachines(d, { sort: "back", limit: 1 })[0];
+
+  return `<div class="hero">` +
+    `<div class="hero-cols"><div class="hero-said">` + head + said + `</div>` +
+    (best ? bestPick(best, d) : "") + `</div>` +
+    potNote(d) + floorsHtml(d, active) + `</div>`;
+}
+
+/**
+ * La machine qui rend le plus par dollar dépensé.
+ *
+ * Le classement plus bas répond à « laquelle » ; celle-ci répond à « et si je
+ * ne veux qu'une réponse ». Le taux est écrit en toutes lettres — c'est ce que
+ * « best return » veut dire, et ça ne se devine pas d'un prix et d'un montant.
+ */
+export function bestPick(m, d) {
+  if (!m?.cost || !m.back) return "";
+  const rate = m.back / m.cost;
+  return `<a class="pick" href="${itemUrl(m.tokenId)}" target="_blank" rel="noopener">` +
+    `<span class="pick-lab">Best return on the book</span>` +
+    (m.machine?.image
+      ? `<img class="pick-art" src="${esc(m.machine.image)}" alt="" loading="lazy">`
+      : `<span class="pick-art pick-noart"></span>`) +
+    `<span class="pick-id">#${m.tokenId} &middot; ${esc(m.classLabel ?? "")}</span>` +
+    `<span class="pick-price">${m.priceUsd === null ? fmtEth(m.priceEth) : fmtUsdRound(m.priceUsd)}` +
+      `<small>${fmtEth(m.priceEth)} ETH</small></span>` +
+    `<span class="pick-back">${fmtUsd(m.epochUsd ?? 0)} a drop` +
+      `<small>${fmtRatio(rate)} of what it costs, every drop</small></span></a>`;
 }
 
 /**
