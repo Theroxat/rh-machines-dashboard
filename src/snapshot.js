@@ -169,6 +169,11 @@ export function composeSnapshot({
       weight,
       inkMult: weight ? weight / classValue : null,
       epochUsd: returnOf(e.tokenId, weight),
+      // La chaîne dit d'une machine du rayon exactement ce qu'elle dit d'une
+      // machine d'OpenSea. Le panneau de détail les affichait à moitié vide
+      // parce qu'on ne les lui donnait pas, pas parce qu'elles manquaient.
+      inkPrinter: ink?.get(e.tokenId) === undefined ? null : Number(ink.get(e.tokenId) / PRINTER),
+      holds: heldBy(e.tokenId),
       askUsd: printer?.usd ? e.askPrinter * printer.usd : null,
       askEth: printer?.usd && eth?.usd ? (e.askPrinter * printer.usd) / eth.usd : null,
     };

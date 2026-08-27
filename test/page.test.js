@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import {
   heroHtml, statsHtml, cardHtml, chipsHtml, floorsHtml, detailHtml, bestPick, pickMachines, walletHtml,
   stepsHtml, voteHtml, scarcityHtml, padHtml, sourcesHtml, bannerMessage, potNote,
-  setContract, itemUrl, esc, ADDRESS_RE, SORTS, STATES, fmtBig,
+  setContract, itemUrl, esc, ADDRESS_RE, SORTS, STATES, fmtBig, ANVIL_URL,
 } from "../src/public/app.js";
 
 const page = readFileSync(new URL("../src/public/index.html", import.meta.url), "utf8");
@@ -564,6 +564,46 @@ test("the panel says what the Anvil would pay, and in what currency", () => {
   assert.match(html, /The Anvil would pay \$185/);
   assert.match(html, /6,706 \$PRINTER, net of the sell fee/);
   assert.match(html, /the same standing bid for any Machine/);
+});
+
+/* Une machine du rayon de l'anvil est une machine comme une autre : elle a un
+   panneau, et il parle de la monnaie dans laquelle elle se paie. */
+test("a Machine off the Anvil's shelf opens on its own market, not on OpenSea", () => {
+  const html = detailHtml({
+    tokenId: 584, classLabel: "x1", lit: true, from: "anvil",
+    askPrinter: 8206.652, askUsd: 173.16, askEth: 0.0684,
+    weight: 100, inkPrinter: 4250, inkMult: 1, epochUsd: 2.62,
+    machine: { image: "https://i2c.seadn.io/x.webp", desk: "tech" },
+  }, DATA);
+  assert.match(html, /#584/);
+  assert.match(html, /\$173/);
+  assert.match(html, /8,207 \$PRINTER at the Anvil/);
+  assert.match(html, new RegExp(`href="${ANVIL_URL.replace(/[.*+?^$()|[\]\\]/g, "\\$&")}"`));
+  assert.doesNotMatch(html, /ETH on OpenSea/);
+  assert.doesNotMatch(html, /Open on OpenSea/);
+  assert.match(html, /Open the Anvil/);
+});
+
+// L'anvil possède ce qu'il met en rayon : afficher ce qu'il en donnerait à
+// côté de ce qu'il en demande ferait passer le vendeur pour un acheteur.
+test("the standing bid is not quoted on a Machine the Anvil is selling", () => {
+  const shared = { tokenId: 1, classLabel: "x1", lit: true, priceEth: 0.1,
+    anvilBidPrinter: 6706, anvilBidEth: 0.075 };
+  assert.match(detailHtml(shared, DATA), /The Anvil would pay/);
+  assert.doesNotMatch(
+    detailHtml({ ...shared, from: "anvil", askPrinter: 8206, askUsd: 173 }, DATA),
+    /The Anvil would pay/);
+});
+
+// La panne : la vignette du rayon avalait le clic — preventDefault partait,
+// la recherche ne regardait que les annonces OpenSea, et il ne se passait
+// rien du tout. Ni panneau, ni lien.
+test("the detail lookup searches the shelf, not only the order book", () => {
+  const app = readFileSync(new URL("../src/public/app.js", import.meta.url), "utf8");
+  const fn = app.slice(app.indexOf("const openDetail ="), app.indexOf("veil.addEventListener"));
+  assert.match(fn, /anvilEntries/, "une machine du rayon reste introuvable");
+  assert.ok(fn.indexOf("anvilEntries") < fn.indexOf("cell?.entries"),
+    "le rayon doit primer : une annonce OpenSea sur une machine du rayon est morte");
 });
 
 // Le compte appartient au jeton : ces actions partent avec la machine si elle

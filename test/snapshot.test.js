@@ -407,3 +407,30 @@ test("an unread vault yields no count rather than a full fleet", () => {
   // Une seule des deux lisible reste exploitable : l'autre vaut zéro connu.
   assert.equal(fleetHeadline({ vault: 255, dead: null }).circulating, 9745);
 });
+
+/* Une machine du rayon de l'anvil est une machine comme une autre. Son panneau
+   de détail s'affichait à moitié vide — pas d'encre, pas d'actions — parce que
+   la composition ne les lui donnait pas, pas parce qu'elles n'existaient pas. */
+test("a Machine on the shelf carries the same chain facts as one on OpenSea", () => {
+  const s = composeSnapshot({
+    ...withGrid,
+    grid: {
+      ...withGrid.grid,
+      rows: [{
+        ...withGrid.grid.rows[0],
+        inked: { ...withGrid.grid.rows[0].inked, anvilEntries: [{ tokenId: 1253, askPrinter: 23465 }] },
+      }],
+    },
+    ink: new Map([[1253, 8500n * 10n ** 18n]]),
+    weights: new Map([[1253, 2000n]]),
+    holdings: new Map([["0xacc", new Map([["0xnvda", 512n]])]]),
+    stockPrices: new Map([["0xnvda", { symbol: "NVDA", usd: 180, decimals: 2 }]]),
+  });
+  const shelf = s.rows[0].inked.anvilEntries[0];
+  assert.equal(shelf.inkPrinter, 8500);
+  assert.equal(shelf.weight, 2000);
+  // Deux fois l'encre d'activation : la vignette le dit déjà, le panneau doit
+  // pouvoir le dire aussi.
+  assert.ok(shelf.inkMult > 1.9);
+  assert.ok("holds" in shelf, "les actions du compte partent avec la machine");
+});

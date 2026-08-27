@@ -354,7 +354,14 @@ async function sweepBook() {
   // Seules les machines en vente : lire les dix mille comptes à chaque
   // balayage coûterait cent mille appels pour une information que personne ne
   // regarde sur une machine qui n'est pas à vendre.
-  const listedIds = [...book.listings.keys()];
+  // Le rayon de l'anvil compte parmi les machines en vente. Le compte d'une
+  // machine du rayon transporte des actions comme n'importe quelle autre, et
+  // elles partent avec elle : les omettre cachait à l'acheteur une partie de
+  // ce qu'il paie. C'est une dizaine de comptes de plus, pas dix mille.
+  const listedIds = [...new Set([
+    ...book.listings.keys(),
+    ...(anvil?.shelfListings?.keys() ?? []),
+  ])];
   const accounts = listedIds
     .map((id) => [id, meta.get(id)?.wallet])
     .filter(([, w]) => w);

@@ -425,6 +425,17 @@ export function detailHtml(m, d) {
   const eth = d?.eth?.usd;
   const usd = (e) => (e && eth ? fmtUsdRound(e * eth) : null);
   const reinked = m.inkMult > 1.0001 && m.weight;
+  // Deux marchés, deux monnaies, deux liens. Une machine du rayon se paie en
+  // $PRINTER au terminal du protocole ; le panneau d'une machine du rayon qui
+  // afficherait un prix en ETH et un bouton OpenSea enverrait l'acheteur sur
+  // une page où elle n'est pas en vente.
+  const shelf = m.from === "anvil";
+  const price = shelf
+    ? (m.askUsd !== null && m.askUsd !== undefined ? fmtUsdRound(m.askUsd) : fmtEth(m.askEth))
+    : (usd(m.priceEth) ?? fmtEth(m.priceEth));
+  const sub = shelf
+    ? `${fmtInt(Math.round(m.askPrinter ?? 0))} $PRINTER at the Anvil`
+    : m.priceEth ? `${fmtEth(m.priceEth)} ETH on OpenSea` : "";
 
   const row = (k, v, cls = "") =>
     v === null || v === undefined || v === "" ? ""
@@ -459,9 +470,10 @@ export function detailHtml(m, d) {
         (m.lit
           ? `<span class="card-earn">${fmtUsd(m.epochUsd ?? 0)} a drop</span>`
           : `<span class="card-earn off">Not printing</span>`) +
-        `<div class="d-price">${usd(m.priceEth) ?? fmtEth(m.priceEth)}` +
-          (m.priceEth ? `<small>${fmtEth(m.priceEth)} ETH on OpenSea</small>` : "") + `</div>` +
-        `<a class="d-buy" href="${itemUrl(m.tokenId)}" target="_blank" rel="noopener">Open on OpenSea &rarr;</a>` +
+        `<div class="d-price">${price}` +
+          (sub ? `<small>${sub}</small>` : "") + `</div>` +
+        `<a class="d-buy" href="${shelf ? ANVIL_URL : itemUrl(m.tokenId)}" target="_blank" rel="noopener">` +
+          `${shelf ? "Open the Anvil" : "Open on OpenSea"} &rarr;</a>` +
       `</div>` +
     `</div>` +
     `<div class="d-block"><h4>What the chain says</h4>` +
@@ -475,7 +487,9 @@ export function detailHtml(m, d) {
     holds +
     // L'anvil est un acheteur permanent : ce qu'il donne est le seul prix
     // qu'on obtienne à coup sûr, et il se paie en $PRINTER, pas en ETH.
-    (m.anvilBidEth
+    // Sur une machine du rayon, l'anvil est le vendeur : annoncer ce qu'il en
+    // donnerait au même endroit que son prix de vente n'aurait aucun sens.
+    (m.anvilBidEth && !shelf
       ? `<div class="d-block"><h4>The Anvil would pay ${usd(m.anvilBidEth) ?? fmtEth(m.anvilBidEth)}</h4>` +
         `<p class="d-note">${fmtInt(Math.round(m.anvilBidPrinter))} $PRINTER, net of the sell fee — ` +
         `the same standing bid for any Machine, whatever its class.</p></div>`
@@ -810,9 +824,14 @@ if (typeof document !== "undefined") {
     let found = null;
     for (const r of data.rows ?? []) {
       for (const [lit, cell] of [[true, r.inked], [false, r.dormant]]) {
-      if (state && lit !== (state === "lit")) continue;
+        // Le rayon d'abord, et la même raison qu'au carnet : une annonce
+        // OpenSea sur une machine que l'anvil possède est une annonce que son
+        // ancien propriétaire n'a pas retirée. C'est la vignette du rayon
+        // qu'on a cliquée, c'est son prix qu'il faut ouvrir.
+        const shelf = (cell?.anvilEntries ?? []).find((x) => x.tokenId === tokenId);
+        if (shelf) { found = { ...shelf, lit, classLabel: r.classLabel, from: "anvil" }; continue; }
         const e = (cell?.entries ?? []).find((x) => x.tokenId === tokenId);
-        if (e) found = { ...e, lit, classLabel: r.classLabel };
+        if (e) found = { ...e, lit, classLabel: r.classLabel, from: "opensea" };
       }
     }
     if (!found) return;
