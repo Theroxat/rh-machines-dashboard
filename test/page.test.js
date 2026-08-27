@@ -515,6 +515,20 @@ test("the wallet tab is named by what it holds, not by a verb", () => {
   assert.match(nav, />My wallet</);
 });
 
+/* L'ancienne version reste en ligne le temps de savoir laquelle les gens
+   préfèrent, et les deux sites se renvoient l'un à l'autre. */
+test("the way out of this version is a link, and does not read as a label", () => {
+  const bar = page.slice(page.indexOf('class="bar"'), page.indexOf("</nav>"));
+  assert.match(bar, /class="tag tag-link"[^>]*href="https:\/\/old\.rh-machines\.sex"/);
+  // Sans la flèche, « RH MACHINES [OLD VERSION] » décrit cette page au lieu
+  // d'en sortir — surtout collé à « UNOFFICIAL », qui est une étiquette.
+  assert.match(bar, /Old version <span aria-hidden="true">&rarr;<\/span>/);
+  // Et il ne prend aucune couleur de la palette : le lime dit « ça imprime »,
+  // le rose « on est là », et une sortie ne dit ni l'un ni l'autre.
+  const rule = css.match(/a\.tag-link \{[^}]*\}/)[0];
+  assert.doesNotMatch(rule, /var\(--lime\)|var\(--pink\)|var\(--sun\)|var\(--sky\)/);
+});
+
 // Le mot vit dans le titre et dans les balises de partage : un lien envoyé sur
 // Discord l'affiche avant que qui que ce soit n'ouvre la page.
 test("the page says it is unofficial before anyone opens it", () => {
