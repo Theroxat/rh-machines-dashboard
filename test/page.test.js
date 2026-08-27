@@ -480,6 +480,10 @@ test("the book opens on price, and nothing hard-codes which sort that is", () =>
   const app = readFileSync(new URL("../src/public/app.js", import.meta.url), "utf8");
   assert.match(app, /sort = SORTS\[0\]\.key/);
   assert.doesNotMatch(app, /sort = "back"/);
+  // Même règle pour l'état : le défaut suit l'ordre des boutons, il ne se
+  // recopie pas. Réordonner la liste suffit à le changer.
+  assert.match(app, /let state = STATES\[0\]\.key/);
+  assert.equal(STATES[0].key, "lit", "le carnet ouvre sur ce qui imprime");
   const picked = pickMachines(DATA);
   assert.equal(picked[0].lit, false, "sans argument, le carnet s'ouvre sur le moins cher");
   assert.match(chipsHtml(DATA, null), /data-s="cheap" aria-pressed="true"/);
@@ -717,4 +721,12 @@ test("the count under the grid counts what the grid is showing", () => {
   const app = readFileSync(new URL("../src/public/app.js", import.meta.url), "utf8");
   assert.match(app, /const total = pickMachines\(data, \{ klass, state, limit: Infinity \}\)\.length/);
   assert.match(app, /dormant and for sale/);
+});
+
+// La phrase sous le titre décrit ce que la grille montre. « Dormant ones are
+// cheaper » sous une grille filtrée sur les allumées ne parle de rien.
+test("the line under the title describes the grid actually on screen", () => {
+  const app = readFileSync(new URL("../src/public/app.js", import.meta.url), "utf8");
+  assert.match(app, /What costs least among the Machines already printing/);
+  assert.match(app, /These earn nothing until someone burns ink for them/);
 });

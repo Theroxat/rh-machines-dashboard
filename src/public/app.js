@@ -694,7 +694,9 @@ if (typeof document !== "undefined") {
   // Le carnet ouvre sur le prix : « combien ça coûte » vient avant « combien
   // ça rend », et c'est aussi le seul tri qui montre les dormantes.
   let sort = SORTS[0].key;
-  let state = null;
+  // Le carnet ouvre sur ce qui imprime : une machine qui ne rapporte encore
+  // rien est un autre achat, et il se demande.
+  let state = STATES[0].key;
   let mine = null;
   let learnPainted = false;
 
@@ -719,8 +721,14 @@ if (typeof document !== "undefined") {
       ? picked.map((m) => cardHtml(m, { light })).join("")
       : `<p class="note">Nothing listed in that class right now.</p>`;
     $("buy-title").textContent = sort === "cheap" ? "Cheapest first" : "Most back per dollar";
-    $("buy-sub").textContent = sort === "cheap"
-      ? "What costs least to get in. Dormant ones are cheaper because they earn nothing yet."
+    // La phrase doit décrire ce que la grille montre. « Dormant ones are
+    // cheaper » sous une grille filtrée sur les allumées ne parle de rien.
+    const cheapSub = state === "lit"
+      ? "What costs least among the Machines already printing."
+      : state === "dormant"
+        ? "What costs least to get in. These earn nothing until someone burns ink for them."
+        : "What costs least to get in. Dormant ones are cheaper because they earn nothing yet.";
+    $("buy-sub").textContent = sort === "cheap" ? cheapSub
       : "What each Machine returns — its share of the pot, plus the stock already sitting in it — against what it costs.";
     // Le total doit compter la même chose que la liste, filtre compris :
     // « 24 sur 757 » sous une grille filtrée sur les dormantes est faux.
