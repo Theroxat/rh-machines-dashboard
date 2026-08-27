@@ -167,8 +167,19 @@
      Sur un écran large, la moitié droite de l'ouverture était vide. Elle porte
      maintenant la machine qui rend le plus par dollar — la question qu'un
      espace vide laissait sans réponse est justement celle qu'on vient poser. */
-  .hero-cols { display: grid; gap: 26px; grid-template-columns: 1fr; align-items: start; }
-  @media (min-width: 900px) { .hero-cols { grid-template-columns: 1fr 268px; } }
+  .hero-cols { display: grid; gap: 20px; grid-template-columns: 1fr; align-items: start; }
+  /* Le pot tient dans la colonne du texte, sous la phrase qu'il complète, et
+     la vitrine tient les deux rangées à côté. Posé sous la rangée entière, il
+     attendait que la vitrine — plus haute que le paragraphe — ait fini, et
+     ouvrait cent cinquante pixels de blanc au milieu de l'ouverture. Le
+     placement est ici et pas dans le document : sur un téléphone il n'y a
+     qu'une colonne, et l'ordre de lecture y est celui du document. */
+  @media (min-width: 900px) {
+    .hero-cols { grid-template-columns: 1fr 268px; gap: 13px 26px; }
+    .hero-cols > .hero-said { grid-area: 1 / 1; }
+    .hero-cols > .pot-note  { grid-area: 2 / 1; }
+    .hero-cols > .pick      { grid-area: 1 / 2 / span 2 / 3; }
+  }
   .hero-said { min-width: 0; }
 
   .pick {
@@ -207,7 +218,7 @@
   /* Ce que le pot contient et quand on le touche. Une machine allumée
      aujourd'hui ne partage pas le tirage en cours, seulement le suivant. */
   .pot-note {
-    margin: 14px 0 0; padding: 12px 15px;
+    margin: 0; padding: 12px 15px;
     border: var(--b) solid var(--ink); background: var(--sky);
     font-size: 15px; font-weight: 600; max-width: 74ch;
   }

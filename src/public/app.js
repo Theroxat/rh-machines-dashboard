@@ -140,10 +140,14 @@ export function heroHtml(d, active = null) {
   // justement celle qu'on vient poser.
   const best = pickMachines(d, { sort: "back", limit: 1 })[0];
 
+  // Le pot entre dans la rangée plutôt que de la suivre. Posé dessous, il
+  // attendait que la colonne la plus haute ait fini — la vitrine — et laissait
+  // un trou au milieu de l'ouverture. Il reste après la vitrine dans le
+  // document : sur un téléphone, la réponse doit venir avant le décor.
   return `<div class="hero">` +
     `<div class="hero-cols"><div class="hero-said">` + head + said + `</div>` +
-    (best ? bestPick(best, d) : "") + `</div>` +
-    potNote(d) + floorsHtml(d, active) + `</div>`;
+    (best ? bestPick(best, d) : "") + potNote(d) + `</div>` +
+    floorsHtml(d, active) + `</div>`;
 }
 
 /**

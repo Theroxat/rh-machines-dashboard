@@ -710,6 +710,27 @@ test("the hero features the single best machine on the book", () => {
   assert.ok(withPot.indexOf("pick-lab") < withPot.indexOf("floors-row"));
 });
 
+/* Le pot était posé sous la rangée entière : il attendait que la colonne la
+   plus haute — la vitrine — ait fini, et ouvrait cent vingt pixels de blanc
+   entre le paragraphe et lui, plus autant sous la vitrine. */
+test("the pot sits in the text column, not underneath the whole row", () => {
+  assert.match(css, /\.hero-cols > \.pot-note\s*\{[^}]*grid-area: 2 \/ 1/);
+  assert.match(css, /\.hero-cols > \.pick\s*\{[^}]*grid-area: 1 \/ 2 \/ span 2 \/ 3/);
+
+  const html = heroHtml({ ...DATA, official: OFFICIAL });
+  // Le placement vit dans la feuille de style, pas dans le document : sur un
+  // téléphone il n'y a qu'une colonne, l'ordre y est celui du document, et la
+  // réponse doit continuer d'y venir avant le décor.
+  assert.ok(html.indexOf("pick-lab") < html.indexOf("pot-note"));
+
+  // Et le pot doit être un enfant de la rangée. Sorti d'elle, les deux règles
+  // ci-dessus ne s'appliquent plus à rien et le trou revient sans qu'aucune
+  // d'elles ne cesse d'exister.
+  const seg = html.slice(html.indexOf('<div class="hero-cols"'), html.indexOf('class="pot-note"'));
+  const depth = (seg.match(/<div\b/g) ?? []).length - (seg.match(/<\/div>/g) ?? []).length;
+  assert.ok(depth >= 1, "le pot est retombé hors de la rangée");
+});
+
 test("the featured machine says what its return actually is, as a rate", () => {
   const m = { tokenId: 7866, classLabel: "x4", priceEth: 0.26, priceUsd: 640,
     epochUsd: 14.43, cost: 640, back: 14.43, machine: { image: "https://i2c.seadn.io/x.webp" } };
