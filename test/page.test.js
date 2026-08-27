@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
-  heroHtml, statsHtml, cardHtml, chipsHtml, floorsHtml, detailHtml, bestPick, pickMachines, mineHtml,
+  heroHtml, statsHtml, cardHtml, chipsHtml, floorsHtml, detailHtml, bestPick, pickMachines, walletHtml,
   stepsHtml, voteHtml, scarcityHtml, padHtml, sourcesHtml, bannerMessage, potNote,
   setContract, itemUrl, esc, ADDRESS_RE, SORTS, STATES, fmtBig,
 } from "../src/public/app.js";
@@ -325,7 +325,7 @@ const WALLET = {
 };
 
 test("a wallet leads with what it is all worth, and says what that means", () => {
-  const html = mineHtml(WALLET, { light: 151 });
+  const html = walletHtml(WALLET, { light: 151 });
   assert.match(html, /<b>\$400<\/b><u>all of it, together/);
   assert.match(html, /<b>1<\/b><u>of yours printing/);
   // Un floor est un prix demandé, pas un prix obtenu. Le total a l'air d'un
@@ -337,9 +337,9 @@ test("an address that is not one is refused before the network is touched", () =
   assert.ok(ADDRESS_RE.test(WALLET.address));
   assert.ok(!ADDRESS_RE.test("0x123"));
   assert.ok(!ADDRESS_RE.test("nonsense"));
-  assert.match(mineHtml({ error: "That is not an address" }), /not an address/);
-  assert.match(mineHtml({ pending: true }), /Reading the chain/);
-  assert.match(mineHtml({ machines: [] }), /holds no Machine/);
+  assert.match(walletHtml({ error: "That is not an address" }), /not an address/);
+  assert.match(walletHtml({ pending: true }), /Reading the chain/);
+  assert.match(walletHtml({ machines: [] }), /holds no Machine/);
 });
 
 /* ── comprendre ──────────────────────────────────────────────────────────── */
@@ -458,18 +458,35 @@ test("nothing from the network reaches the page unescaped", () => {
   const html = cardHtml({ ...entry({ machine: { image: evil } }), lit: true, classLabel: evil, priceUsd: 1 });
   assert.doesNotMatch(html, /<img src=x/);
   assert.match(html, /&lt;img src=x/);
-  assert.doesNotMatch(mineHtml({ error: evil }), /<img src=x/);
+  assert.doesNotMatch(walletHtml({ error: evil }), /<img src=x/);
 });
 
 /* ── la page elle-même ───────────────────────────────────────────────────── */
-test("three tabs, and the old six-tab links still land somewhere", () => {
+test("three tabs, and every hash the site has ever served still lands", () => {
   assert.match(page, /data-tab="buy">Buy</);
-  assert.match(page, /data-tab="mine">Mine</);
+  assert.match(page, /data-tab="wallet">My wallet</);
   assert.match(page, /data-tab="learn">Learn</);
   const app = readFileSync(new URL("../src/public/app.js", import.meta.url), "utf8");
-  for (const old of ["market", "wallet", "vote", "pad", "scarcity", "how", "protocol"]) {
-    assert.match(app, new RegExp(`${old}: "(buy|mine|learn)"`), `#${old} ne mène nulle part`);
+  const tabs = app.match(/const TABS = \[([^\]]*)\]/)[1].match(/"(\w+)"/g).map((q) => q.slice(1, -1));
+  const moved = app.match(/const MOVED = \{([^}]*)\}/)[1];
+  // Une adresse ancienne est servie soit parce qu'elle est redevenue un
+  // onglet, soit parce qu'elle est redirigée. Les deux comptent ; ce qui ne
+  // compte pas, c'est de n'être ni l'un ni l'autre.
+  for (const hash of ["market", "wallet", "mine", "vote", "pad", "scarcity", "how", "protocol"]) {
+    const lands = tabs.includes(hash) ||
+      new RegExp(`\\b${hash}: "(${tabs.join("|")})"`).test(moved);
+    assert.ok(lands, `#${hash} ne mène nulle part`);
   }
+});
+
+// « Mine » se lit d'abord comme le verbe : tout le vocabulaire du protocole
+// parle de machines qui produisent, et l'écosystème a jusqu'à un contrat qui
+// s'appelle MINE. Le possessif anglais arrive en second, et pour un lecteur
+// non anglophone il n'arrive pas toujours.
+test("the wallet tab is named by what it holds, not by a verb", () => {
+  const nav = page.slice(page.indexOf('id="nav"'), page.indexOf("</nav>"));
+  assert.doesNotMatch(nav, />Mine</, "le libellé se lit comme « miner »");
+  assert.match(nav, />My wallet</);
 });
 
 // Le mot vit dans le titre et dans les balises de partage : un lien envoyé sur
@@ -485,13 +502,13 @@ test("the page says it is unofficial before anyone opens it", () => {
 // Les quatre chiffres d'état se lisent avant la phrase qui les commente : on
 // regarde ce qui est vrai, puis ce qu'on en dit.
 test("the state of the protocol is read before the sentence about it", () => {
-  const buy = page.slice(page.indexOf('id="pane-buy"'), page.indexOf('id="pane-mine"'));
+  const buy = page.slice(page.indexOf('id="pane-buy"'), page.indexOf('id="pane-wallet"'));
   assert.ok(buy.indexOf('id="stats"') < buy.indexOf('id="hero"'),
     "les chiffres doivent précéder l'ouverture");
 });
 
 test("every section the site carries has somewhere to be drawn", () => {
-  for (const id of ["hero", "stats", "chips", "cards", "mine-out",
+  for (const id of ["hero", "stats", "chips", "cards", "wallet-out",
                     "learn-steps", "vote", "scarcity", "pad", "sources"]) {
     assert.match(page, new RegExp(`id="${id}"`), `#${id} manque à la page`);
   }

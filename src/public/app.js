@@ -497,7 +497,7 @@ export const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
  * bancaire et n'en est pas un — la page le dit sous le chiffre plutôt que de le
  * sous-entendre.
  */
-export function mineHtml(w, { light = 0 } = {}) {
+export function walletHtml(w, { light = 0 } = {}) {
   if (!w) return "";
   if (w.pending) return `<p class="note" style="margin-top:22px">Reading the chain…</p>`;
   if (w.error) return `<p class="note" style="margin-top:22px">${esc(w.error)}</p>`;
@@ -728,11 +728,11 @@ export function bannerMessage(v) {
 
 if (typeof document !== "undefined") {
   const $ = (id) => document.getElementById(id);
-  const TABS = ["buy", "mine", "learn"];
+  const TABS = ["buy", "wallet", "learn"];
   // Les anciennes adresses menaient à six onglets. Un lien partagé la semaine
   // dernière ne doit pas tomber sur une page blanche.
   const MOVED = {
-    market: "buy", wallet: "mine", vote: "learn",
+    market: "buy", mine: "wallet", vote: "learn",
     pad: "learn", scarcity: "learn", how: "learn", protocol: "learn",
   };
 
@@ -744,7 +744,7 @@ if (typeof document !== "undefined") {
   // Le carnet ouvre sur ce qui imprime : une machine qui ne rapporte encore
   // rien est un autre achat, et il se demande.
   let state = STATES[0].key;
-  let mine = null;
+  let held = null;
   let learnPainted = false;
 
   const show = (name) => {
@@ -862,18 +862,18 @@ if (typeof document !== "undefined") {
   // Le portefeuille. Aucune signature, aucune connexion : la page lit, un point.
   const lookup = async (value) => {
     if (!ADDRESS_RE.test(value)) {
-      mine = { error: "That is not an address — it should start with 0x and have 40 characters after it." };
-      $("mine-out").innerHTML = mineHtml(mine);
+      held = { error: "That is not an address — it should start with 0x and have 40 characters after it." };
+      $("wallet-out").innerHTML = walletHtml(held);
       return;
     }
-    mine = { pending: true };
-    $("mine-out").innerHTML = mineHtml(mine);
+    held = { pending: true };
+    $("wallet-out").innerHTML = walletHtml(held);
     try {
-      mine = await (await fetch(`/api/wallet?address=${encodeURIComponent(value)}`)).json();
+      held = await (await fetch(`/api/wallet?address=${encodeURIComponent(value)}`)).json();
     } catch {
-      mine = { error: "Could not reach the service. Try again in a moment." };
+      held = { error: "Could not reach the service. Try again in a moment." };
     }
-    $("mine-out").innerHTML = mineHtml(mine, { light: data?.ink?.activationTotalUsd ?? 0 });
+    $("wallet-out").innerHTML = walletHtml(held, { light: data?.ink?.activationTotalUsd ?? 0 });
   };
 
   $("ask").addEventListener("submit", (e) => {
