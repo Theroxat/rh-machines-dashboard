@@ -106,8 +106,16 @@ export async function readVote({ provider, epoch }) {
  * rien à recouper : la page nommait ces desks d'après des tickers déduits, et
  * la déduction était fausse.
  */
-export function deskShares({ vote, tickers = [] }) {
+export function deskShares({ vote, tickers = null }) {
   if (!vote) return null;
+
+  // `tickers` peut être null, et pas seulement absent : `readBallotTickers`
+  // rend null dès que le bulletin de l'epoch est vide — ce qui est arrivé le
+  // 2026-09-20, l'epoch 8 ayant ouvert sans qu'aucune action ne soit encore
+  // posée sur les desks. Un défaut `= []` ne rattrape que `undefined`, jamais
+  // ce null-là : `tickers[index]` a jeté, et le balayage du carnet est mort
+  // avec, pendant dix-sept heures, sur une information d'appoint. Le secteur
+  // suffit à nommer un desk ; le ticker est ce qu'on ajoute quand on l'a.
 
   const total = vote.totalVotes;
   const desks = [];
@@ -117,11 +125,11 @@ export function deskShares({ vote, tickers = [] }) {
     desks.push({
       index,
       // Même règle que partout : le ticker nomme, le secteur situe.
-      desk: tickers[index] ?? deskName(index),
+      desk: tickers?.[index] ?? deskName(index),
       sector: deskName(index),
       // Sur le bulletin de cette epoch, ou non : un desk dont l'action n'a pas
       // de pool n'est pas votable ce tour-ci, même s'il porte un nom.
-      ticker: tickers[index] ?? null,
+      ticker: tickers?.[index] ?? null,
       // Le poids voté, en points : une machine vote avec son poids, pas pour
       // une voix.
       votedWeight: Number(weight / 100n),

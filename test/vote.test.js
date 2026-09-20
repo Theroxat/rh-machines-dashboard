@@ -84,3 +84,20 @@ test("with no ballot read, a desk claims no ticker", () => {
   const { desks } = deskShares({ vote: voteOf({ opened: true, tally: tallyOf([[0, 1]]), totalVotes: 1n }) });
   assert.equal(desks[0].ticker, null);
 });
+
+// Le 2026-09-20, l'epoch 8 a ouvert sans bulletin : `choicesFor` rendait un
+// tableau vide, `readBallotTickers` rendait donc null — ce qu'il documente —
+// et `tickers[index]` a jeté un TypeError dans `deskShares`. Le balayage du
+// carnet mourait avec, l'instantané n'était jamais calculé, et la page entière
+// a annoncé « Warming up » pendant dix-sept heures. Le défaut `= []` ne couvre
+// que `undefined` ; le lecteur, lui, rend `null`. C'est ce null qu'on éprouve.
+test("a ballot read as null names the desks by sector instead of taking the page down", () => {
+  const { desks } = deskShares({
+    vote: voteOf({ opened: true, tally: tallyOf([[10, 100], [7, 50]]), totalVotes: 150n }),
+    tickers: null,
+  });
+  assert.equal(desks.find((d) => d.index === 10).desk, "real estate");
+  assert.equal(desks.find((d) => d.index === 10).ticker, null);
+  assert.equal(desks.find((d) => d.index === 7).desk, "tech");
+  assert.equal(desks.find((d) => d.index === 7).ticker, null);
+});
