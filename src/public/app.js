@@ -104,7 +104,17 @@ export const esc = (s) => String(s).replace(/[&<>"']/g,
  * Trois servaient à décider quelque chose.
  */
 export function heroHtml(d, active = null) {
-  if (!d?.pot?.usd) {
+  /* Ce qui dit qu'on n'a rien, c'est l'absence de grille — jamais un pot vide.
+   *
+   * Le 2026-09-03 le protocole a vidé le pot pour acheter : le solde USDG du
+   * swapper est tombé à zéro, ce qui est son état normal juste après un achat.
+   * La condition portait sur `pot.usd`, donc ce zéro légitime s'est lu comme
+   * « premier balayage en cours » — et comme `floorsHtml` est rendu dans la
+   * branche normale, le titre, la vitrine et toute la grille des planchers ont
+   * disparu avec. Le service allait bien, l'instantané était complet et juste :
+   * 955 annonces, sept lignes de planchers, 24,2 % brûlé. La page annonçait
+   * qu'elle n'avait rien. */
+  if (!d?.rows) {
     return `<div class="hero"><h2>Reading the chain…</h2>` +
       `<p>The first sweep is still running. Nothing below is wrong — there is just nothing yet.</p></div>`;
   }

@@ -201,6 +201,19 @@ test("with no supply read, no burn share is invented", () => {
   assert.doesNotMatch(html, /gone for good/);
 });
 
+// Le pot vaut zéro le jour où le protocole vient de le dépenser en actions —
+// c'est un état normal, pas une absence de lecture. La vitrine le prenait pour
+// un premier balayage en cours et effaçait tout : le titre, la meilleure
+// affaire, et la grille des planchers qui est rendue à l'intérieur. Un
+// instantané complet et juste s'annonçait comme vide.
+test("an emptied pot is not an empty dashboard", () => {
+  const html = heroHtml({ ...DATA, pot: { usd: 0, fleetWeight: 1638939 } });
+  assert.doesNotMatch(html, /Reading the chain/,
+    "un pot dépensé n'est pas un balayage en cours");
+  assert.match(html, /Machines still out there/, "le titre doit rester");
+  assert.match(html, /Floor by class/, "la grille des planchers doit rester");
+});
+
 test("with nothing read the page says so rather than showing zeros", () => {
   assert.match(heroHtml({}), /Reading the chain/);
   assert.match(bannerMessage({}), /Warming up/);
