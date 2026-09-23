@@ -258,7 +258,7 @@ export function floorsHtml(d, active = null) {
   if (!rows.length) return "";
   const money = (e) => (e && eth ? fmtUsdRound(e * eth) : e ? `${fmtEth(e)} ETH` : "—");
 
-  return `<div class="floors"><span class="floors-lab">Floor by class — tap one to filter</span>` +
+  return `<div class="floors"><span class="floors-lab">Cheapest by class — tap one to filter</span>` +
     `<div class="floors-row">` +
     `<button type="button" class="fl fl-all" data-k="" aria-pressed="${active ? "false" : "true"}">` +
       `<b>All</b><u>${fmtInt(rows.reduce((a, r) => a + listedIn(r), 0))} listed</u>` +
@@ -268,8 +268,16 @@ export function floorsHtml(d, active = null) {
       `aria-pressed="${active === r.classLabel ? "true" : "false"}">` +
       `<span class="fl-cls">${esc(r.classLabel)}</span>` +
       `<b>${money(r.inked?.floorEth)}</b>` +
-      `<u>${r.dormant?.floorEth ? `${money(r.dormant.floorEth)} dormant` : "none dormant"}</u>` +
-      (r.burned?.floorEth ? `<u class="fl-burned">${money(r.burned.floorEth)} burned</u>` : "") +
+      `<u>${r.inked?.floorEth ? "printing" : "none printing"}</u>` +
+      // Les autres états en dessous, étiquette d'abord, prix ensuite. Écrit
+      // « $46 burned », le 2026-09-23, la ligne se lisait « 46 $ brûlés » —
+      // un montant détruit, pas un prix d'achat. Et « none dormant » répété
+      // sept fois, quand il n'en reste que deux, ne disait plus rien : un état
+      // sans annonce n'a pas de ligne, il n'a pas de prix inventé non plus.
+      (r.dormant?.floorEth
+        ? `<span class="fl-alt"><i>dormant</i>${money(r.dormant.floorEth)}</span>` : "") +
+      (r.burned?.floorEth
+        ? `<span class="fl-alt fl-burned"><i>burned</i>${money(r.burned.floorEth)}</span>` : "") +
       `</button>`).join("") +
     `</div></div>`;
 }

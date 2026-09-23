@@ -272,8 +272,11 @@
     margin-bottom: 9px;
   }
   .floors-row { display: flex; flex-wrap: wrap; gap: 9px; }
+  /* En haut, pas centré : un bouton centre son contenu, et un bloc sans ligne
+     « burned » flottait plus bas que ses voisins. */
   .fl {
     font: inherit; cursor: pointer; text-align: left;
+    display: flex; flex-direction: column; justify-content: flex-start;
     padding: 8px 13px; min-width: 92px;
     color: var(--ink); background: var(--paper);
     border: var(--b) solid var(--ink); box-shadow: var(--shadow-sm);
@@ -297,8 +300,24 @@
   .fl[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
   .fl[aria-pressed="true"] u { color: var(--paper-2); }
   .fl-all b { margin-top: 1px; }
-  .fl u.fl-burned { color: var(--blood); }
-  .fl[aria-pressed="true"] u.fl-burned { color: var(--paper-2); }
+  /* Les autres états, sous un trait : l'étiquette d'abord, le prix ensuite,
+     pour qu'aucun ne se lise comme un montant détruit. */
+  .fl-alt {
+    display: flex; align-items: baseline; gap: 6px;
+    font-size: 13px; font-weight: 900; font-variant-numeric: tabular-nums;
+    margin-top: 6px; padding-top: 5px; border-top: 2px solid var(--paper-2);
+  }
+  .fl-alt + .fl-alt { margin-top: 3px; padding-top: 0; border-top: 0; }
+  .fl-alt i {
+    font-style: normal; font-size: 9.5px; font-weight: 900;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    padding: 1px 5px; border: 2px solid var(--ink-2); color: var(--ink-2);
+  }
+  /* Le rouge du Meltdown, en étiquette pleine : la même que sur les cartes. */
+  .fl-burned i { background: var(--blood); border-color: var(--blood); color: var(--paper); }
+  .fl[aria-pressed="true"] .fl-alt { border-top-color: var(--ink-2); }
+  .fl[aria-pressed="true"] .fl-alt i { border-color: var(--paper-2); color: var(--paper-2); }
+  .fl[aria-pressed="true"] .fl-burned i { border-color: var(--blood); color: var(--paper); }
 
   /* ── les pastilles de filtre ───────────────────────────────────────────── */
   .chips { display: flex; flex-wrap: wrap; gap: 9px; margin: 0 0 18px; }

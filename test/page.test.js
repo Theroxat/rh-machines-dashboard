@@ -221,7 +221,7 @@ test("an emptied pot is not an empty dashboard", () => {
   assert.doesNotMatch(html, /Reading the chain/,
     "un pot dépensé n'est pas un balayage en cours");
   assert.match(html, /Machines still out there/, "le titre doit rester");
-  assert.match(html, /Floor by class/, "la grille des planchers doit rester");
+  assert.match(html, /Cheapest by class/, "la grille des planchers doit rester");
 });
 
 test("with nothing read the page says so rather than showing zeros", () => {
@@ -313,9 +313,9 @@ test("a dormant Machine carries the price of lighting it in its cost", () => {
 test("the hero carries the floor of every class that has something listed", () => {
   const html = heroHtml(DATA);
   // x1 allumée : 0.072 ETH × 2460 = $177
-  assert.match(html, /class="fl-cls">x1<\/span><b>\$177<\/b><u>\$172 dormant/);
-  assert.match(html, /class="fl-cls">x4<\/span><b>\$640<\/b><u>\$492 dormant/);
-  assert.match(html, /Floor by class — tap one to filter/);
+  assert.match(html, /class="fl-cls">x1<\/span><b>\$177<\/b><u>printing<\/u><span class="fl-alt"><i>dormant<\/i>\$172<\/span>/);
+  assert.match(html, /class="fl-cls">x4<\/span><b>\$640<\/b><u>printing<\/u><span class="fl-alt"><i>dormant<\/i>\$492<\/span>/);
+  assert.match(html, /Cheapest by class — tap one to filter/);
 });
 
 test("a class with nothing listed is not given a price it does not have", () => {
@@ -324,11 +324,23 @@ test("a class with nothing listed is not given a price it does not have", () => 
   assert.equal(floorsHtml(bare), "");
 });
 
-test("a class listed only lit says so rather than inventing a dormant floor", () => {
+// Sept « none dormant » quand il n'en reste que deux ne disaient plus rien.
+// Un état sans annonce n'a pas de ligne — et surtout pas de prix inventé.
+test("a class listed only lit gets no dormant line, and no invented dormant floor", () => {
   const one = { ...DATA, rows: [{ classValue: 100, classLabel: "x1",
     inked: { floorEth: 0.072, listed: 3, entries: [] },
     dormant: { floorEth: null, listed: 0, entries: [] } }] };
-  assert.match(floorsHtml(one), /<u>none dormant<\/u>/);
+  const html = floorsHtml(one);
+  assert.doesNotMatch(html, /dormant/);
+  assert.match(html, /<b>\$177<\/b><u>printing<\/u>/);
+});
+
+test("a class with only burned Machines on sale says none is printing, not a price", () => {
+  const only = { ...DATA, rows: [{ classValue: 600, classLabel: "x6",
+    inked: { floorEth: null, listed: 0, entries: [] },
+    dormant: { floorEth: null, listed: 0, entries: [] },
+    burned: { floorEth: 0.5, listed: 1, entries: [] } }] };
+  assert.match(floorsHtml(only), /<b>—<\/b><u>none printing<\/u><span class="fl-alt fl-burned"><i>burned<\/i>\$1,230<\/span>/);
 });
 
 test("a floor block is the filter, and it says which one is on", () => {
@@ -1028,7 +1040,10 @@ test("the burned filter shows the burned only, priced without the cost of ink", 
 
 test("a class block shows the burned floor under the others, never as its headline", () => {
   const html = floorsHtml(MELT);
-  assert.match(html, /<u class="fl-burned">\$10 burned<\/u>/);
+  // L'étiquette avant le prix : « $46 burned » se lisait « 46 $ brûlés ».
+  assert.match(html, /<span class="fl-alt fl-burned"><i>burned<\/i>\$10<\/span>/);
+  assert.doesNotMatch(html, /\$10 burned/);
+  assert.match(css, /\.fl-burned i \{[^}]*var\(--blood\)/);
   // Le grand chiffre reste celui qui imprime.
   assert.match(html, /<b>\$177<\/b>/);
 });
