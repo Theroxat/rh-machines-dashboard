@@ -85,19 +85,23 @@ export function sweepCut(s, { myWeight, myByDesk, potUsd, fleetWeight, sectorWei
 
 /** Le portefeuille : ses machines, son poids, sa part, son conseil. */
 export function analyseWallet({
-  address, tokenIds, weightOf, deskOf, epochUsdOf, imageOf, holdsOf,
+  address, tokenIds, weightOf, deskOf, epochUsdOf, imageOf, holdsOf, burnedOf,
   tally, potUsd, fleetWeight, sectorWeight, tickers = [],
 }) {
   const machines = tokenIds.map((tokenId) => {
     const weight = weightOf(tokenId) ?? 0;
     const index = deskOf(tokenId);
+    // Brûlée au Meltdown : la chaîne lui laisse son poids, l'équipe dit qu'elle
+    // ne touchera plus rien. Le portefeuille le montre, et ne lui promet rien.
+    const burned = burnedOf ? burnedOf(tokenId) === true : false;
     return {
       tokenId,
       weight,
       deskIndex: index ?? null,
       desk: deskName(index),
       ticker: index === null || index === undefined ? null : (tickers[index] ?? null),
-      epochUsd: epochUsdOf ? epochUsdOf(weight, tokenId) : null,
+      burned,
+      epochUsd: epochUsdOf && !burned ? epochUsdOf(weight, tokenId) : null,
       // De quoi dessiner la machine plutôt que de la nommer : la page du
       // portefeuille était la seule à parler de machines sans en montrer une.
       image: imageOf ? imageOf(tokenId) : null,

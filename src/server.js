@@ -7,7 +7,7 @@ import { ethers } from "ethers";
 import { loadConfig, RPC_URL, CHAIN_ID, ADDRESSES, TOTAL_MACHINES, PAD, PROTON } from "./config.js";
 import { fetchListings, fetchCollectionStats } from "./opensea.js";
 import { loadTraits } from "./traits.js";
-import { loadMetadata } from "./metadata.js";
+import { loadMetadata, readLiveStatus } from "./metadata.js";
 import { deriveHeadwearLegend } from "./rarity.js";
 import { readInk } from "./ink.js";
 import { fetchPrinter, fetchEthUsd } from "./prices.js";
@@ -118,6 +118,22 @@ let pad = null;
 // les journaux coûte une centaine de requêtes, et rien de tout cela ne bouge à
 // la minute.
 let scarcity = null;
+// Le statut et l'image publiés aujourd'hui, par machine. Le Meltdown du
+// 2026-09-23 les a réécrits hors chaîne pour 4 381 machines encore détenues :
+// ce n'est plus scellé, donc relu sur sa propre boucle.
+let live = null;
+
+async function sweepStatus() {
+  const r = await readLiveStatus({ apiKey: cfg.openseaApiKey, maxPages: cfg.maxMetadataPages });
+  live = { ...r, readAt: Date.now() };
+  const burned = [...r.status.values()].filter((v) => v === "burned").length;
+  console.log(`status: ${r.status.size} machines published, ${burned} marked burned, ` +
+    `${r.image.size} current pictures (${r.pages} pages)`);
+}
+
+/** Les machines de l'adresse morte, lues sur la carte des propriétaires. */
+const goneOf = () => new Set([...owners.byToken]
+  .filter(([, o]) => o?.toLowerCase() === DEAD_ADDRESS.toLowerCase()).map(([id]) => id));
 
 async function sweepOwners() {
   owners = await readOwners({
@@ -288,6 +304,10 @@ async function sweepScarcity() {
 }
 
 async function sweepBook() {
+  // Sans statut, les brûlées du Meltdown se rangeraient parmi les vivantes et
+  // tireraient leurs floors vers le bas sans rien dire. Mieux vaut une page
+  // qui attend — ou qui garde le dernier instantané juste — qu'une page fausse.
+  if (!live) throw new Error("machine status not read yet — the burned cannot be told from the living");
   const [book, printer, eth, protocol, stats, offCirculation, official] = await Promise.all([
     fetchListings({ apiKey: cfg.openseaApiKey, maxPages: cfg.maxBookPages }),
     fetchPrinter(),
@@ -346,6 +366,7 @@ async function sweepBook() {
   const grid = buildGrid({
     listings: book.listings, traits, ink, pelotonSize: cfg.pelotonSize,
     shelf: anvil?.shelfListings,
+    status: live.status, gone: goneOf(),
   });
 
   // Le poids de chaque desk : il décide de la dilution sur sa propre tranche.
@@ -380,6 +401,7 @@ async function sweepBook() {
     holdings: held?.holdings, stockPrices, ownerOf: owners.byToken, now: Date.now(),
     offCirculation,
     official,
+    live,
   });
   store.succeed(composed);
 
@@ -609,7 +631,8 @@ const server = createServer(async (req, res) => {
     const body = analyseWallet({
       address: address.trim().toLowerCase(),
       tokenIds: ownedIds,
-      imageOf: (id) => meta.get(id)?.image ?? null,
+      imageOf: (id) => live?.image.get(id) ?? meta.get(id)?.image ?? null,
+      burnedOf: (id) => live?.status.get(id) === "burned",
       holdsOf,
       weightOf: (id) => Number(weights.get(id) ?? 0n),
       deskOf: (id) => deskIndex.get(id) ?? null,
@@ -774,7 +797,12 @@ const started = async () => {
   }
 
 
+  // Le statut avant le carnet : le premier balayage du carnet en a besoin pour
+  // séparer les brûlées des vivantes, et il échouerait sinon.
+  await sweepStatus().catch((e) => console.error(`status: ${e.message}`));
+
   loop("book", sweepBook, cfg.bookPollIntervalMs);
+  loop("status", sweepStatus, cfg.inkPollIntervalMs, { runNow: false });
   loop("ink", sweepInk, cfg.inkPollIntervalMs, { runNow: false });
   loop("owners", sweepOwners, cfg.inkPollIntervalMs);
   loop("pad", sweepPad, cfg.padPollIntervalMs);

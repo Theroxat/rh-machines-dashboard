@@ -816,3 +816,52 @@ distribué.
 Nous gardons notre définition : **le solde USDG du swapper**, c'est-à-dire ce
 qui est converti et prêt. C'est aussi exactement la ligne « in the pot, ready »
 de leur propre page Stock.
+
+## Le Meltdown (2026-09-23)
+
+Annoncé par @btcordinal (« RH MACHINE collection is now down to 6521 — we have
+burned the entire Factory »). Vérifié on-chain le jour même.
+
+### Deux « burns » qui n'ont rien de commun
+
+| | combien | où ça se lit | réversible |
+|---|---|---|---|
+| envoyées à `0x…dEaD` | 3 497 | `ownerOf`, journaux `Transfer` | non |
+| marquées `Status: Burned`, toujours détenues | 4 381 (1 400 porteurs) | métadonnées hors chaîne seulement | oui, par l'équipe |
+
+**L'adresse morte.** 3 477 des 3 497 sortent du coffre du Proton
+(`0xE4979E6c…`), en 3 486 transactions `releaseMachine(uint256,address)`
+(`0xbb37d716`) signées par son propriétaire `0xA08c58FC…`, entre 01:29 et 04:04
+UTC. Le reste — une vingtaine — a été envoyé directement par des porteurs.
+Le coffre ne se remplissait pas par les seules fusions : depuis au moins le
+2026-09-13, les porteurs y déposaient eux-mêmes leurs machines par un proxy
+ERC-1967 `0x687e2D91…` (implémentation `0x812d7d63…`, non vérifiée), sélecteur
+`0x16194de3(uint256[],address)`, qui émet un compteur par dépôt. 2 668 dépôts,
+344 expéditeurs, sur les neuf jours lus. Personne n'a été dépossédé de force.
+
+**Les marquées.** Toutes les machines sous 2x au moment du Meltdown ont vu leur
+`rhmachines.com/meta/{id}.json` réécrit : `Status: Burned`, `Burned In: The
+Meltdown`, fond `Blood Red`, **nouveau Headwear** (« Broken Halo », « Sold At A
+Big Loss », « Crowned Devil »…), `Weight (x): 0`, nouvelle image IPFS. Les
+2 120 `Active` restantes sont toutes à 2x ou plus.
+
+### Ce qui n'a pas bougé
+
+- Aucun `Upgraded` sur le NFT, MINE ni TRAITS ; les implémentations sont celles
+  d'avant. `totalSupply` = 10 000.
+- `MINE.weightOf` donne toujours leur poids aux marquées : 437 232 au total
+  (100, 200, 466…). Le `totalWeight` officiel (22 649) retombe à l'unité près
+  sur la somme vivantes + marquées + adresse morte. « Ne pèsera plus jamais »
+  est donc une déclaration de l'équipe, pas un fait de la chaîne — à revérifier
+  si le distributeur ou MINE change.
+
+### Ce que ça a changé ici
+
+- OpenSea n'expose plus les machines de l'adresse morte (d'où « 6 521 » puis
+  6 503), et ne publie plus les traits `Wallet`, `Desk` ni `Weight`. Relire tout
+  le cache des métadonnées aurait effacé les comptes 6551 des machines.
+- Le statut et l'image sont relus à part (`readLiveStatus`, boucle `status`,
+  10 min). Les traits du cache restent ceux du mint : le nouveau Headwear des
+  marquées ferait sinon exploser la dérivation couvre-chef → classe.
+- Troisième case `burned` par classe. Floor de collection et capitalisation sur
+  les seules vivantes.

@@ -37,6 +37,9 @@
     --pink:   #FF4FA3;
     --sky:    #4FC3FF;
     --sun:    #FFCE3E;
+    /* Le rouge du Meltdown : la couleur que l'équipe a donnée aux brûlées.
+       Elle ne sert qu'à elles. */
+    --blood:  #C4161C;
 
     /* L'encre diluée, pour ce qui accompagne sans porter. Mesurée sur le
        papier : 4.5:1 minimum pour du petit texte. */
@@ -294,6 +297,8 @@
   .fl[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
   .fl[aria-pressed="true"] u { color: var(--paper-2); }
   .fl-all b { margin-top: 1px; }
+  .fl u.fl-burned { color: var(--blood); }
+  .fl[aria-pressed="true"] u.fl-burned { color: var(--paper-2); }
 
   /* ── les pastilles de filtre ───────────────────────────────────────────── */
   .chips { display: flex; flex-wrap: wrap; gap: 9px; margin: 0 0 18px; }
@@ -349,6 +354,7 @@
     border: var(--b) solid var(--ink); box-shadow: 3px 3px 0 var(--ink);
   }
   .card-state.off { background: var(--paper); color: var(--ink-2); }
+  .card-state.burned { background: var(--blood); color: var(--paper); }
   /* Ces machines-là ne sont pas sur OpenSea : elles s'achètent au terminal du
      protocole et se paient en $PRINTER. Deux marchés, deux monnaies — le dire
      évite d'envoyer quelqu'un sur une page où elle n'est pas en vente. */

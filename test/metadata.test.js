@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fetchMetadata, readCache, writeCache, backfillMetadata, loadMetadata } from "../src/metadata.js";
+import { fetchMetadata, readCache, writeCache, backfillMetadata, loadMetadata, readLiveStatus } from "../src/metadata.js";
 
 const tmp = () => join(mkdtempSync(join(tmpdir(), "rh-meta-")), "metadata.json");
 
@@ -201,4 +201,52 @@ test("a probe that fails keeps the cache, rather than refetching ten thousand", 
   const fetchImpl = async () => { throw new Error("network down"); };
   const { meta } = await loadMetadata({ apiKey: "k", cachePath: path, maxPages: 1, total: 10, fetchImpl });
   assert.equal(meta.size, 10);
+});
+
+// Le Meltdown du 2026-09-23 a réécrit l'image et le statut de 4 381 machines
+// sans toucher au reste : ce sont les deux seuls champs qu'on relit.
+test("the live status is read per machine, lowercased, with the current image", async () => {
+  const burned = nft(1, "Broken Halo", {
+    display_image_url: "https://img/1-red.webp",
+    traits: [{ trait_type: "Status", value: "Burned" }, { trait_type: "Background", value: "Blood Red" }],
+  });
+  const active = nft(4, "Ordinals", { traits: [{ trait_type: "Status", value: "Active" }] });
+  const { status, image, pages } = await readLiveStatus({
+    apiKey: "k", maxPages: 5,
+    fetchImpl: fakeFetch([{ nfts: [burned], next: "p2" }, { nfts: [active], next: null }]),
+  });
+  assert.equal(pages, 2);
+  assert.equal(status.get(1), "burned");
+  assert.equal(status.get(4), "active");
+  assert.equal(image.get(1), "https://img/1-red.webp");
+});
+
+// Lue sans trait Status n'est pas absente : elle est lue et non marquée. Une
+// machine absente de la carte, elle, reste inconnue — c'est à l'appelant de
+// ne pas la ranger.
+test("a machine read without a Status trait is unmarked, not missing", async () => {
+  const { status } = await readLiveStatus({
+    apiKey: "k", maxPages: 5,
+    fetchImpl: fakeFetch([{ nfts: [nft(7, "Halo")], next: null }]),
+  });
+  assert.equal(status.get(7), "unmarked");
+  assert.equal(status.has(8), false);
+});
+
+// Une carte partielle rangerait des brûlées parmi les vivantes sans le dire.
+test("a status book that is not exhausted throws instead of returning half", async () => {
+  await assert.rejects(
+    readLiveStatus({
+      apiKey: "k", maxPages: 1,
+      fetchImpl: fakeFetch([{ nfts: [nft(1, "Halo")], next: "more" }]),
+    }),
+    /not exhausted/,
+  );
+});
+
+test("an OpenSea error on the status book is a failure, not an empty fleet", async () => {
+  await assert.rejects(
+    readLiveStatus({ apiKey: "k", maxPages: 5, fetchImpl: async () => ({ ok: false, status: 500 }) }),
+    /500/,
+  );
 });

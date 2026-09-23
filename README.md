@@ -62,10 +62,44 @@ rebuilds it.
 To run without Docker: `npm install`, then
 `set -a && . ./.env && set +a && npm start`. Tests: `npm test`.
 
+## The Meltdown, and the third state
+
+On 2026-09-23 the team ran what it calls the **Meltdown**. Two different things
+happened, and the page keeps them apart:
+
+- **3,497 Machines went to the dead address** (`0x…dEaD`). 3,477 of them were
+  the Proton's vault, which holders had filled themselves; its owner key sent
+  them all out with `releaseMachine`. These are destroyed: out of every supply,
+  out of every floor, and read **on-chain**, by owner.
+- **4,381 Machines still in holders' wallets were marked burned.** Every Machine
+  below 2x had its metadata rewritten off-chain: `Status: Burned`, a blood-red
+  picture, a new headwear, `Weight (x): 0`. **No contract changed.** `MINE.weightOf`
+  still gives them their weight and the official `totalWeight` still counts it;
+  that they "will never carry weight again" is the team's statement, not
+  something the chain enforces today.
+
+So each row now has a third cell, **burned**, next to inked and dormant. A burned
+Machine is still for sale, and still a Machine of its class, but it is neither
+one that prints nor one you can switch on — mixing it into either floor would
+drag that floor to the price of a Machine the team says will never earn. The
+page shows no drop for it.
+
+The collection floor and the market cap are computed on the living fleet only
+(not destroyed, not marked burned). The burned floor is shown beside it.
+
+The mark comes from metadata, so it is re-read every ten minutes from OpenSea.
+Until it has been read once, the book is not computed at all: a page that waits
+beats one that files burned Machines among the living. A Machine OpenSea does
+not return is excluded and counted, never assumed alive. Only the picture and
+the status are re-read — the traits used to derive rarity stay those of the
+mint, and OpenSea no longer publishes the `Wallet`, `Desk` and `Weight` traits
+the cache holds, so a full re-read would have erased them.
+
 ## Reading the grid
 
-Seven rows, one per rarity, each split into an **inked** half and a
-**dormant** half. A Machine is inked when its `inkBurned` is above zero.
+Seven rows, one per rarity, each split into an **inked** half, a **dormant**
+half and, since the Meltdown, a **burned** cell. A Machine is inked when its
+`inkBurned` is above zero, unless its metadata marks it burned.
 
 Each half shows that book as pictures, cheapest Machine first, with its price
 and its `#id` under each. The cheapest one — the floor — is outlined, since that
@@ -178,7 +212,9 @@ information, not something to average away.
 | What | Source |
 |---|---|
 | Listings | OpenSea v2, `/listings/collection/rh-machines/all`, cursor-paginated |
-| Pictures and traits | OpenSea v2, `/chain/robinhood/contract/{addr}/nfts`, 200 per page, cached forever |
+| Traits | OpenSea v2, `/chain/robinhood/contract/{addr}/nfts`, 200 per page, cached forever as minted |
+| Current picture and burned mark | the same endpoint, re-read every 10 minutes |
+| Destroyed Machines | `ownerOf` = `0x…dEaD`, via Multicall3 |
 | Sealed rarity and desk | `TRAITS.weightOf` / `TRAITS.sectorOf` via Multicall3 |
 | Ink | `MINE.inkBurned` via Multicall3, all 10,000 Machines |
 | Protocol state | `MINE` — epoch, multiplier ceiling, total burned, active Machines |
@@ -254,11 +290,20 @@ not see a phantom staleness warning.
 
 ## Cadences
 
-The listings book, prices and protocol state refresh every **60 seconds**. Ink
-across all 10,000 Machines refreshes every **10 minutes**, in its own loop — it
-only changes when someone activates or re-inks, so it does not need the book's
-rhythm and must never block the display. The two loops are independent: either
-one failing leaves the other running, and the page says which half is stale.
+Six loops, each independent, each rescheduling itself only after it finishes:
+
+| Loop | Every | What |
+|---|---|---|
+| book | 60 s | listings, prices, protocol state |
+| ink | 10 min | ink and weight of all 10,000 Machines |
+| owners | 10 min | who holds every Machine |
+| status | 10 min | current picture and burned mark |
+| pad | 2 min | PRINTER.FUN coins |
+| proton | 10 min | fusions and the vault |
+
+Ink only changes when someone activates or re-inks, so it does not need the
+book's rhythm and must never block the display. One loop failing leaves the
+others running, and the page says what is stale.
 
 ## Design and plan
 

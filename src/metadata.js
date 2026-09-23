@@ -36,8 +36,11 @@ function traitsOf(nft, image) {
   };
 }
 
-/** Image et traits de chaque machine. Scellés au mint comme les raretés, donc
- *  lus une fois puis cachés à vie : en régime établi, zéro appel. */
+/** Image et traits de chaque machine, tels qu'au mint, lus une fois puis cachés
+ *  à vie : en régime établi, zéro appel. Depuis le Meltdown l'image et le
+ *  couvre-chef publiés ont changé pour une partie de la flotte — le cache garde
+ *  ceux du mint, dont dépend la dérivation des classes, et `readLiveStatus`
+ *  porte l'image actuelle. */
 export async function fetchMetadata({
   apiKey,
   fetchImpl = fetch,
@@ -75,6 +78,67 @@ export async function fetchMetadata({
   if (next) throw new Error(`collection not exhausted after ${maxPages} metadata pages`);
 
   return { meta, pages, skipped };
+}
+
+/**
+ * Ce qui, dans les métadonnées, ne reste plus scellé : l'image et le statut.
+ *
+ * Le 2026-09-23 l'équipe a déclenché le « Meltdown » : 4 381 machines sous 2x,
+ * toujours dans les portefeuilles de 1 400 porteurs, ont été réécrites hors
+ * chaîne — `Status: Burned`, fond « Blood Red », nouvelle image, nouveau
+ * couvre-chef. Aucun contrat n'a bougé, `MINE.weightOf` leur donne toujours un
+ * poids ; seules les métadonnées le disent. Le cache scellé ne l'aurait jamais
+ * vu, et le relire en entier aurait été pire : OpenSea ne publie plus
+ * `Wallet`, `Desk` ni `Weight`, donc une relecture effaçait les comptes des
+ * machines. On relit donc ces deux champs-là seulement, à part.
+ *
+ * OpenSea omet les machines détenues par l'adresse morte (3 497 ce jour-là) :
+ * elles manquent de la carte, et l'appelant les reconnaît par leur
+ * propriétaire, pas par un statut qu'on ne publie pas. Une machine sans trait
+ * Status vaut `"unmarked"` — lue, et non marquée — ce qui n'est pas la même
+ * chose qu'absente.
+ */
+export async function readLiveStatus({
+  apiKey,
+  fetchImpl = fetch,
+  maxPages,
+  contract = ADDRESSES.MACHINES,
+  chain = OPENSEA.chain,
+}) {
+  const status = new Map();
+  const image = new Map();
+  let next = null;
+  let pages = 0;
+
+  do {
+    const url = new URL(`${OPENSEA.base}/chain/${chain}/contract/${contract}/nfts`);
+    url.searchParams.set("limit", "200");
+    if (next) url.searchParams.set("next", next);
+
+    const res = await fetchImpl(url.toString(), {
+      headers: { "x-api-key": apiKey, accept: "application/json" },
+    });
+    if (!res.ok) throw new Error(`OpenSea returned ${res.status} on status page ${pages + 1}`);
+
+    const body = await res.json();
+    for (const n of body?.nfts ?? []) {
+      const tokenId = Number(n?.identifier);
+      if (!Number.isInteger(tokenId) || tokenId <= 0) continue;
+      const raw = (n.traits ?? []).find((t) => t?.trait_type === "Status")?.value;
+      status.set(tokenId, typeof raw === "string" && raw.trim() ? raw.trim().toLowerCase() : "unmarked");
+      const img = n?.display_image_url || n?.image_url || null;
+      if (img) image.set(tokenId, img);
+    }
+
+    next = body?.next || null;
+    pages++;
+  } while (next && pages < maxPages);
+
+  // Une carte partielle rangerait des machines brûlées parmi les vivantes sans
+  // rien dire : mieux vaut garder l'ancienne, entière.
+  if (next) throw new Error(`collection not exhausted after ${maxPages} status pages`);
+
+  return { status, image, pages };
 }
 
 /**

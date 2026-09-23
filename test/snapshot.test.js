@@ -54,7 +54,7 @@ test("every machine on sale carries its picture, its traits and the desk it sits
   const s = composeSnapshot({ ...withGrid, deskIndex: new Map([[1253, 9]]) });
   assert.deepEqual(s.rows[0].inked.entries[0].machine, {
     image: "https://img/1253.webp", headwear: "Blueberries", body: "Cobalt Stripe",
-    eyes: "Rage", desk: "utilities", sector: "utilities", ticker: null,
+    eyes: "Rage", burned: false, desk: "utilities", sector: "utilities", ticker: null,
   });
 });
 
@@ -136,7 +136,7 @@ test("the collection floor is the cheapest machine anywhere on the board", () =>
   assert.ok(Math.abs(s.collection.floorUsd - 0.094 * 1883.24) < 0.01);
 });
 
-test("the collection's market cap is the floor across all ten thousand machines", () => {
+test("with nothing destroyed or burned, the market cap spans all ten thousand machines", () => {
   const s = composeSnapshot(withStats);
   assert.ok(Math.abs(s.collection.marketCapEth - 940) < 1e-9);   // 0.094 x 10,000
   assert.equal(s.collection.machines, 10000);
@@ -433,4 +433,62 @@ test("a Machine on the shelf carries the same chain facts as one on OpenSea", ()
   // pouvoir le dire aussi.
   assert.ok(shelf.inkMult > 1.9);
   assert.ok("holds" in shelf, "les actions du compte partent avec la machine");
+});
+
+// Le Meltdown du 2026-09-23. Les brûlées gardent un poids sur la chaîne, mais
+// l'équipe dit qu'elles ne toucheront plus rien : elles ont leur floor à part,
+// et la flotte qu'on multiplie par le floor ne compte que les vivantes.
+const cell = (floorEth, entries = []) => ({
+  floorEth, floorTokenId: entries[0]?.tokenId ?? null, pelotonEth: null,
+  listed: entries.length, supply: 10, listedRatio: 0, entries, anvilEntries: [],
+});
+const meltdown = {
+  ...base,
+  grid: {
+    ...base.grid,
+    rows: [{
+      classLabel: "x1", classValue: 100, docCount: 1, chainCount: 30, spreadEth: null,
+      inked: cell(0.02, [{ tokenId: 1, priceEth: 0.02 }]),
+      dormant: cell(null),
+      burned: cell(0.005, [{ tokenId: 2, priceEth: 0.005 }]),
+    }],
+    totals: { inked: 10, dormant: 10, burned: 4381, listed: 2 },
+  },
+  offCirculation: { vault: 1, dead: 3497 },
+  meta: new Map([
+    [1, { image: "https://mint/1.webp", headwear: "Halo" }],
+    [2, { image: "https://mint/2.webp", headwear: "Straw Hat" }],
+  ]),
+  live: {
+    status: new Map([[1, "active"], [2, "burned"]]),
+    image: new Map([[2, "https://now/2-red.webp"]]),
+  },
+  protocol: { ...base.protocol, totalWeight: 1000n },
+  potUsd: 1000,
+  weights: new Map([[1, 100n], [2, 100n]]),
+};
+
+test("the collection floor leaves the burned out, and shows theirs beside it", () => {
+  const s = composeSnapshot(meltdown);
+  assert.equal(s.collection.floorEth, 0.02);
+  assert.equal(s.collection.burnedFloorEth, 0.005);
+  assert.equal(s.collection.burned, 4381);
+  assert.equal(s.collection.destroyed, 3497);
+});
+
+test("the market cap multiplies the floor by the living fleet only", () => {
+  const s = composeSnapshot(meltdown);
+  assert.equal(s.collection.machines, 10000 - 3497 - 4381);
+  assert.ok(Math.abs(s.collection.marketCapEth - 0.02 * 2122) < 1e-9);
+});
+
+test("a burned machine wears its current picture and claims no return", () => {
+  const s = composeSnapshot(meltdown);
+  const e = s.rows[0].burned.entries[0];
+  assert.equal(e.machine.image, "https://now/2-red.webp");
+  assert.equal(e.machine.burned, true);
+  assert.equal(e.epochUsd, null);
+  // La vivante garde sa vignette du mint tant qu'on n'en publie pas d'autre.
+  assert.equal(s.rows[0].inked.entries[0].machine.image, "https://mint/1.webp");
+  assert.ok(s.rows[0].inked.entries[0].epochUsd > 0);
 });

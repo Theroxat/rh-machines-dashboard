@@ -60,7 +60,7 @@ export function fleetHeadline(off) {
 export function composeSnapshot({
   grid, printer, eth, protocol, stats, book, inkMeta, meta, legend, ink, weights, anvil,
   deskIndex, vote, potUsd, sectorWeight, tickers, holdings, stockPrices, ownerOf, now,
-  offCirculation, official,
+  offCirculation, official, live,
 }) {
   const activationPrinter = protocol?.activationInk
     ? Number(BigInt(protocol.activationInk) / 10n ** 15n) / 1000
@@ -92,6 +92,12 @@ export function composeSnapshot({
     const index = deskIndex?.get(tokenId);
     return {
       ...m,
+      // L'image publiée aujourd'hui, pas celle du mint : le Meltdown a repeint
+      // en rouge les machines qu'il a brûlées, et une vignette d'avant les
+      // vendrait sous un visage qu'elles n'ont plus. Les traits, eux, restent
+      // ceux du mint — c'est d'eux que dépend la dérivation des classes.
+      image: live?.image?.get(tokenId) ?? m.image,
+      burned: live?.status?.get(tokenId) === "burned",
       // Le nom officiel d'un desk est son ticker : c'est ce que publient les
       // métadonnées de la collection, et c'est ce que cherche un porteur — on
       // ne demande pas « les machines du secteur utilities », on demande GME.
@@ -179,7 +185,7 @@ export function composeSnapshot({
     };
   };
 
-  const withMachines = (cell, classValue) => ({
+  const withMachines = (cell, classValue, burned = false) => ({
     ...cell,
     anvilEntries: (cell.anvilEntries ?? []).map((e) => shelfEntry(e, classValue)),
     entries: cell.entries.map((e) => {
@@ -192,7 +198,10 @@ export function composeSnapshot({
         machine: machineOf(e.tokenId),
         weight,
         inkPrinter: i === undefined ? null : Number(i / PRINTER),
-        epochUsd: returnOf(e.tokenId, weight),
+        // La chaîne lui donne encore un poids, mais l'équipe annonce qu'une
+        // brûlée ne touchera plus rien. On n'affiche pas un revenu que le
+        // protocole a dit ne plus verser : ni zéro affirmé, ni montant.
+        epochUsd: burned ? null : returnOf(e.tokenId, weight),
         holds: heldBy(e.tokenId),
         // Le compte du NFT et son porteur : de quoi vérifier soi-même ce que
         // la fiche annonce, sans avoir à nous croire.
@@ -212,29 +221,47 @@ export function composeSnapshot({
     ...r,
     inked: withMachines(r.inked, r.classValue),
     dormant: withMachines(r.dormant, r.classValue),
+    burned: withMachines(r.burned ?? { entries: [], anvilEntries: [] }, r.classValue, true),
   }));
 
   const listed = new Set();
   for (const r of rows) {
     for (const e of r.inked.entries) listed.add(e.tokenId);
     for (const e of r.dormant.entries) listed.add(e.tokenId);
+    for (const e of r.burned.entries) listed.add(e.tokenId);
   }
 
   // Le floor de la collection est le moins cher de nos quatorze cases, pas le
   // chiffre publié par OpenSea : il vient du même carnet que tout le reste de
-  // la page, donc il ne peut pas la contredire.
-  const floors = rows.flatMap((r) => [r.inked.floorEth, r.dormant.floorEth]).filter((v) => v !== null && v !== undefined);
-  const floorEth = floors.length ? Math.min(...floors) : null;
+  // la page, donc il ne peut pas la contredire. Les brûlées du Meltdown n'y
+  // entrent pas — elles ont leur propre floor, à côté : le prix d'entrée dans
+  // une flotte qui imprime n'est pas celui d'une machine qui ne pèsera plus.
+  const minOf = (vals) => {
+    const v = vals.filter((x) => x !== null && x !== undefined);
+    return v.length ? Math.min(...v) : null;
+  };
+  const floorEth = minOf(rows.flatMap((r) => [r.inked.floorEth, r.dormant.floorEth]));
+  const burnedFloorEth = minOf(rows.map((r) => r.burned.floorEth));
   const inEth = (v) => (v !== null && v !== undefined && eth?.usd ? v * eth.usd : null);
+  // Ce qui reste vivant : ni à l'adresse morte, ni marqué brûlé. C'est sur
+  // cette flotte-là que le floor se multiplie — dix mille fois le prix d'une
+  // vivante comptait 3 497 machines détruites et 4 381 brûlées.
+  const dead = offCirculation?.dead ?? 0;
+  const alive = TOTAL_MACHINES - dead - (grid.totals?.burned ?? 0);
 
   const collection = {
     floorEth,
     floorUsd: inEth(floorEth),
     // Convention du marché NFT : floor x supply. C'est une valorisation
     // théorique, pas une somme observée — l'étiquette le dit sur la page.
-    machines: TOTAL_MACHINES,
-    marketCapEth: floorEth === null ? null : floorEth * TOTAL_MACHINES,
-    marketCapUsd: inEth(floorEth === null ? null : floorEth * TOTAL_MACHINES),
+    machines: alive,
+    minted: TOTAL_MACHINES,
+    destroyed: offCirculation?.dead ?? null,
+    burned: grid.totals?.burned ?? null,
+    burnedFloorEth,
+    burnedFloorUsd: inEth(burnedFloorEth),
+    marketCapEth: floorEth === null ? null : floorEth * alive,
+    marketCapUsd: inEth(floorEth === null ? null : floorEth * alive),
     volumeEth: stats?.volume ?? null,
     volumeUsd: inEth(stats?.volume),
     sales: stats?.sales ?? null,

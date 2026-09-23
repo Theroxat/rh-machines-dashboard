@@ -45,6 +45,13 @@ export const SOURCES = Object.freeze([
       "There is no order book on-chain to read instead.",
   },
   { what: "Pictures and traits", kind: "api", from: "OpenSea" },
+  {
+    what: "Which Machines were burned in the Meltdown",
+    kind: "api", from: "OpenSea, relaying the collection's own metadata",
+    note: "The mark lives only in metadata the team rewrote off-chain on 2026-09-23. No contract " +
+      "changed: the chain still gives these Machines their weight. The ones sent to the dead " +
+      "address are read on-chain, by owner, not from this.",
+  },
   { what: "Collection volume and sales", kind: "api", from: "OpenSea" },
   {
     what: "Every dollar figure on this site",

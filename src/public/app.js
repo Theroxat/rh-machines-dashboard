@@ -129,7 +129,8 @@ export function heroHtml(d, active = null) {
   // Le point après « Machines » n'est pas un détail de ponctuation. Écrit
   // « 10,000 Machines, and 22.5% of the $PRINTER already burned », le dernier
   // mot se rattache aussi au premier membre et la phrase annonce dix mille
-  // machines brûlées. Il n'en existe aucune : `totalSupply` n'a jamais bougé.
+  // machines brûlées. `totalSupply` n'a jamais bougé ; ce qui a disparu est
+  // compté à part, juste en dessous, et jamais fondu dans ce titre.
   const noun = f ? "Machines still out there" : "Machines";
   const fleet = `<mark class="stamp">${fmtInt(total)}</mark>`;
   const head = b
@@ -137,15 +138,25 @@ export function heroHtml(d, active = null) {
       `$PRINTER already burned.</h2>`
     : `<h2>${fleet} ${noun}, and a $PRINTER supply that only ever falls.</h2>`;
 
-  // « Hors circulation » n'est pas « détruite » : le coffre du Proton a un
-  // propriétaire qui peut ressortir ce qu'il garde. La phrase compte les deux
-  // séparément plutôt que de les fondre dans une perte.
+  // Trois disparitions, et aucune n'est de même nature. L'adresse morte ne
+  // rend rien. Le Meltdown du 2026-09-23 y a envoyé les 3 477 machines du
+  // coffre, et marqué brûlées 4 381 autres qui restent pourtant dans des
+  // portefeuilles, avec leur poids sur la chaîne — c'est l'équipe qui dit
+  // qu'elles ne pèseront plus. Le coffre, lui, peut ressortir ce qu'il garde.
+  // La phrase compte les trois séparément plutôt que de les fondre en une perte.
+  const marked = d.collection?.burned ?? 0;
+  const bits = !f ? [] : [
+    f.dead ? `${fmtInt(f.dead)} went to a dead address, where nothing comes back` : null,
+    marked ? `${fmtInt(marked)} more were marked burned in the Meltdown and still sit in ` +
+      `wallets — the team says they will never carry weight again` : null,
+    f.vault ? (f.vault === 1
+      ? `1 sits in the Proton's vault, which can send it back out`
+      : `${fmtInt(f.vault)} sit in the Proton's vault, which can send them back out`) : null,
+  ].filter(Boolean);
   const gone = !f ? "" :
-    (f.vault
-      ? ` ${fmtInt(f.minted)} were minted and none has ever been destroyed — ` +
-        `${fmtInt(f.vault)} sit in the Proton's vault, which can send them back out` +
-        (f.dead ? `, and ${fmtInt(f.dead)} went to a dead address and cannot` : "") + `.`
-      : ` All ${fmtInt(f.minted)} ever minted are still in circulation.`);
+    bits.length
+      ? ` ${fmtInt(f.minted)} were minted: ${bits.join("; ")}.`
+      : ` All ${fmtInt(f.minted)} ever minted are still in circulation.`;
 
   const said = b
     ? `<p>The $PRINTER is the part that burns: ${fmtInt(Math.round(b.burned))} of the ` +
@@ -158,7 +169,11 @@ export function heroHtml(d, active = null) {
   // Le meilleur retour du carnet, en vitrine. Cette moitié de la boîte était
   // vide sur un écran large — et la question qu'elle laissait sans réponse est
   // justement celle qu'on vient poser.
-  const best = pickMachines(d, { sort: "back", limit: 1 })[0];
+  // Jamais une brûlée : le 2026-09-23, sur le banc, la vitrine a mis en avant
+  // une machine du Meltdown à « $0.00 a drop » parce que les actions qu'elle
+  // transporte, rapportées à son prix bradé, faisaient 9,8 %. Une vitrine de
+  // retour qui ne rapporte rien ment par sa place.
+  const best = pickMachines(d, { sort: "back", limit: Infinity }).find((m) => !m.burned);
 
   // Le pot entre dans la rangée plutôt que de la suivre. Posé dessous, il
   // attendait que la colonne la plus haute ait fini — la vitrine — et laissait
@@ -236,14 +251,17 @@ export function potNote(d) {
  */
 export function floorsHtml(d, active = null) {
   const eth = d?.eth?.usd;
-  const rows = (d?.rows ?? []).filter((r) => (r.inked?.listed ?? 0) + (r.dormant?.listed ?? 0) > 0);
+  // Les brûlées du Meltdown se vendent aussi, et un bloc qui n'aurait qu'elles
+  // doit apparaître : c'est le seul prix de la classe qu'on peut payer.
+  const listedIn = (r) => (r.inked?.listed ?? 0) + (r.dormant?.listed ?? 0) + (r.burned?.listed ?? 0);
+  const rows = (d?.rows ?? []).filter((r) => listedIn(r) > 0);
   if (!rows.length) return "";
   const money = (e) => (e && eth ? fmtUsdRound(e * eth) : e ? `${fmtEth(e)} ETH` : "—");
 
   return `<div class="floors"><span class="floors-lab">Floor by class — tap one to filter</span>` +
     `<div class="floors-row">` +
     `<button type="button" class="fl fl-all" data-k="" aria-pressed="${active ? "false" : "true"}">` +
-      `<b>All</b><u>${fmtInt(rows.reduce((a, r) => a + (r.inked?.listed ?? 0) + (r.dormant?.listed ?? 0), 0))} listed</u>` +
+      `<b>All</b><u>${fmtInt(rows.reduce((a, r) => a + listedIn(r), 0))} listed</u>` +
     `</button>` +
     rows.map((r) =>
       `<button type="button" class="fl" data-k="${esc(r.classLabel)}" ` +
@@ -251,6 +269,7 @@ export function floorsHtml(d, active = null) {
       `<span class="fl-cls">${esc(r.classLabel)}</span>` +
       `<b>${money(r.inked?.floorEth)}</b>` +
       `<u>${r.dormant?.floorEth ? `${money(r.dormant.floorEth)} dormant` : "none dormant"}</u>` +
+      (r.burned?.floorEth ? `<u class="fl-burned">${money(r.burned.floorEth)} burned</u>` : "") +
       `</button>`).join("") +
     `</div></div>`;
 }
@@ -317,7 +336,14 @@ export const SORTS = Object.freeze([
 export const STATES = Object.freeze([
   { key: "lit", label: "Printing" },
   { key: "dormant", label: "Dormant" },
+  // Le Meltdown du 2026-09-23 : marquées brûlées, toujours en vente. Un troisième
+  // état, pas une variante des deux autres — on ne l'allume pas, et l'équipe
+  // annonce qu'elle ne portera plus de poids.
+  { key: "burned", label: "Burned" },
 ]);
+
+/** Les trois cases d'une ligne, dans l'ordre de la page, avec leur état. */
+const cellsOf = (r) => [["lit", r.inked], ["dormant", r.dormant], ["burned", r.burned]];
 
 export function pickMachines(d, { klass = null, state = null, limit = 24, sort = SORTS[0].key } = {}) {
   const eth = d?.eth?.usd;
@@ -330,20 +356,24 @@ export function pickMachines(d, { klass = null, state = null, limit = 24, sort =
   // deux fois, à deux prix, dont un imaginaire.
   const onShelf = new Set();
   for (const r of d?.rows ?? []) {
-    for (const cell of [r.inked, r.dormant]) {
+    for (const [, cell] of cellsOf(r)) {
       for (const e of cell?.anvilEntries ?? []) onShelf.add(e.tokenId);
     }
   }
   for (const r of d?.rows ?? []) {
     if (klass && r.classLabel !== klass) continue;
-    for (const [lit, cell] of [[true, r.inked], [false, r.dormant]]) {
-      if (state && lit !== (state === "lit")) continue;
+    for (const [key, cell] of cellsOf(r)) {
+      if (state && key !== state) continue;
+      const lit = key === "lit";
+      const burned = key === "burned";
+      // Une brûlée ne s'allume pas : son coût ne porte pas l'allumage.
+      const toLight = key === "dormant" ? light : 0;
       for (const e of cell?.entries ?? []) {
         if (onShelf.has(e.tokenId)) continue;
         const priceUsd = eth ? e.priceEth * eth : null;
-        const cost = priceUsd === null ? null : priceUsd + (lit ? 0 : light);
+        const cost = priceUsd === null ? null : priceUsd + toLight;
         const back = (e.epochUsd ?? 0) + (e.holds?.usd ?? 0);
-        out.push({ ...e, lit, classLabel: r.classLabel, priceUsd, cost, back,
+        out.push({ ...e, lit, burned, classLabel: r.classLabel, priceUsd, cost, back,
           ratio: cost ? back / cost : 0, from: "opensea" });
       }
       // Le rayon de l'anvil. Ces machines sont achetables et n'apparaissaient
@@ -352,9 +382,9 @@ export function pickMachines(d, { klass = null, state = null, limit = 24, sort =
       // marché à quelqu'un venu comparer les prix.
       for (const e of cell?.anvilEntries ?? []) {
         const priceUsd = e.askUsd ?? null;
-        const cost = priceUsd === null ? null : priceUsd + (lit ? 0 : light);
-        const back = (e.epochUsd ?? 0) + (e.holds?.usd ?? 0);
-        out.push({ ...e, lit, classLabel: r.classLabel,
+        const cost = priceUsd === null ? null : priceUsd + toLight;
+        const back = burned ? (e.holds?.usd ?? 0) : (e.epochUsd ?? 0) + (e.holds?.usd ?? 0);
+        out.push({ ...e, lit, burned, classLabel: r.classLabel,
           priceEth: e.askEth ?? null, priceUsd, cost, back,
           ratio: cost ? back / cost : 0, from: "anvil" });
       }
@@ -384,12 +414,16 @@ export function cardHtml(m, { light = 0 } = {}) {
     (m.machine?.image
       ? `<img class="card-art" src="${esc(m.machine.image)}" alt="" loading="lazy">`
       : `<span class="card-noart"></span>`) +
-    `<span class="card-state${m.lit ? "" : " off"}">${m.lit ? "Printing" : "Dormant"}</span>` +
+    (m.burned
+      ? `<span class="card-state burned">Burned</span>`
+      : `<span class="card-state${m.lit ? "" : " off"}">${m.lit ? "Printing" : "Dormant"}</span>`) +
     (m.from === "anvil" ? `<span class="card-from">Anvil</span>` : "") +
     `</span>`;
   // Lime : cette machine imprime. Une dormante n'en porte aucune trace, et
   // c'est l'information elle-même.
-  const earns = m.lit
+  const earns = m.burned
+    ? `<span class="card-earn off">burned in the Meltdown</span>`
+    : m.lit
     ? `<span class="card-earn">${fmtUsd(m.epochUsd ?? 0)} a drop</span>`
     : `<span class="card-earn off">${light ? `${fmtUsdRound(light)} to switch on` : "no ink"}</span>`;
   const price = m.priceUsd === null || m.priceUsd === undefined
@@ -420,9 +454,9 @@ export function cardHtml(m, { light = 0 } = {}) {
 /**
  * Le tri et l'état. La classe, elle, se choisit sur les blocs de plancher.
  *
- * Deux boutons pour trois états : aucun enfoncé montre tout, un enfoncé ne
- * montre que celui-là, et le renfoncer revient à tout. Un troisième bouton
- * « All » ferait une rangée de cinq pour une question qui en compte deux.
+ * Un bouton par état : aucun enfoncé montre tout, un enfoncé ne montre que
+ * celui-là, et le renfoncer revient à tout. Un bouton « All » de plus ferait
+ * une rangée de six pour une question qui en compte trois.
  */
 export function chipsHtml(d, active, sort = SORTS[0].key, state = null) {
   const sorts = SORTS.map((o) =>
@@ -491,7 +525,9 @@ export function detailHtml(m, d) {
       `<div class="d-head">` +
         `<span class="d-id">#${m.tokenId}</span>` +
         `<h3>${esc(m.classLabel ?? "")}${reinked ? ` <span class="d-re">re-inked</span>` : ""}</h3>` +
-        (m.lit
+        (m.burned
+          ? `<span class="card-earn off">Burned in the Meltdown</span>`
+          : m.lit
           ? `<span class="card-earn">${fmtUsd(m.epochUsd ?? 0)} a drop</span>`
           : `<span class="card-earn off">Not printing</span>`) +
         `<div class="d-price">${price}` +
@@ -544,7 +580,7 @@ export function walletHtml(w, { light = 0 } = {}) {
   }
 
   const wo = w.worth;
-  const earning = w.machines.filter((m) => m.weight).length;
+  const earning = w.machines.filter((m) => m.weight && !m.burned).length;
   const stats = `<div class="stats" style="margin-top:24px">` +
     (wo?.total ? `<div class="st st-pot"><b>${fmtUsdRound(wo.total)}</b><u>all of it, together</u></div>` : "") +
     `<div class="st st-live"><b>${fmtInt(earning)}</b><u>of yours printing</u></div>` +
@@ -568,7 +604,8 @@ export function walletHtml(w, { light = 0 } = {}) {
     tokenId: m.tokenId,
     machine: { image: m.image },
     classLabel: m.desk ?? "",
-    lit: Boolean(m.weight),
+    lit: Boolean(m.weight) && !m.burned,
+    burned: Boolean(m.burned),
     epochUsd: m.epochUsd,
     holds: m.holds,
     priceEth: null,
@@ -653,9 +690,10 @@ export function scarcityHtml(sc) {
     st("st-cost", b?.burnedShare ? fmtRatio(b.burnedShare) : "—", "of the supply burned") +
     `</div>` +
     `<div class="prose"><p>Fusing a Machine into another sends the sacrifice to a vault. ` +
-    `It is <b>not burned</b> — the collection is still ten thousand strong — but it leaves ` +
-    `your wallet for good, before the dice even roll. The vault is owned by a single key, not ` +
-    `a multi-signature wallet, and it can send any Machine it holds to any address. ` +
+    `It is <b>not burned</b> by the fuse — but it leaves your wallet for good, before the ` +
+    `dice even roll. The vault is owned by a single key, not a multi-signature wallet, and it ` +
+    `can send any Machine it holds to any address. On 23 September 2026 it sent all 3,477 it ` +
+    `held to the dead address, in the Meltdown. ` +
     `${p?.released ? `${fmtInt(p.released)} have come back out.` : "Nothing has ever come back out so far."} ` +
     `Locked is not burned, and this page will not call it that.</p>` +
     // Le protocole annonce que le coffre allume ce qu'il garde et en partage
@@ -675,7 +713,7 @@ export function scarcityHtml(sc) {
     // d'analyse, pas une donnée d'achat : elle vit ici, où l'on vient
     // comprendre, et pas sur la page où l'on vient acheter.
     (sc.market?.printerCap && sc.market?.collectionCap
-      ? `<p>$PRINTER is a <b>${fmtBig(sc.market.printerCap)}</b> market. The ten thousand ` +
+      ? `<p>$PRINTER is a <b>${fmtBig(sc.market.printerCap)}</b> market. The living ` +
         `Machines it fuels are worth <b>${fmtBig(sc.market.collectionCap)}</b> all together — ` +
         `so the fuel is priced at <b>${fmtExact(sc.market.printerCap / sc.market.collectionCap)}×</b> ` +
         `the fleet it burns for. Both move on their own, and the ratio with them.</p>`
@@ -812,6 +850,8 @@ if (typeof document !== "undefined") {
       ? "What costs least among the Machines already printing."
       : state === "dormant"
         ? "What costs least to get in. These earn nothing until someone burns ink for them."
+      : state === "burned"
+        ? "Marked burned in the Meltdown. The team says they will never carry weight again — they are not a way in."
         : "What costs least to get in. Dormant ones are cheaper because they earn nothing yet.";
     $("buy-sub").textContent = sort === "cheap" ? cheapSub
       : "What each Machine returns — its share of the pot, plus the stock already sitting in it — against what it costs.";
@@ -820,6 +860,7 @@ if (typeof document !== "undefined") {
     const total = pickMachines(data, { klass, state, limit: Infinity }).length;
     const of = state === "lit" ? "printing and for sale"
       : state === "dormant" ? "dormant and for sale"
+      : state === "burned" ? "burned and for sale"
       : "for sale";
     $("more-note").textContent = picked.length && total > picked.length
       ? `Showing ${picked.length} of ${total} ${of}.` : "";
@@ -847,15 +888,16 @@ if (typeof document !== "undefined") {
     if (!data) return;
     let found = null;
     for (const r of data.rows ?? []) {
-      for (const [lit, cell] of [[true, r.inked], [false, r.dormant]]) {
+      for (const [key, cell] of cellsOf(r)) {
+        const lit = key === "lit", burned = key === "burned";
         // Le rayon d'abord, et la même raison qu'au carnet : une annonce
         // OpenSea sur une machine que l'anvil possède est une annonce que son
         // ancien propriétaire n'a pas retirée. C'est la vignette du rayon
         // qu'on a cliquée, c'est son prix qu'il faut ouvrir.
         const shelf = (cell?.anvilEntries ?? []).find((x) => x.tokenId === tokenId);
-        if (shelf) { found = { ...shelf, lit, classLabel: r.classLabel, from: "anvil" }; continue; }
+        if (shelf) { found = { ...shelf, lit, burned, classLabel: r.classLabel, from: "anvil" }; continue; }
         const e = (cell?.entries ?? []).find((x) => x.tokenId === tokenId);
-        if (e) found = { ...e, lit, classLabel: r.classLabel, from: "opensea" };
+        if (e) found = { ...e, lit, burned, classLabel: r.classLabel, from: "opensea" };
       }
     }
     if (!found) return;

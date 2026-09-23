@@ -237,3 +237,84 @@ test("nothing is dropped when the two markets do not overlap", () => {
 });
 
 
+
+// Le Meltdown du 2026-09-23 : 4 381 machines marquées Burned restent en vente,
+// et 3 497 sont parties à l'adresse morte. Les mêler aux vivantes fausse les
+// floors ; les inventer vivantes faute de statut, aussi.
+const statusOf = (entries) => new Map(entries);
+
+test("a machine marked burned gets its own cell, whatever its ink", () => {
+  const grid = buildGrid({
+    traits: traitsOf([[1, 100], [2, 100], [3, 100]]),
+    ink: inkOf([[1, 4250], [2, 0], [3, 4250]]),
+    listings: listingsOf([[1, 0.01], [2, 0.02], [3, 0.5]]),
+    status: statusOf([[1, "burned"], [2, "burned"], [3, "active"]]),
+    pelotonSize: 5,
+  });
+  const x1 = rowOf(grid, "x1");
+  assert.equal(x1.burned.supply, 2);
+  assert.equal(x1.burned.listed, 2);
+  assert.equal(x1.burned.floorEth, 0.01);
+  // Le floor des vivantes n'est plus tiré vers le bas par les brûlées.
+  assert.equal(x1.inked.floorEth, 0.5);
+  assert.equal(x1.inked.supply, 1);
+  assert.equal(x1.dormant.supply, 0);
+  assert.equal(grid.totals.burned, 2);
+  assert.equal(grid.totals.listed, 3);
+});
+
+test("a machine held by the dead address is destroyed: out of every supply", () => {
+  const grid = buildGrid({
+    traits: traitsOf([[1, 100], [2, 100]]),
+    ink: inkOf([[1, 0], [2, 0]]),
+    listings: listingsOf([[1, 0.01]]),
+    status: statusOf([[2, "dormant"]]),
+    gone: new Set([1]),
+    pelotonSize: 5,
+  });
+  const x1 = rowOf(grid, "x1");
+  assert.equal(x1.burned.supply + x1.inked.supply + x1.dormant.supply, 1);
+  assert.equal(x1.chainCount, 1);
+  assert.equal(grid.excluded.destroyed, 1);
+  // Une annonce OpenSea résiduelle sur une machine détruite n'est pas achetable.
+  assert.equal(grid.totals.listed, 0);
+});
+
+test("a machine whose status was not read is excluded and counted, never guessed alive", () => {
+  const grid = buildGrid({
+    traits: traitsOf([[1, 100], [2, 100]]),
+    ink: inkOf([[1, 4250], [2, 4250]]),
+    listings: listingsOf([[1, 0.01], [2, 0.5]]),
+    status: statusOf([[2, "active"]]),
+    pelotonSize: 5,
+  });
+  const x1 = rowOf(grid, "x1");
+  assert.equal(grid.excluded.unknownStatus, 1);
+  assert.equal(x1.inked.floorEth, 0.5);
+  assert.equal(grid.excluded.listingsOffGrid, 1);
+});
+
+test("without a status map the grid keeps two states and an empty burned cell", () => {
+  const grid = buildGrid({
+    traits: traitsOf([[1, 100]]),
+    ink: inkOf([[1, 4250]]),
+    listings: listingsOf([[1, 0.3]]),
+    pelotonSize: 5,
+  });
+  const x1 = rowOf(grid, "x1");
+  assert.equal(x1.inked.floorEth, 0.3);
+  assert.equal(x1.burned.supply, 0);
+  assert.equal(x1.burned.floorEth, null);
+});
+
+test("the anvil shelf is sorted into the burned cell like the book", () => {
+  const grid = buildGrid({
+    traits: traitsOf([[1, 100]]),
+    ink: inkOf([[1, 0]]),
+    listings: listingsOf([]),
+    status: statusOf([[1, "burned"]]),
+    shelf: new Map([[1, 9000]]),
+    pelotonSize: 5,
+  });
+  assert.deepEqual(rowOf(grid, "x1").burned.anvilEntries, [{ tokenId: 1, askPrinter: 9000 }]);
+});

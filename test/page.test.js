@@ -132,7 +132,7 @@ test("the headline cannot be read as ten thousand Machines burned", () => {
   // Le point sépare les deux affirmations ; une virgule les enchaînait.
   assert.match(html, /out there\. <mark>/);
   assert.doesNotMatch(html, /Machines, and <mark>/);
-  assert.match(html, /none has ever been destroyed/);
+  assert.match(html, /10,000 were minted:/);
 });
 
 /* ── hors circulation n'est pas détruite ───────────────────────────────────
@@ -142,9 +142,8 @@ test("the headline cannot be read as ten thousand Machines burned", () => {
    veut dire. */
 test("machines out of circulation are counted apart from machines destroyed", () => {
   const html = heroHtml(DATA);
-  assert.match(html, /10,000 were minted and none has ever been destroyed/);
+  assert.match(html, /10,000 were minted: 1 went to a dead address, where nothing comes back/);
   assert.match(html, /255 sit in the Proton's vault, which can send them back out/);
-  assert.match(html, /1 went to a dead address and cannot/);
 });
 
 test("with nothing in the vault the page says the whole fleet is still out there", () => {
@@ -188,8 +187,19 @@ test("the highlight box is contained by the line it belongs to", () => {
   assert.ok(total <= h2, `la boîte fait ${total}em pour une ligne de ${h2}em`);
 });
 
-test("with no supply read it still says no Machine was ever destroyed", () => {
-  assert.match(heroHtml({ ...DATA, burn: null }), /none has ever been destroyed/);
+test("with no supply read it still says where the missing Machines went", () => {
+  assert.match(heroHtml({ ...DATA, burn: null }), /10,000 were minted: 1 went to a dead address/);
+});
+
+// Le Meltdown du 2026-09-23 : l'adresse morte, les brûlées encore détenues et
+// le coffre sont trois choses, et la phrase les compte une par une.
+test("the Meltdown's burned are counted apart from the destroyed and the vaulted", () => {
+  const html = heroHtml({ ...DATA,
+    fleet: { minted: 10000, vault: 1, dead: 3497, circulating: 6502, share: 0.35 },
+    collection: { machines: 2121, burned: 4381 } });
+  assert.match(html, /<mark class="stamp">6,502<\/mark> Machines still out there/);
+  assert.match(html, /3,497 went to a dead address, where nothing comes back; 4,381 more were marked burned in the Meltdown and still sit in wallets/);
+  assert.match(html, /1 sits in the Proton's vault, which can send it back out/);
 });
 
 // Une part manquante n'est pas une part nulle : sans l'offre lue on annonce ce
@@ -418,7 +428,8 @@ const SC = {
 // veut dire.
 test("a Machine in the vault is never called burned", () => {
   const html = scarcityHtml(SC);
-  assert.match(html, /It is <b>not burned<\/b> — the collection is still ten thousand strong/);
+  assert.match(html, /It is <b>not burned<\/b> by the fuse/);
+  assert.match(html, /sent all 3,477 it held to the dead address, in the Meltdown/);
   assert.match(html, /Locked is not burned, and this page will not call it that/);
   assert.match(html, /owned by a single key, not a multi-signature wallet/);
   assert.match(html, /Nothing has ever come back out so far/);
@@ -872,13 +883,14 @@ test("the state filter narrows the book to one side or the other", () => {
   assert.equal(lit.length + off.length, all.length, "les deux moitiés doivent faire le tout");
 });
 
-test("the two buttons say which one is on, and neither means everything", () => {
-  assert.deepEqual(STATES.map((s) => s.key), ["lit", "dormant"]);
+test("the state buttons say which one is on, and none means everything", () => {
+  assert.deepEqual(STATES.map((s) => s.key), ["lit", "dormant", "burned"]);
   assert.match(chipsHtml(DATA, null, "cheap", "lit"), /data-st="lit" aria-pressed="true"/);
   assert.match(chipsHtml(DATA, null, "cheap", "lit"), /data-st="dormant" aria-pressed="false"/);
   const none = chipsHtml(DATA, null, "cheap", null);
   assert.doesNotMatch(none, /aria-pressed="true"[^>]*>Printing/);
   assert.doesNotMatch(none, /aria-pressed="true"[^>]*>Dormant/);
+  assert.doesNotMatch(none, /aria-pressed="true"[^>]*>Burned/);
 });
 
 // Renfoncer le bouton actif revient à tout montrer. Sans ça, un filtre posé
@@ -980,4 +992,64 @@ test("the Learn page is set at a reading width, not a dashboard width", () => {
   // de la navigation, et deux bords gauches sur la même page se lisent comme
   // un défaut.
   assert.doesNotMatch(rule, /margin: 0 auto/);
+});
+
+/* ── le Meltdown ───────────────────────────────────────────────────────────
+   Le 2026-09-23, 4 381 machines encore détenues ont été marquées brûlées. Elles
+   restent en vente : la page les montre, à part, et ne leur promet rien. */
+const MELT = {
+  ...DATA,
+  rows: [
+    { ...DATA.rows[0],
+      burned: { floorEth: 0.004, listed: 30, entries: [entry({ tokenId: 1, priceEth: 0.004, epochUsd: null,
+        machine: { image: "https://i2c.seadn.io/red.webp", burned: true } })] } },
+    ...DATA.rows.slice(1),
+  ],
+};
+
+test("a burned Machine says so on its face, in its own colour, and claims no drop", () => {
+  const html = cardHtml({ ...entry({ epochUsd: null }), burned: true, lit: false, classLabel: "x1", priceUsd: 10 });
+  assert.match(html, /class="card-state burned">Burned</);
+  assert.match(html, /burned in the Meltdown/);
+  assert.doesNotMatch(html, /a drop/);
+  assert.doesNotMatch(html, /to switch on/);
+  assert.match(css, /\.card-state\.burned \{[^}]*var\(--blood\)/);
+});
+
+test("the burned filter shows the burned only, priced without the cost of ink", () => {
+  const picked = pickMachines(MELT, { state: "burned", limit: Infinity });
+  assert.deepEqual(picked.map((m) => m.tokenId), [1]);
+  assert.equal(picked[0].burned, true);
+  assert.equal(picked[0].lit, false);
+  assert.ok(Math.abs(picked[0].cost - 0.004 * 2460) < 1e-9);
+  // Et « Printing » n'en montre aucune.
+  assert.ok(!pickMachines(MELT, { state: "lit", limit: Infinity }).some((m) => m.tokenId === 1));
+});
+
+test("a class block shows the burned floor under the others, never as its headline", () => {
+  const html = floorsHtml(MELT);
+  assert.match(html, /<u class="fl-burned">\$10 burned<\/u>/);
+  // Le grand chiffre reste celui qui imprime.
+  assert.match(html, /<b>\$177<\/b>/);
+});
+
+test("a wallet does not count a burned Machine among those printing", () => {
+  const html = walletHtml({ machines: [
+    { tokenId: 1, weight: 100, burned: true, epochUsd: null, image: null },
+    { tokenId: 2, weight: 100, burned: false, epochUsd: 3, image: null },
+  ] });
+  assert.match(html, /<b>1<\/b><u>of yours printing/);
+  assert.match(html, /card-state burned/);
+});
+
+// Le 2026-09-23 sur le banc : une brûlée bradée, lestée d'actions, sortait en
+// tête du « Best return » avec « $0.00 a drop ».
+test("the best-return showcase never features a burned Machine", () => {
+  const rich = { ...MELT, rows: [{ ...MELT.rows[0],
+    burned: { floorEth: 0.001, listed: 1, entries: [entry({ tokenId: 1, priceEth: 0.001, epochUsd: null,
+      holds: { usd: 500 }, machine: { image: "https://i2c.seadn.io/red.webp", burned: true } })] } },
+    ...MELT.rows.slice(1)] };
+  const html = heroHtml(rich);
+  assert.match(html, /Best return on the book/);
+  assert.doesNotMatch(html, /#1 &middot;/);
 });

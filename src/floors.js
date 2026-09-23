@@ -33,17 +33,35 @@ function buildCell(entries, supply, pelotonSize) {
   return cell;
 }
 
-export function buildGrid({ listings, traits, ink, pelotonSize, shelf }) {
-  const excluded = { unknownRarity: 0, unknownInk: 0, listingsOffGrid: 0, heldByAnvil: 0 };
-  const stateOf = new Map();   // tokenId -> "inked" | "dormant"
+/**
+ * `status` (la carte de `readLiveStatus`) et `gone` (les machines de l'adresse
+ * morte) sont arrivés avec le Meltdown du 2026-09-23. Sans `status`, la grille
+ * garde ses deux états d'avant — c'est ce que font les appelants qui n'en
+ * savent rien. Avec, une machine que la carte ne connaît pas est exclue et
+ * comptée : la ranger vivante déplacerait le floor des vivantes vers celui des
+ * brûlées, sans erreur nulle part.
+ */
+export function buildGrid({ listings, traits, ink, pelotonSize, shelf, status, gone }) {
+  const excluded = {
+    unknownRarity: 0, unknownInk: 0, unknownStatus: 0, destroyed: 0,
+    listingsOffGrid: 0, heldByAnvil: 0,
+  };
+  const stateOf = new Map();   // tokenId -> "inked" | "dormant" | "burned"
   const classOf = new Map();   // tokenId -> weightClass
   const supply = new Map();    // "class:state" -> compte
 
   for (const [tokenId, t] of traits) {
     if (t?.weightClass == null) { excluded.unknownRarity++; continue; }
+    // L'adresse morte ne rend rien : ce n'est plus de l'offre, dans aucune case.
+    if (gone?.has(tokenId)) { excluded.destroyed++; continue; }
+    const marked = status ? status.get(tokenId) : null;
+    if (status && marked === undefined) { excluded.unknownStatus++; continue; }
     const burned = ink.get(tokenId);
     if (burned == null) { excluded.unknownInk++; continue; }
-    const state = burned > 0n ? "inked" : "dormant";
+    // Brûlée par le Meltdown, elle garde son encre et son poids sur la chaîne,
+    // mais l'équipe annonce qu'elle ne portera plus jamais de poids. Elle n'est
+    // ni une allumée ni une dormante qu'on pourrait allumer : sa propre case.
+    const state = marked === "burned" ? "burned" : burned > 0n ? "inked" : "dormant";
     stateOf.set(tokenId, state);
     classOf.set(tokenId, t.weightClass);
     const k = `${t.weightClass}:${state}`;
@@ -87,15 +105,18 @@ export function buildGrid({ listings, traits, ink, pelotonSize, shelf }) {
   const rows = CLASSES.map((c) => {
     const inked = buildCell(byCell.get(`${c.value}:inked`) ?? [], supply.get(`${c.value}:inked`) ?? 0, pelotonSize);
     const dormant = buildCell(byCell.get(`${c.value}:dormant`) ?? [], supply.get(`${c.value}:dormant`) ?? 0, pelotonSize);
+    const burned = buildCell(byCell.get(`${c.value}:burned`) ?? [], supply.get(`${c.value}:burned`) ?? 0, pelotonSize);
     inked.anvilEntries = shelfFor(`${c.value}:inked`);
     dormant.anvilEntries = shelfFor(`${c.value}:dormant`);
+    burned.anvilEntries = shelfFor(`${c.value}:burned`);
     return {
       classValue: c.value,
       classLabel: c.label,
       docCount: c.docCount,
-      chainCount: inked.supply + dormant.supply,
+      chainCount: inked.supply + dormant.supply + burned.supply,
       inked,
       dormant,
+      burned,
       spreadEth: inked.floorEth !== null && dormant.floorEth !== null
         ? inked.floorEth - dormant.floorEth
         : null,
@@ -108,7 +129,8 @@ export function buildGrid({ listings, traits, ink, pelotonSize, shelf }) {
     totals: {
       inked: rows.reduce((n, r) => n + r.inked.supply, 0),
       dormant: rows.reduce((n, r) => n + r.dormant.supply, 0),
-      listed: rows.reduce((n, r) => n + r.inked.listed + r.dormant.listed, 0),
+      burned: rows.reduce((n, r) => n + r.burned.supply, 0),
+      listed: rows.reduce((n, r) => n + r.inked.listed + r.dormant.listed + r.burned.listed, 0),
     },
   };
 }

@@ -118,3 +118,19 @@ test("only a plain forty-hex address is accepted", () => {
   assert.equal(isAddress(undefined), false);
   assert.equal(isAddress({ toString: () => "0x" + "0".repeat(40) }), false);
 });
+
+// Le Meltdown du 2026-09-23 : la chaîne laisse son poids à une brûlée, l'équipe
+// dit qu'elle ne touchera plus rien. Le portefeuille le dit et ne promet rien.
+test("a machine burned in the Meltdown is marked and promised no drop", () => {
+  const w = analyseWallet({
+    address: "0x" + "1".repeat(40), tokenIds: [1, 2],
+    weightOf: () => 100, deskOf: () => 10,
+    epochUsdOf: () => 5, burnedOf: (id) => id === 2,
+    tally: TALLY, potUsd: POT, fleetWeight: FLEET, sectorWeight: SECTOR, tickers: TICKERS,
+  });
+  const byId = new Map(w.machines.map((m) => [m.tokenId, m]));
+  assert.equal(byId.get(1).burned, false);
+  assert.equal(byId.get(1).epochUsd, 5);
+  assert.equal(byId.get(2).burned, true);
+  assert.equal(byId.get(2).epochUsd, null);
+});
