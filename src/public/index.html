@@ -40,6 +40,9 @@
     /* Le rouge du Meltdown : la couleur que l'équipe a donnée aux brûlées.
        Elle ne sert qu'à elles. */
     --blood:  #C4161C;
+    /* L'orange du $PRINTER : le carburant, et lui seul. Ajouté le 2026-09-24
+       quand la case du marché du jeton est sortie du gris. */
+    --fuel:   #FF8A3D;
 
     /* L'encre diluée, pour ce qui accompagne sans porter. Mesurée sur le
        papier : 4.5:1 minimum pour du petit texte. */
@@ -211,6 +214,8 @@
   .st-pot  { background: var(--sky); }
   .st-cost { background: var(--sun); }
   .st-book { background: var(--paper-2); }
+  /* Le marché du jeton : ni un prix à payer, ni l'état du parc — le carburant. */
+  .st-fuel { background: var(--fuel); }
 
 
   /* ── titres de section ─────────────────────────────────────────────────── */

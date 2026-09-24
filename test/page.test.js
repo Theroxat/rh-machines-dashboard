@@ -239,9 +239,9 @@ test("five figures on one line, each carrying the colour of what it classifies",
   const html = statsHtml({ ...DATA, printer: { usd: 0.0188, change24h: -24.1, marketCap: 2915894 } });
   assert.match(html, /st-live"><b>7,504<\/b><u>printing now/);
   assert.match(html, /st-pot"><b>\$32k<\/b><u>in the pot/);
-  assert.match(html, /st-book"><b>\$177<\/b><u>cheapest way in/);
+  assert.match(html, /st-cost"><b>\$177<\/b><u>cheapest way in/);
   assert.match(html, /st-cost"><b>\$151<\/b><u>to switch one on/);
-  assert.match(html, /st-book"><b>\$2\.92M<\/b><u>\$PRINTER market/);
+  assert.match(html, /st-fuel"><b>\$2\.92M<\/b><u>\$PRINTER market/);
   assert.equal((html.match(/class="st /g) ?? []).length, 5);
   // Le marché du jeton ferme la ligne : c'est un contexte, pas une décision.
   assert.ok(html.lastIndexOf("$PRINTER market") > html.lastIndexOf("to switch one on"));
@@ -1285,4 +1285,16 @@ test("the ceiling gates follow the ink burned, and end uncapped", () => {
 test("the wallet box keeps the same distance from the tabs as the shop's figures", () => {
   const stats = css.match(/\.stats \{[^}]*margin: (\d+)px/)[1];
   assert.match(css, new RegExp(`#pane-wallet > \\.hero:first-child \\{ margin-top: ${stats}px; \\}`));
+});
+
+// Le 2026-09-24 : deux cases grises en fin de ligne se lisaient éteintes. Le
+// prix d'entrée prend le jaune de ce qu'on paie, le jeton un orange à lui seul.
+test("every figure in the top row wears a colour, and the token's is its own", () => {
+  const html = statsHtml(NODORM);
+  assert.doesNotMatch(html, /st-book/);
+  assert.match(html, /st-cost"><b>[^<]*<\/b><u>cheapest way in/);
+  assert.match(html, /st-fuel"><b>[^<]*<\/b><u>\$PRINTER market/);
+  assert.match(css, /\.st-fuel \{ background: var\(--fuel\); \}/);
+  // L'orange ne sert qu'au jeton.
+  assert.equal((css.match(/var\(--fuel\)/g) ?? []).length, 1);
 });

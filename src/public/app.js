@@ -336,11 +336,14 @@ export function statsHtml(d) {
   return [
     cell("st-live", fmtInt(d.totals?.inked ?? 0), "printing now"),
     cell("st-pot", fmtUsdShort(d.official?.potUsd ?? d.pot?.usd ?? 0), "in the pot"),
-    cell("st-book", cheapest === null ? "—" : fmtUsdRound(cheapest), "cheapest way in"),
+    // Le jaune dit ce qu'on paie : le prix d'entrée en est un. La case restait
+    // grise tant que « to switch one on » tenait ce rôle ; elle est partie avec
+    // les dormantes, et deux cases grises en fin de ligne se lisaient éteintes.
+    cell("st-cost", cheapest === null ? "—" : fmtUsdRound(cheapest), "cheapest way in"),
     dormantOnSale(d)
       ? cell("st-cost", d.ink?.activationTotalUsd ? fmtUsdRound(d.ink.activationTotalUsd) : "—", "to switch one on")
       : "",
-    cell("st-book", cap === null ? "—" : fmtBig(cap), "$PRINTER market"),
+    cell("st-fuel", cap === null ? "—" : fmtBig(cap), "$PRINTER market"),
   ].join("");
 }
 
