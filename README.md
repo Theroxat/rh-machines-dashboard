@@ -95,6 +95,26 @@ the status are re-read — the traits used to derive rarity stay those of the
 mint, and OpenSea no longer publishes the `Wallet`, `Desk` and `Weight` traits
 the cache holds, so a full re-read would have erased them.
 
+## Dark Machines
+
+On 2026-09-23 the team opened the **Dark Ritual** (`0x207455FD…`). Four Machines
+burned in the Meltdown go to the dead address and a fifth, the *vessel*, is
+played on a hundred-spin slot. Win and the vessel becomes a **Dark Machine**;
+lose and all five are gone. 60% success is claimed. The team says a Dark Machine
+carries no weight but earns 10× on printer.fun and game revenue — an off-chain
+promise nothing here measures.
+
+Dark Machines are a fourth state with **one cell for the whole collection**, not
+one per class: there are a few dozen of them, and splitting that by rarity would
+leave every cell empty. A Machine is Dark when a ritual settled as won on-chain
+(`Settled.won`), or when its published status says so. The two disagreed on day
+one: #23 was published Dark with no ritual on chain. The Learn tab names such
+Machines and puts the claimed and observed win rates side by side, as it does
+for the Proton.
+
+Dark Machines leave the living fleet like the burned ones, and never appear in
+the best-return showcase.
+
 ## Reading the grid
 
 Seven rows, one per rarity, each split into an **inked** half, a **dormant**
@@ -290,7 +310,7 @@ not see a phantom staleness warning.
 
 ## Cadences
 
-Six loops, each independent, each rescheduling itself only after it finishes:
+Seven loops, each independent, each rescheduling itself only after it finishes:
 
 | Loop | Every | What |
 |---|---|---|
@@ -298,6 +318,7 @@ Six loops, each independent, each rescheduling itself only after it finishes:
 | ink | 10 min | ink and weight of all 10,000 Machines |
 | owners | 10 min | who holds every Machine |
 | status | 10 min | current picture and burned mark |
+| dark | 2 min | Dark Ritual logs, read incrementally from the day it opened |
 | pad | 2 min | PRINTER.FUN coins |
 | proton | 10 min | fusions and the vault |
 

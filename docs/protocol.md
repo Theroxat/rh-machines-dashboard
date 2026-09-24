@@ -865,3 +865,40 @@ Big Loss », « Crowned Devil »…), `Weight (x): 0`, nouvelle image IPFS. Les
   marquées ferait sinon exploser la dérivation couvre-chef → classe.
 - Troisième case `burned` par classe. Floor de collection et capitalisation sur
   les seules vivantes.
+
+## Le Rituel noir (2026-09-23)
+
+Annoncé le soir même du Meltdown (@btcordinal, 22:50 UTC) : les brûlées
+deviennent la matière première d'une nouvelle catégorie, les **Dark Machines**.
+
+| | |
+|---|---|
+| contrat | `0x207455FDbb3F0DEc567b9c83176FCee3e0940506`, pas un proxy, 8 016 octets |
+| propriétaire | `0xA08c58FC…`, la même clé que le Proton et le coffre |
+| ouverture | bloc 70 867 555, 2026-09-23 22:22 UTC (premier journal) |
+| coût | 4 brûlées (« fuel », parties à `0x…dEaD`) + 1 vessel + 10 000 $PRINTER + ~0,0165 ETH |
+| mécanique | machine à sous de 100 tours, objectif 235 points, graine fixée au `perform()` |
+| annoncé | 60 % de réussite |
+
+Source de l'adresse : `/api/dark` du site officiel, recoupée on-chain — les
+journaux `Charged`/`Settled` retombent exactement sur les compteurs de l'API
+(31 rituels, 19 gagnés, 10 perdus, 2 en cours, 124 machines brûlées au
+2026-09-24). Le vessel doit prouver par Merkle (`vesselProof`) qu'il est une
+brûlée ; la racine est publiée par l'API.
+
+**Taux observé : 19 sur 29 réglés, 65,5 %**, au-dessus des 60 % annoncés.
+
+**La #23 est Dark sans rituel.** Publiée `Status: Dark Machine` par les
+métadonnées et listée par `/api/dark`, elle n'apparaît dans aucun journal du
+contrat — ni comme vessel, ni comme carburant. Marquée à la main. À l'inverse,
+OpenSea avait six Dark de retard sur la chaîne le jour de l'ouverture.
+
+**Aucun poids retiré.** `MINE.weightOf` donne toujours 100 à 700 aux Dark
+Machines. « No weight » est, comme pour les brûlées, une déclaration de
+l'équipe ; les « 10× sur printer.fun et les jeux » ne sont visibles dans aucun
+contrat lu ici.
+
+Métadonnées d'une Dark : aucun trait de rareté (ni Body, ni Headwear, ni
+Eyes), `Forged In: The Dark Ritual`, une image commune — « Art is not yet
+revealed ». La dérivation des classes s'appuie sur le cache du mint, elle n'en
+souffre pas.

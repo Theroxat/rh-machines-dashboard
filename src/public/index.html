@@ -123,7 +123,40 @@
   .x-link { display: inline-flex; color: var(--ink); }
   .x-link svg { width: 19px; height: 19px; fill: currentColor; display: block; }
 
-  nav.nav { display: flex; gap: 10px; margin: 18px 0 0; flex-wrap: wrap; }
+  .nav-row {
+    display: flex; flex-wrap: wrap; gap: 12px;
+    align-items: flex-end; justify-content: space-between; margin: 18px 0 0;
+  }
+  nav.nav { display: flex; gap: 10px; margin: 0; flex-wrap: wrap; }
+
+  /* Le compteur des Dark : en négatif, ombre rouge — la même signature que le
+     bloc Dark de la rangée des floors. */
+  .dark-count {
+    display: inline-flex; align-items: center; gap: 12px;
+    padding: 6px 16px 6px 14px; text-decoration: none;
+    color: var(--paper); background: var(--ink);
+    border: var(--b) solid var(--ink); box-shadow: 5px 5px 0 var(--blood);
+  }
+  .dark-count[hidden] { display: none; }
+  .dark-count:hover { transform: translate(1px, 1px); box-shadow: 4px 4px 0 var(--blood); }
+  .dc-num {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 30px; font-weight: 900; letter-spacing: -0.05em; line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .dc-txt { display: flex; flex-direction: column; line-height: 1.15; }
+  .dc-txt b { font-size: 12.5px; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; }
+  .dc-txt u { text-decoration: none; font-size: 11.5px; font-weight: 700; color: var(--paper-2); }
+  /* Un rituel en cours : un point qui bat. Rien ne bat quand rien ne se joue. */
+  .dc-live {
+    width: 10px; height: 10px; border-radius: 50%; background: var(--blood);
+    box-shadow: 0 0 0 0 var(--blood); animation: dc-beat 1.6s ease-out infinite;
+  }
+  @keyframes dc-beat {
+    0% { box-shadow: 0 0 0 0 rgba(196, 22, 28, 0.8); }
+    70% { box-shadow: 0 0 0 9px rgba(196, 22, 28, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(196, 22, 28, 0); }
+  }
   nav.nav a {
     font-size: 15px; font-weight: 900; text-transform: uppercase; letter-spacing: -0.005em;
     text-decoration: none; color: var(--ink);
@@ -315,6 +348,10 @@
   }
   /* Le rouge du Meltdown, en étiquette pleine : la même que sur les cartes. */
   .fl-burned i { background: var(--blood); border-color: var(--blood); color: var(--paper); }
+  /* Le bloc Dark, en négatif : un marché à part, pas une classe de plus. */
+  .fl-dark { background: var(--ink); color: var(--paper); box-shadow: 4px 4px 0 var(--blood); }
+  .fl-dark u { color: var(--paper-2); }
+  .fl-dark[aria-pressed="true"] { background: var(--blood); }
   .fl[aria-pressed="true"] .fl-alt { border-top-color: var(--ink-2); }
   .fl[aria-pressed="true"] .fl-alt i { border-color: var(--paper-2); color: var(--paper-2); }
   .fl[aria-pressed="true"] .fl-burned i { border-color: var(--blood); color: var(--paper); }
@@ -374,6 +411,8 @@
   }
   .card-state.off { background: var(--paper); color: var(--ink-2); }
   .card-state.burned { background: var(--blood); color: var(--paper); }
+  /* Noir plein : la Dark Machine. Ni lime — elle n'imprime pas — ni rouge. */
+  .card-state.dark { background: var(--ink); color: var(--paper); box-shadow: 3px 3px 0 var(--blood); }
   /* Ces machines-là ne sont pas sur OpenSea : elles s'achètent au terminal du
      protocole et se paient en $PRINTER. Deux marchés, deux monnaies — le dire
      évite d'envoyer quelqu'un sur une page où elle n'est pas en vente. */
@@ -540,7 +579,7 @@
      sur cette page, et qui refuse le mouvement ne perd aucune information. */
   @media (prefers-reduced-motion: reduce) {
     * { transition: none !important; animation: none !important; }
-    .card:hover, .chips button:hover, nav.nav a:hover, .ask button:hover { transform: none; }
+    .card:hover, .chips button:hover, nav.nav a:hover, .ask button:hover, .dark-count:hover { transform: none; }
   }
 </style>
 
@@ -564,11 +603,16 @@
       </span>
     </div>
 
-    <nav class="nav" id="nav" role="tablist">
-      <a href="#buy"    role="tab" data-tab="buy">Buy</a>
-      <a href="#wallet" role="tab" data-tab="wallet">My wallet</a>
-      <a href="#learn"  role="tab" data-tab="learn">Learn</a>
-    </nav>
+    <!-- Les onglets à gauche, le compteur des Dark à droite : hors de la liste
+         d'onglets, qu'il n'est pas. -->
+    <div class="nav-row">
+      <nav class="nav" id="nav" role="tablist">
+        <a href="#buy"    role="tab" data-tab="buy">Buy</a>
+        <a href="#wallet" role="tab" data-tab="wallet">My wallet</a>
+        <a href="#learn"  role="tab" data-tab="learn">Learn</a>
+      </nav>
+      <a class="dark-count" id="dark-count" href="#buy" hidden aria-label="Show the Dark Machines for sale"></a>
+    </div>
 
     <div class="banner" id="banner" role="status"></div>
   </header>
@@ -613,6 +657,8 @@
       <div class="vote" id="vote"></div>
       <h3 class="sec" style="margin-top:44px">What leaves circulation</h3>
       <div id="scarcity"></div>
+      <h3 class="sec" style="margin-top:44px">The Dark Ritual</h3>
+      <div id="ritual"></div>
       <h3 class="sec" style="margin-top:44px">PRINTER.FUN</h3>
       <div id="pad"></div>
       <h3 class="sec" style="margin-top:44px">Where every number comes from</h3>

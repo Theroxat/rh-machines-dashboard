@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import {
   heroHtml, statsHtml, cardHtml, chipsHtml, floorsHtml, detailHtml, bestPick, pickMachines, walletHtml,
   stepsHtml, voteHtml, scarcityHtml, padHtml, sourcesHtml, bannerMessage, potNote,
-  setContract, itemUrl, esc, ADDRESS_RE, SORTS, STATES, fmtBig, ANVIL_URL,
+  setContract, itemUrl, esc, ADDRESS_RE, SORTS, STATES, fmtBig, ANVIL_URL, ritualHtml, DARK_LABEL, darkCountHtml,
 } from "../src/public/app.js";
 
 const page = readFileSync(new URL("../src/public/index.html", import.meta.url), "utf8");
@@ -896,7 +896,7 @@ test("the state filter narrows the book to one side or the other", () => {
 });
 
 test("the state buttons say which one is on, and none means everything", () => {
-  assert.deepEqual(STATES.map((s) => s.key), ["lit", "dormant", "burned"]);
+  assert.deepEqual(STATES.map((s) => s.key), ["lit", "dormant", "burned", "dark"]);
   assert.match(chipsHtml(DATA, null, "cheap", "lit"), /data-st="lit" aria-pressed="true"/);
   assert.match(chipsHtml(DATA, null, "cheap", "lit"), /data-st="dormant" aria-pressed="false"/);
   const none = chipsHtml(DATA, null, "cheap", null);
@@ -1067,4 +1067,109 @@ test("the best-return showcase never features a burned Machine", () => {
   const html = heroHtml(rich);
   assert.match(html, /Best return on the book/);
   assert.doesNotMatch(html, /#1 &middot;/);
+});
+
+/* ── le Rituel noir ────────────────────────────────────────────────────────
+   Le 2026-09-23 : quatre brûlées pour forger une Dark Machine. Une case pour
+   toute la collection, un bloc à part, et aucune promesse de drop. */
+const DARKD = {
+  ...MELT,
+  darkBook: { floorEth: 1.2, listed: 2, supply: 20, entries: [
+    entry({ tokenId: 93, priceEth: 1.2, epochUsd: null, machine: { image: "https://i2c.seadn.io/dark.webp", dark: true, ritualId: 4 } }),
+    entry({ tokenId: 23, priceEth: 3, epochUsd: null, machine: { image: "https://i2c.seadn.io/dark.webp", dark: true, ritualId: null } }),
+  ] },
+  collection: { ...MELT.collection, dark: 20 },
+};
+
+test("the Dark Machines get a block of their own after the classes", () => {
+  const html = floorsHtml(DARKD);
+  assert.match(html, /class="fl fl-dark" data-k="Dark"[^>]*><span class="fl-cls">Dark<\/span><b>\$2,952<\/b><u>2 of 20 for sale<\/u>/);
+  assert.ok(html.indexOf("fl-dark") > html.indexOf(">x4<"));
+});
+
+test("the Dark block filters the book to the Dark Machines only", () => {
+  const picked = pickMachines(DARKD, { klass: DARK_LABEL, limit: Infinity });
+  assert.deepEqual(picked.map((m) => m.tokenId).sort((a, b) => a - b), [23, 93]);
+  assert.ok(picked.every((m) => m.dark && !m.lit));
+  assert.deepEqual(pickMachines(DARKD, { state: "dark", limit: Infinity }).length, 2);
+  assert.ok(!pickMachines(DARKD, { state: "lit", limit: Infinity }).some((m) => m.dark));
+});
+
+test("a Dark card says so in black and promises nothing from the pot", () => {
+  const html = cardHtml({ ...entry({ epochUsd: null }), dark: true, lit: false, classLabel: "Dark", priceUsd: 2952 });
+  assert.match(html, /class="card-state dark">Dark</);
+  assert.match(html, /paid outside the pot/);
+  assert.doesNotMatch(html, /a drop/);
+  assert.match(css, /\.card-state\.dark \{[^}]*var\(--ink\)/);
+});
+
+test("the detail says which ritual forged it, or that none did", () => {
+  const forged = detailHtml({ ...DARKD.darkBook.entries[0], dark: true, classLabel: "Dark", from: "opensea" }, DARKD);
+  const byHand = detailHtml({ ...DARKD.darkBook.entries[1], dark: true, classLabel: "Dark", from: "opensea" }, DARKD);
+  assert.match(forged, /Forged in Dark Ritual #4/);
+  assert.match(byHand, /Marked Dark — no ritual on chain/);
+});
+
+test("the showcase never features a Dark Machine either", () => {
+  const rich = { ...DARKD, darkBook: { ...DARKD.darkBook, entries: [entry({ tokenId: 93, priceEth: 0.0001, epochUsd: null,
+    holds: { usd: 900 }, machine: { image: "https://i2c.seadn.io/dark.webp", dark: true } })] } };
+  assert.doesNotMatch(heroHtml(rich), /#93 &middot;/);
+});
+
+test("the ritual section puts the claimed and the observed odds side by side", () => {
+  const html = ritualHtml({ rituals: 31, won: 19, lost: 10, pending: 2, winRate: 19 / 29, claimedWinRate: 0.6,
+    fuelBurned: 124, printerBurned: 310000, ethPaid: 0.51, forged: 19, unforged: [23] });
+  assert.match(html, /<b>19<\/b><u>Dark Machines forged/);
+  assert.match(html, /<b>124<\/b><u>burned Machines fed to it/);
+  assert.match(html, /claims <b>60\.0%<\/b> success; so far <b>19<\/b> of 29 settled rituals were won, and 2 are still being played/);
+  assert.match(html, /#23 is published as Dark without any ritual on chain/);
+  assert.match(ritualHtml(null), /Not read yet/);
+});
+
+test("the hero counts the Dark Machines apart from the burned", () => {
+  const html = heroHtml({ ...DARKD, fleet: { minted: 10000, vault: 0, dead: 3623, circulating: 6377, share: 0.36 },
+    collection: { machines: 2102, burned: 4255, dark: 20 } });
+  assert.match(html, /4,255 more were marked burned in the Meltdown[^;]*; 20 were forged into Dark Machines/);
+});
+
+// Le jour de l'ouverture, aucune Dark n'était en vente : la catégorie doit
+// exister dans la rangée quand même, sans prix inventé.
+test("the Dark block shows even with none for sale, and invents no price", () => {
+  const none = { ...DARKD, darkBook: { floorEth: null, listed: 0, supply: 20, entries: [] } };
+  assert.match(floorsHtml(none), /<span class="fl-cls">Dark<\/span><b>—<\/b><u>none of 20 for sale<\/u>/);
+  const gone = { ...DARKD, darkBook: { floorEth: null, listed: 0, supply: 0, entries: [] } };
+  assert.doesNotMatch(floorsHtml(gone), /fl-dark/);
+});
+
+/* ── le compteur des Dark, à droite des onglets ─────────────────────────── */
+test("the Dark counter shows how many exist and how the rituals went", () => {
+  const html = darkCountHtml({ collection: { dark: 20 }, ritual: { won: 19, lost: 10, pending: 0 } });
+  assert.match(html, /<span class="dc-num">20<\/span>/);
+  assert.match(html, /<b>Dark Machines<\/b><u>19 of 29 rituals won<\/u>/);
+  assert.doesNotMatch(html, /dc-live/);
+});
+
+// Le point ne bat que si une partie se joue : il dit « maintenant ».
+test("the counter's red dot beats only while a ritual is being played", () => {
+  const html = darkCountHtml({ collection: { dark: 20 }, ritual: { won: 19, lost: 10, pending: 2 } });
+  assert.match(html, /<i class="dc-live" title="2 rituals being played now"><\/i>20/);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)[^@]*animation: none/);
+});
+
+test("no Dark Machine, no counter", () => {
+  assert.equal(darkCountHtml({ collection: { dark: 0 } }), "");
+  assert.equal(darkCountHtml(null), "");
+});
+
+test("the counter sits outside the tab list, which it is not part of", () => {
+  const nav = page.slice(page.indexOf('<nav class="nav"'), page.indexOf("</nav>"));
+  assert.doesNotMatch(nav, /dark-count/);
+  assert.match(page, /<\/nav>\s*<a class="dark-count" id="dark-count"/);
+});
+
+// Le 2026-09-24 sur le banc : le bloc Dark ouvrait un carnet vide, parce que
+// le filtre « Printing » par défaut écartait toutes les Dark.
+test("choosing Dark shows the Dark Machines whatever state was selected", () => {
+  const picked = pickMachines(DARKD, { klass: DARK_LABEL, state: "lit", limit: Infinity });
+  assert.equal(picked.length, 2);
 });

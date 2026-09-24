@@ -54,7 +54,7 @@ test("every machine on sale carries its picture, its traits and the desk it sits
   const s = composeSnapshot({ ...withGrid, deskIndex: new Map([[1253, 9]]) });
   assert.deepEqual(s.rows[0].inked.entries[0].machine, {
     image: "https://img/1253.webp", headwear: "Blueberries", body: "Cobalt Stripe",
-    eyes: "Rage", burned: false, desk: "utilities", sector: "utilities", ticker: null,
+    eyes: "Rage", burned: false, dark: false, ritualId: null, desk: "utilities", sector: "utilities", ticker: null,
   });
 });
 
@@ -491,4 +491,56 @@ test("a burned machine wears its current picture and claims no return", () => {
   // La vivante garde sa vignette du mint tant qu'on n'en publie pas d'autre.
   assert.equal(s.rows[0].inked.entries[0].machine.image, "https://mint/1.webp");
   assert.ok(s.rows[0].inked.entries[0].epochUsd > 0);
+});
+
+// Le Rituel noir. Une case pour toute la collection, retirée du parc vivant,
+// et une Dark Machine publiée sans rituel sur la chaîne est nommée.
+const ritualOf = (forged) => ({
+  rituals: 31, won: 19, lost: 10, pending: 2, winRate: 19 / 29,
+  fuelBurned: 124, printerBurned: 310000, ethPaid: 0.51, forged: new Map(forged),
+});
+const withDark = {
+  ...meltdown,
+  grid: {
+    ...meltdown.grid,
+    dark: cell(1.2, [{ tokenId: 93, priceEth: 1.2 }]),
+    totals: { ...meltdown.grid.totals, dark: 20 },
+  },
+  meta: new Map([...meltdown.meta, [93, { image: "https://mint/93.webp", headwear: "Halo" }]]),
+  live: {
+    status: new Map([...meltdown.live.status, [93, "dark machine"], [23, "dark machine"]]),
+    image: new Map([...meltdown.live.image, [93, "https://now/dark.webp"]]),
+  },
+  ritual: ritualOf([[93, 4]]),
+};
+
+test("Dark Machines have their own floor and leave the living fleet", () => {
+  const s = composeSnapshot(withDark);
+  assert.equal(s.collection.darkFloorEth, 1.2);
+  assert.equal(s.collection.dark, 20);
+  assert.equal(s.collection.machines, 10000 - 3497 - 4381 - 20);
+  // Le floor des vivantes ne voit pas les Dark.
+  assert.equal(s.collection.floorEth, 0.02);
+});
+
+test("a Dark Machine on sale says which ritual forged it and claims no drop", () => {
+  const e = composeSnapshot(withDark).darkBook.entries[0];
+  assert.equal(e.machine.dark, true);
+  assert.equal(e.machine.ritualId, 4);
+  assert.equal(e.machine.image, "https://now/dark.webp");
+  assert.equal(e.epochUsd, null);
+  assert.equal(e.inkMult, null);
+});
+
+test("a Dark Machine published without a ritual on-chain is named, not hidden", () => {
+  const r = composeSnapshot(withDark).ritual;
+  assert.deepEqual(r.unforged, [23]);
+  assert.equal(r.forged, 1);
+  assert.equal(r.claimedWinRate, 0.6);
+});
+
+test("with no ritual read the snapshot says nothing about it", () => {
+  const s = composeSnapshot(meltdown);
+  assert.equal(s.ritual, null);
+  assert.equal(s.darkBook.entries.length, 0);
 });

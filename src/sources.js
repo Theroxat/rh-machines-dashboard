@@ -36,6 +36,7 @@ export const SOURCES = Object.freeze([
   { what: "Every coin on PRINTER.FUN", kind: "chain", from: "both pad factories" },
   { what: "Fusions, wins, losses, the vault", kind: "chain", from: "Proton contract logs" },
   { what: "$PRINTER supply and ink burned", kind: "chain", from: "token and MINE contracts" },
+  { what: "Dark Machines, and every ritual won or lost", kind: "chain", from: "Dark Ritual contract logs" },
 
   // --- des tiers ---
   {

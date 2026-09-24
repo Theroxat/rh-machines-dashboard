@@ -1,5 +1,5 @@
 import { buildTraitIndex } from "./traitindex.js";
-import { TOTAL_MACHINES, OPERATING_CHARGE_PRINTER, ADDRESSES, OPENSEA } from "./config.js";
+import { TOTAL_MACHINES, OPERATING_CHARGE_PRINTER, ADDRESSES, OPENSEA, DARK } from "./config.js";
 import { deskShares } from "./vote.js";
 import { deskName } from "./desks.js";
 import { epochUsd } from "./pot.js";
@@ -60,7 +60,7 @@ export function fleetHeadline(off) {
 export function composeSnapshot({
   grid, printer, eth, protocol, stats, book, inkMeta, meta, legend, ink, weights, anvil,
   deskIndex, vote, potUsd, sectorWeight, tickers, holdings, stockPrices, ownerOf, now,
-  offCirculation, official, live,
+  offCirculation, official, live, ritual,
 }) {
   const activationPrinter = protocol?.activationInk
     ? Number(BigInt(protocol.activationInk) / 10n ** 15n) / 1000
@@ -98,6 +98,10 @@ export function composeSnapshot({
       // ceux du mint — c'est d'eux que dépend la dérivation des classes.
       image: live?.image?.get(tokenId) ?? m.image,
       burned: live?.status?.get(tokenId) === "burned",
+      // Forgée au Rituel noir, ou seulement publiée comme telle : la page dit
+      // lequel, parce que la #23 était la seconde sans être la première.
+      dark: Boolean(ritual?.forged?.has(tokenId) || live?.status?.get(tokenId) === "dark machine"),
+      ritualId: ritual?.forged?.get(tokenId) ?? null,
       // Le nom officiel d'un desk est son ticker : c'est ce que publient les
       // métadonnées de la collection, et c'est ce que cherche un porteur — on
       // ne demande pas « les machines du secteur utilities », on demande GME.
@@ -173,7 +177,7 @@ export function composeSnapshot({
       // Une machine du rayon peut avoir été re-inkée comme n'importe quelle
       // autre, et sa vignette doit pouvoir le dire.
       weight,
-      inkMult: weight ? weight / classValue : null,
+      inkMult: weight && classValue ? weight / classValue : null,
       epochUsd: returnOf(e.tokenId, weight),
       // La chaîne dit d'une machine du rayon exactement ce qu'elle dit d'une
       // machine d'OpenSea. Le panneau de détail les affichait à moitié vide
@@ -185,6 +189,8 @@ export function composeSnapshot({
     };
   };
 
+  // `burned` couvre aussi les Dark Machines : ni l'une ni l'autre ne touche le
+  // pot selon l'équipe, et la page ne leur promet donc aucun drop.
   const withMachines = (cell, classValue, burned = false) => ({
     ...cell,
     anvilEntries: (cell.anvilEntries ?? []).map((e) => shelfEntry(e, classValue)),
@@ -208,7 +214,7 @@ export function composeSnapshot({
         account: meta?.get(e.tokenId)?.wallet ?? null,
         owner: ownerOf?.get(e.tokenId) ?? null,
         // Une machine dormante ne pèse rien : un rapport n'aurait aucun sens.
-        inkMult: weight ? weight / classValue : null,
+        inkMult: weight && classValue ? weight / classValue : null,
         anvilBidPrinter: anvil?.bids?.get(e.tokenId) ?? null,
         anvilBidEth,
         // Une offre suspendue n'est pas une offre basse : on ne compare pas.
@@ -224,7 +230,11 @@ export function composeSnapshot({
     burned: withMachines(r.burned ?? { entries: [], anvilEntries: [] }, r.classValue, true),
   }));
 
+  // Le carnet des Dark Machines : une case pour toute la collection.
+  const darkBook = withMachines(grid.dark ?? { entries: [], anvilEntries: [] }, null, true);
+
   const listed = new Set();
+  for (const e of darkBook.entries) listed.add(e.tokenId);
   for (const r of rows) {
     for (const e of r.inked.entries) listed.add(e.tokenId);
     for (const e of r.dormant.entries) listed.add(e.tokenId);
@@ -242,12 +252,13 @@ export function composeSnapshot({
   };
   const floorEth = minOf(rows.flatMap((r) => [r.inked.floorEth, r.dormant.floorEth]));
   const burnedFloorEth = minOf(rows.map((r) => r.burned.floorEth));
+  const darkFloorEth = darkBook.floorEth ?? null;
   const inEth = (v) => (v !== null && v !== undefined && eth?.usd ? v * eth.usd : null);
   // Ce qui reste vivant : ni à l'adresse morte, ni marqué brûlé. C'est sur
   // cette flotte-là que le floor se multiplie — dix mille fois le prix d'une
   // vivante comptait 3 497 machines détruites et 4 381 brûlées.
   const dead = offCirculation?.dead ?? 0;
-  const alive = TOTAL_MACHINES - dead - (grid.totals?.burned ?? 0);
+  const alive = TOTAL_MACHINES - dead - (grid.totals?.burned ?? 0) - (grid.totals?.dark ?? 0);
 
   const collection = {
     floorEth,
@@ -260,6 +271,9 @@ export function composeSnapshot({
     burned: grid.totals?.burned ?? null,
     burnedFloorEth,
     burnedFloorUsd: inEth(burnedFloorEth),
+    dark: grid.totals?.dark ?? null,
+    darkFloorEth,
+    darkFloorUsd: inEth(darkFloorEth),
     marketCapEth: floorEth === null ? null : floorEth * alive,
     marketCapUsd: inEth(floorEth === null ? null : floorEth * alive),
     volumeEth: stats?.volume ?? null,
@@ -281,6 +295,17 @@ export function composeSnapshot({
   return {
     at: now,
     rows,
+    darkBook,
+    // Le Rituel noir tel que la chaîne l'enregistre, et ce que le statut publié
+    // affirme en plus : une Dark Machine sans rituel est nommée, pas cachée.
+    ritual: ritual ? {
+      rituals: ritual.rituals, won: ritual.won, lost: ritual.lost, pending: ritual.pending,
+      winRate: ritual.winRate, claimedWinRate: DARK.claimedWinBps / 10000,
+      fuelBurned: ritual.fuelBurned, printerBurned: ritual.printerBurned, ethPaid: ritual.ethPaid,
+      forged: ritual.forged.size,
+      unforged: [...(live?.status ?? [])]
+        .filter(([id, st]) => st === "dark machine" && !ritual.forged.has(id)).map(([id]) => id).sort((a, b) => a - b),
+    } : null,
     // D'où vient chaque chiffre. Scellé, donc servi tel quel : c'est une
     // déclaration, pas une mesure.
     sources: { list: SOURCES, kinds: SOURCE_KINDS },

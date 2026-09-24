@@ -318,3 +318,51 @@ test("the anvil shelf is sorted into the burned cell like the book", () => {
   });
   assert.deepEqual(rowOf(grid, "x1").burned.anvilEntries, [{ tokenId: 1, askPrinter: 9000 }]);
 });
+
+// Le Rituel noir du 2026-09-23 : les vessels gagnés sont une case à part, hors
+// classes, et ne tirent ni le floor des brûlées ni celui des vivantes.
+test("a Dark Machine forged on-chain has one cell for the whole collection", () => {
+  const grid = buildGrid({
+    traits: traitsOf([[1, 100], [2, 200], [3, 100]]),
+    ink: inkOf([[1, 4250], [2, 4250], [3, 4250]]),
+    listings: listingsOf([[1, 2.0], [2, 1.5], [3, 0.01]]),
+    status: statusOf([[1, "burned"], [2, "burned"], [3, "burned"]]),
+    dark: new Set([1, 2]),
+    pelotonSize: 5,
+  });
+  assert.equal(grid.dark.supply, 2);
+  assert.equal(grid.dark.floorEth, 1.5);
+  assert.equal(grid.totals.dark, 2);
+  assert.equal(rowOf(grid, "x1").burned.supply, 1);
+  assert.equal(rowOf(grid, "x1").burned.floorEth, 0.01);
+  assert.equal(grid.totals.listed, 3);
+});
+
+// Le jour de l'ouverture, OpenSea avait six machines de retard sur la chaîne —
+// et la #23 était publiée Dark sans qu'aucun rituel ne l'ait produite.
+test("a Dark Machine is recognised by the chain or by its published status", () => {
+  const grid = buildGrid({
+    traits: traitsOf([[1, 100], [23, 100]]),
+    ink: inkOf([[1, 0], [23, 0]]),
+    listings: listingsOf([]),
+    status: statusOf([[23, "dark machine"]]),   // #1 pas encore republiée
+    dark: new Set([1]),
+    pelotonSize: 5,
+  });
+  assert.equal(grid.dark.supply, 2);
+  assert.equal(grid.excluded.unknownStatus, 0);
+});
+
+test("a Dark Machine sent to the dead address is destroyed, not dark", () => {
+  const grid = buildGrid({
+    traits: traitsOf([[1, 100]]),
+    ink: inkOf([[1, 0]]),
+    listings: listingsOf([]),
+    status: statusOf([]),
+    dark: new Set([1]),
+    gone: new Set([1]),
+    pelotonSize: 5,
+  });
+  assert.equal(grid.dark.supply, 0);
+  assert.equal(grid.excluded.destroyed, 1);
+});

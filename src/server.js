@@ -4,10 +4,11 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { ethers } from "ethers";
 
-import { loadConfig, RPC_URL, CHAIN_ID, ADDRESSES, TOTAL_MACHINES, PAD, PROTON } from "./config.js";
+import { loadConfig, RPC_URL, CHAIN_ID, ADDRESSES, TOTAL_MACHINES, PAD, PROTON, DARK } from "./config.js";
 import { fetchListings, fetchCollectionStats } from "./opensea.js";
 import { loadTraits } from "./traits.js";
 import { loadMetadata, readLiveStatus } from "./metadata.js";
+import { readRitualLogs, tallyRituals } from "./dark.js";
 import { deriveHeadwearLegend } from "./rarity.js";
 import { readInk } from "./ink.js";
 import { fetchPrinter, fetchEthUsd } from "./prices.js";
@@ -129,6 +130,25 @@ async function sweepStatus() {
   const burned = [...r.status.values()].filter((v) => v === "burned").length;
   console.log(`status: ${r.status.size} machines published, ${burned} marked burned, ` +
     `${r.image.size} current pictures (${r.pages} pages)`);
+}
+
+// Le Rituel noir : ses journaux, lus depuis l'ouverture puis par incréments.
+// Un curseur qui n'avance qu'après une lecture complète — une tranche refusée
+// fait relire la même fenêtre au tour suivant, jamais sauter par-dessus.
+let ritualEvents = [];
+let ritualCursor = DARK.fromBlock;
+let ritual = null;
+
+async function sweepDark() {
+  const head = await provider.getBlockNumber();
+  if (ritualCursor <= head) {
+    const fresh = await readRitualLogs({ provider, contract: DARK.contract, fromBlock: ritualCursor, toBlock: head });
+    ritualEvents = ritualEvents.concat(fresh);
+    ritualCursor = head + 1;
+  }
+  ritual = tallyRituals(ritualEvents);
+  console.log(`dark: ${ritual.rituals} rituals, ${ritual.won} won, ${ritual.lost} lost, ${ritual.pending} pending — ` +
+    `${ritual.forged.size} Dark Machines forged on-chain, ${ritual.fuelBurned} burned as fuel`);
 }
 
 /** Les machines de l'adresse morte, lues sur la carte des propriétaires. */
@@ -367,6 +387,8 @@ async function sweepBook() {
     listings: book.listings, traits, ink, pelotonSize: cfg.pelotonSize,
     shelf: anvil?.shelfListings,
     status: live.status, gone: goneOf(),
+    // Sans rituel lu, les Dark se reconnaissent encore à leur statut publié.
+    dark: ritual ? new Set(ritual.forged.keys()) : undefined,
   });
 
   // Le poids de chaque desk : il décide de la dilution sur sa propre tranche.
@@ -402,6 +424,7 @@ async function sweepBook() {
     offCirculation,
     official,
     live,
+    ritual,
   });
   store.succeed(composed);
 
@@ -633,6 +656,7 @@ const server = createServer(async (req, res) => {
       tokenIds: ownedIds,
       imageOf: (id) => live?.image.get(id) ?? meta.get(id)?.image ?? null,
       burnedOf: (id) => live?.status.get(id) === "burned",
+      darkOf: (id) => Boolean(ritual?.forged.has(id) || live?.status.get(id) === "dark machine"),
       holdsOf,
       weightOf: (id) => Number(weights.get(id) ?? 0n),
       deskOf: (id) => deskIndex.get(id) ?? null,
@@ -800,9 +824,12 @@ const started = async () => {
   // Le statut avant le carnet : le premier balayage du carnet en a besoin pour
   // séparer les brûlées des vivantes, et il échouerait sinon.
   await sweepStatus().catch((e) => console.error(`status: ${e.message}`));
+  await sweepDark().catch((e) => console.error(`dark: ${e.message}`));
 
   loop("book", sweepBook, cfg.bookPollIntervalMs);
   loop("status", sweepStatus, cfg.inkPollIntervalMs, { runNow: false });
+  // Une partie se joue en quelques minutes : la cadence du pad, pas celle de l'encre.
+  loop("dark", sweepDark, cfg.padPollIntervalMs, { runNow: false });
   loop("ink", sweepInk, cfg.inkPollIntervalMs, { runNow: false });
   loop("owners", sweepOwners, cfg.inkPollIntervalMs);
   loop("pad", sweepPad, cfg.padPollIntervalMs);

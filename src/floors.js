@@ -40,21 +40,37 @@ function buildCell(entries, supply, pelotonSize) {
  * savent rien. Avec, une machine que la carte ne connaît pas est exclue et
  * comptée : la ranger vivante déplacerait le floor des vivantes vers celui des
  * brûlées, sans erreur nulle part.
+ *
+ * `dark` (les vessels gagnés au Rituel noir, lus sur la chaîne) est arrivé le
+ * lendemain. Une Dark Machine est aussi reconnue à son statut publié : la #23
+ * l'était sans qu'aucun rituel ne l'ait produite. Elles ne se rangent pas par
+ * classe — une vingtaine en tout, sans poids selon l'équipe, un marché à part —
+ * et forment une seule case, `grid.dark`, à côté des lignes.
  */
-export function buildGrid({ listings, traits, ink, pelotonSize, shelf, status, gone }) {
+export function buildGrid({ listings, traits, ink, pelotonSize, shelf, status, gone, dark }) {
   const excluded = {
     unknownRarity: 0, unknownInk: 0, unknownStatus: 0, destroyed: 0,
     listingsOffGrid: 0, heldByAnvil: 0,
   };
-  const stateOf = new Map();   // tokenId -> "inked" | "dormant" | "burned"
+  const stateOf = new Map();   // tokenId -> "inked" | "dormant" | "burned" | "dark"
   const classOf = new Map();   // tokenId -> weightClass
   const supply = new Map();    // "class:state" -> compte
+  // Les Dark Machines n'ont qu'une case, sans classe.
+  const keyOf = (wc, state) => (state === "dark" ? "dark" : `${wc}:${state}`);
 
   for (const [tokenId, t] of traits) {
     if (t?.weightClass == null) { excluded.unknownRarity++; continue; }
     // L'adresse morte ne rend rien : ce n'est plus de l'offre, dans aucune case.
     if (gone?.has(tokenId)) { excluded.destroyed++; continue; }
     const marked = status ? status.get(tokenId) : null;
+    // Forgée sur la chaîne, elle est Dark même si OpenSea ne l'a pas encore
+    // republiée — il avait six machines de retard le jour de l'ouverture.
+    if (dark?.has(tokenId) || marked === "dark machine") {
+      stateOf.set(tokenId, "dark");
+      classOf.set(tokenId, t.weightClass);
+      supply.set("dark", (supply.get("dark") ?? 0) + 1);
+      continue;
+    }
     if (status && marked === undefined) { excluded.unknownStatus++; continue; }
     const burned = ink.get(tokenId);
     if (burned == null) { excluded.unknownInk++; continue; }
@@ -64,7 +80,7 @@ export function buildGrid({ listings, traits, ink, pelotonSize, shelf, status, g
     const state = marked === "burned" ? "burned" : burned > 0n ? "inked" : "dormant";
     stateOf.set(tokenId, state);
     classOf.set(tokenId, t.weightClass);
-    const k = `${t.weightClass}:${state}`;
+    const k = keyOf(t.weightClass, state);
     supply.set(k, (supply.get(k) ?? 0) + 1);
   }
 
@@ -81,7 +97,7 @@ export function buildGrid({ listings, traits, ink, pelotonSize, shelf, status, g
     // la placer, et deviner une case déplacerait silencieusement le floor de
     // cette case.
     if (state === undefined || wc === undefined) { excluded.listingsOffGrid++; continue; }
-    const k = `${wc}:${state}`;
+    const k = keyOf(wc, state);
     if (!byCell.has(k)) byCell.set(k, []);
     byCell.get(k).push(entry);
   }
@@ -95,7 +111,7 @@ export function buildGrid({ listings, traits, ink, pelotonSize, shelf, status, g
     const state = stateOf.get(tokenId);
     const wc = classOf.get(tokenId);
     if (state === undefined || wc === undefined) continue;
-    const k = `${wc}:${state}`;
+    const k = keyOf(wc, state);
     if (!shelfByCell.has(k)) shelfByCell.set(k, []);
     shelfByCell.get(k).push({ tokenId, askPrinter });
   }
@@ -123,14 +139,19 @@ export function buildGrid({ listings, traits, ink, pelotonSize, shelf, status, g
     };
   });
 
+  const darkCell = buildCell(byCell.get("dark") ?? [], supply.get("dark") ?? 0, pelotonSize);
+  darkCell.anvilEntries = shelfFor("dark");
+
   return {
     rows,
+    dark: darkCell,
     excluded,
     totals: {
       inked: rows.reduce((n, r) => n + r.inked.supply, 0),
       dormant: rows.reduce((n, r) => n + r.dormant.supply, 0),
       burned: rows.reduce((n, r) => n + r.burned.supply, 0),
-      listed: rows.reduce((n, r) => n + r.inked.listed + r.dormant.listed + r.burned.listed, 0),
+      dark: darkCell.supply,
+      listed: rows.reduce((n, r) => n + r.inked.listed + r.dormant.listed + r.burned.listed, 0) + darkCell.listed,
     },
   };
 }

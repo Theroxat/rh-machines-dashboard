@@ -70,6 +70,23 @@ export const PROTON = Object.freeze({
   claimedSuccessBps: 8000,
 });
 
+/**
+ * Le Rituel noir, ouvert le 2026-09-23 à 22:22 UTC (bloc 70 867 555, premier
+ * journal du contrat). Quatre machines brûlées partent à l'adresse morte, une
+ * cinquième — le « vessel » — devient Dark Machine si la partie est gagnée.
+ * L'adresse vient de `/api/dark` du site officiel, recoupée on-chain : `owner()`
+ * est la même clé que le Proton, le contrat n'est pas un proxy, et ses
+ * journaux `Charged`/`Settled` retombent sur les compteurs de l'API.
+ * `fromBlock` est un plancher de lecture : ce nœud ne sert pas l'état
+ * historique, mais il sert les journaux.
+ */
+export const DARK = Object.freeze({
+  contract: "0x207455FDbb3F0DEc567b9c83176FCee3e0940506",
+  fromBlock: 70_867_000,
+  owner: "0xA08c58FCC285D9Cd48b7122293C8a62446AA3d17",
+  claimedWinBps: 6000,
+});
+
 export const PAD = Object.freeze({
   factories: Object.freeze([
     "0x0C8c78ab91b87a03659c8AD4A11e6d23d5Ab869b",

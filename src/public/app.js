@@ -149,6 +149,7 @@ export function heroHtml(d, active = null) {
     f.dead ? `${fmtInt(f.dead)} went to a dead address, where nothing comes back` : null,
     marked ? `${fmtInt(marked)} more were marked burned in the Meltdown and still sit in ` +
       `wallets — the team says they will never carry weight again` : null,
+    d.collection?.dark ? `${fmtInt(d.collection.dark)} were forged into Dark Machines` : null,
     f.vault ? (f.vault === 1
       ? `1 sits in the Proton's vault, which can send it back out`
       : `${fmtInt(f.vault)} sit in the Proton's vault, which can send them back out`) : null,
@@ -173,7 +174,7 @@ export function heroHtml(d, active = null) {
   // une machine du Meltdown à « $0.00 a drop » parce que les actions qu'elle
   // transporte, rapportées à son prix bradé, faisaient 9,8 %. Une vitrine de
   // retour qui ne rapporte rien ment par sa place.
-  const best = pickMachines(d, { sort: "back", limit: Infinity }).find((m) => !m.burned);
+  const best = pickMachines(d, { sort: "back", limit: Infinity }).find((m) => !m.burned && !m.dark);
 
   // Le pot entre dans la rangée plutôt que de la suivre. Posé dessous, il
   // attendait que la colonne la plus haute ait fini — la vitrine — et laissait
@@ -255,13 +256,14 @@ export function floorsHtml(d, active = null) {
   // doit apparaître : c'est le seul prix de la classe qu'on peut payer.
   const listedIn = (r) => (r.inked?.listed ?? 0) + (r.dormant?.listed ?? 0) + (r.burned?.listed ?? 0);
   const rows = (d?.rows ?? []).filter((r) => listedIn(r) > 0);
-  if (!rows.length) return "";
+  const dk = d?.darkBook;
+  if (!rows.length && !dk?.supply) return "";
   const money = (e) => (e && eth ? fmtUsdRound(e * eth) : e ? `${fmtEth(e)} ETH` : "—");
 
   return `<div class="floors"><span class="floors-lab">Cheapest by class — tap one to filter</span>` +
     `<div class="floors-row">` +
     `<button type="button" class="fl fl-all" data-k="" aria-pressed="${active ? "false" : "true"}">` +
-      `<b>All</b><u>${fmtInt(rows.reduce((a, r) => a + listedIn(r), 0))} listed</u>` +
+      `<b>All</b><u>${fmtInt(rows.reduce((a, r) => a + listedIn(r), 0) + (dk?.listed ?? 0))} listed</u>` +
     `</button>` +
     rows.map((r) =>
       `<button type="button" class="fl" data-k="${esc(r.classLabel)}" ` +
@@ -279,6 +281,16 @@ export function floorsHtml(d, active = null) {
       (r.burned?.floorEth
         ? `<span class="fl-alt fl-burned"><i>burned</i>${money(r.burned.floorEth)}</span>` : "") +
       `</button>`).join("") +
+    // Les Dark Machines en dernier bloc : un marché à part, une vingtaine de
+    // machines, pas une classe de plus. Montré dès qu'il en existe une, même
+    // sans annonce : le jour de l'ouverture aucune n'était en vente, et une
+    // catégorie absente de la rangée n'existe pas pour qui la lit.
+    (dk?.supply
+      ? `<button type="button" class="fl fl-dark" data-k="${DARK_LABEL}" ` +
+        `aria-pressed="${active === DARK_LABEL ? "true" : "false"}">` +
+        `<span class="fl-cls">Dark</span><b>${dk.listed ? money(dk.floorEth) : "—"}</b>` +
+        `<u>${dk.listed ? `${fmtInt(dk.listed)} of ${fmtInt(dk.supply)}` : `none of ${fmtInt(dk.supply)}`} for sale</u></button>`
+      : "") +
     `</div></div>`;
 }
 
@@ -348,10 +360,21 @@ export const STATES = Object.freeze([
   // état, pas une variante des deux autres — on ne l'allume pas, et l'équipe
   // annonce qu'elle ne portera plus de poids.
   { key: "burned", label: "Burned" },
+  // Le Rituel noir du 2026-09-23 : quatre brûlées pour en forger une. Une case
+  // pour toute la collection, pas une par classe — elles sont une vingtaine.
+  { key: "dark", label: "Dark" },
 ]);
 
-/** Les trois cases d'une ligne, dans l'ordre de la page, avec leur état. */
-const cellsOf = (r) => [["lit", r.inked], ["dormant", r.dormant], ["burned", r.burned]];
+/** Les cases d'une ligne, dans l'ordre de la page, avec leur état. */
+const cellsOf = (r) => [["lit", r.inked], ["dormant", r.dormant], ["burned", r.burned], ["dark", r.dark]];
+
+/** Les lignes du carnet, plus celle des Dark Machines, qui n'a pas de classe :
+ *  elle se filtre comme une classe, sous le nom « Dark ». */
+export const DARK_LABEL = "Dark";
+const boardRows = (d) => [
+  ...(d?.rows ?? []),
+  ...(d?.darkBook ? [{ classValue: null, classLabel: DARK_LABEL, dark: d.darkBook }] : []),
+];
 
 export function pickMachines(d, { klass = null, state = null, limit = 24, sort = SORTS[0].key } = {}) {
   const eth = d?.eth?.usd;
@@ -363,17 +386,22 @@ export function pickMachines(d, { klass = null, state = null, limit = 24, sort =
   // ne peut plus être exécutée. La montrer ferait apparaître la même machine
   // deux fois, à deux prix, dont un imaginaire.
   const onShelf = new Set();
-  for (const r of d?.rows ?? []) {
+  for (const r of boardRows(d)) {
     for (const [, cell] of cellsOf(r)) {
       for (const e of cell?.anvilEntries ?? []) onShelf.add(e.tokenId);
     }
   }
-  for (const r of d?.rows ?? []) {
+  // Choisir « Dark », c'est choisir un état : le filtre « Printing » par défaut
+  // n'y laissait rien, et le bloc Dark ouvrait sur un carnet vide.
+  if (klass === DARK_LABEL) state = null;
+  for (const r of boardRows(d)) {
     if (klass && r.classLabel !== klass) continue;
     for (const [key, cell] of cellsOf(r)) {
       if (state && key !== state) continue;
+      if (!cell) continue;
       const lit = key === "lit";
       const burned = key === "burned";
+      const dark = key === "dark";
       // Une brûlée ne s'allume pas : son coût ne porte pas l'allumage.
       const toLight = key === "dormant" ? light : 0;
       for (const e of cell?.entries ?? []) {
@@ -381,7 +409,7 @@ export function pickMachines(d, { klass = null, state = null, limit = 24, sort =
         const priceUsd = eth ? e.priceEth * eth : null;
         const cost = priceUsd === null ? null : priceUsd + toLight;
         const back = (e.epochUsd ?? 0) + (e.holds?.usd ?? 0);
-        out.push({ ...e, lit, burned, classLabel: r.classLabel, priceUsd, cost, back,
+        out.push({ ...e, lit, burned, dark, classLabel: r.classLabel, priceUsd, cost, back,
           ratio: cost ? back / cost : 0, from: "opensea" });
       }
       // Le rayon de l'anvil. Ces machines sont achetables et n'apparaissaient
@@ -391,8 +419,8 @@ export function pickMachines(d, { klass = null, state = null, limit = 24, sort =
       for (const e of cell?.anvilEntries ?? []) {
         const priceUsd = e.askUsd ?? null;
         const cost = priceUsd === null ? null : priceUsd + toLight;
-        const back = burned ? (e.holds?.usd ?? 0) : (e.epochUsd ?? 0) + (e.holds?.usd ?? 0);
-        out.push({ ...e, lit, burned, classLabel: r.classLabel,
+        const back = burned || dark ? (e.holds?.usd ?? 0) : (e.epochUsd ?? 0) + (e.holds?.usd ?? 0);
+        out.push({ ...e, lit, burned, dark, classLabel: r.classLabel,
           priceEth: e.askEth ?? null, priceUsd, cost, back,
           ratio: cost ? back / cost : 0, from: "anvil" });
       }
@@ -422,14 +450,18 @@ export function cardHtml(m, { light = 0 } = {}) {
     (m.machine?.image
       ? `<img class="card-art" src="${esc(m.machine.image)}" alt="" loading="lazy">`
       : `<span class="card-noart"></span>`) +
-    (m.burned
+    (m.dark
+      ? `<span class="card-state dark">Dark</span>`
+      : m.burned
       ? `<span class="card-state burned">Burned</span>`
       : `<span class="card-state${m.lit ? "" : " off"}">${m.lit ? "Printing" : "Dormant"}</span>`) +
     (m.from === "anvil" ? `<span class="card-from">Anvil</span>` : "") +
     `</span>`;
   // Lime : cette machine imprime. Une dormante n'en porte aucune trace, et
   // c'est l'information elle-même.
-  const earns = m.burned
+  const earns = m.dark
+    ? `<span class="card-earn off">no weight — paid outside the pot</span>`
+    : m.burned
     ? `<span class="card-earn off">burned in the Meltdown</span>`
     : m.lit
     ? `<span class="card-earn">${fmtUsd(m.epochUsd ?? 0)} a drop</span>`
@@ -533,7 +565,11 @@ export function detailHtml(m, d) {
       `<div class="d-head">` +
         `<span class="d-id">#${m.tokenId}</span>` +
         `<h3>${esc(m.classLabel ?? "")}${reinked ? ` <span class="d-re">re-inked</span>` : ""}</h3>` +
-        (m.burned
+        (m.dark
+          ? `<span class="card-earn off">${m.machine?.ritualId
+              ? `Forged in Dark Ritual #${m.machine.ritualId}`
+              : "Marked Dark — no ritual on chain"}</span>`
+          : m.burned
           ? `<span class="card-earn off">Burned in the Meltdown</span>`
           : m.lit
           ? `<span class="card-earn">${fmtUsd(m.epochUsd ?? 0)} a drop</span>`
@@ -588,7 +624,7 @@ export function walletHtml(w, { light = 0 } = {}) {
   }
 
   const wo = w.worth;
-  const earning = w.machines.filter((m) => m.weight && !m.burned).length;
+  const earning = w.machines.filter((m) => m.weight && !m.burned && !m.dark).length;
   const stats = `<div class="stats" style="margin-top:24px">` +
     (wo?.total ? `<div class="st st-pot"><b>${fmtUsdRound(wo.total)}</b><u>all of it, together</u></div>` : "") +
     `<div class="st st-live"><b>${fmtInt(earning)}</b><u>of yours printing</u></div>` +
@@ -612,8 +648,9 @@ export function walletHtml(w, { light = 0 } = {}) {
     tokenId: m.tokenId,
     machine: { image: m.image },
     classLabel: m.desk ?? "",
-    lit: Boolean(m.weight) && !m.burned,
+    lit: Boolean(m.weight) && !m.burned && !m.dark,
     burned: Boolean(m.burned),
+    dark: Boolean(m.dark),
     epochUsd: m.epochUsd,
     holds: m.holds,
     priceEth: null,
@@ -685,6 +722,56 @@ export function voteHtml(vote, epoch) {
  * l'autre : une machine brûlée réduit l'offre pour toujours, une machine au
  * coffre peut revenir demain.
  */
+/**
+ * Le Rituel noir, tel que la chaîne l'enregistre.
+ *
+ * La même règle que pour le Proton : publier le taux annoncé et le taux
+ * observé côte à côte, et nommer ce que le statut publié affirme sans que la
+ * chaîne le montre — la #23, Dark sans rituel, le jour de l'ouverture.
+ */
+export function ritualHtml(r) {
+  if (!r) return `<p class="note">Not read yet — the ritual's logs are walked from the day it opened.</p>`;
+  const st = (cls, val, label) => `<div class="st ${cls}"><b>${val}</b><u>${label}</u></div>`;
+  const done = r.won + r.lost;
+  return `<div class="stats">` +
+    st("st-book", fmtInt(r.forged), "Dark Machines forged") +
+    st("st-book", fmtInt(r.fuelBurned), "burned Machines fed to it") +
+    st("st-cost", fmtInt(Math.round(r.printerBurned)), "$PRINTER burned") +
+    st("st-book", r.winRate === null ? "—" : fmtRatio(r.winRate), "of rituals won") +
+    `</div>` +
+    `<div class="prose"><p>Four Machines burned in the Meltdown go to the dead address, and a fifth — ` +
+    `the vessel — is played on a hundred-spin slot. Win and the vessel becomes a <b>Dark Machine</b>; ` +
+    `lose and all five are gone. The team claims <b>${fmtRatio(r.claimedWinRate)}</b> success; ` +
+    `so far <b>${fmtInt(r.won)}</b> of ${fmtInt(done)} settled rituals were won` +
+    (r.pending ? `, and ${fmtInt(r.pending)} ${r.pending === 1 ? "is" : "are"} still being played` : "") + `.</p>` +
+    `<p>A Dark Machine carries no weight in the pot. The team says it earns <b>10×</b> on the ` +
+    `revenue of printer.fun and its games instead — a promise made off-chain, which nothing on this ` +
+    `page can measure yet.</p>` +
+    (r.unforged?.length
+      ? `<p>${r.unforged.map((id) => `#${id}`).join(", ")} ${r.unforged.length === 1 ? "is" : "are"} ` +
+        `published as Dark without any ritual on chain: marked by hand, not forged.</p>`
+      : "") +
+    `</div>`;
+}
+
+/**
+ * Le compteur des Dark Machines, à droite des onglets.
+ *
+ * Visible depuis tous les onglets : c'est la seule catégorie qui grossit à vue
+ * d'œil, une partie à la fois. Le point rouge ne bat que si un rituel est en
+ * train de se jouer — il dit « maintenant », pas « décoration ».
+ */
+export function darkCountHtml(d) {
+  const n = d?.collection?.dark;
+  if (!n) return "";
+  const r = d.ritual;
+  const done = r ? r.won + r.lost : 0;
+  const sub = r && done ? `${fmtInt(r.won)} of ${fmtInt(done)} rituals won` : "forged in the Dark Ritual";
+  return `<span class="dc-num">${r?.pending ? `<i class="dc-live" title="${fmtInt(r.pending)} ritual${
+      r.pending === 1 ? "" : "s"} being played now"></i>` : ""}${fmtInt(n)}</span>` +
+    `<span class="dc-txt"><b>Dark Machines</b><u>${sub}</u></span>`;
+}
+
 export function scarcityHtml(sc) {
   if (!sc) return `<p class="note">Not read yet — walking the chain's logs takes a hundred requests.</p>`;
   const v = sc.vault, b = sc.burn, o = sc.odds, p = sc.proton;
@@ -860,6 +947,8 @@ if (typeof document !== "undefined") {
         ? "What costs least to get in. These earn nothing until someone burns ink for them."
       : state === "burned"
         ? "Marked burned in the Meltdown. The team says they will never carry weight again — they are not a way in."
+      : state === "dark"
+        ? "Forged in the Dark Ritual. No weight, and no share of the pot — the team says they earn 10× on printer.fun and games instead."
         : "What costs least to get in. Dormant ones are cheaper because they earn nothing yet.";
     $("buy-sub").textContent = sort === "cheap" ? cheapSub
       : "What each Machine returns — its share of the pot, plus the stock already sitting in it — against what it costs.";
@@ -869,6 +958,7 @@ if (typeof document !== "undefined") {
     const of = state === "lit" ? "printing and for sale"
       : state === "dormant" ? "dormant and for sale"
       : state === "burned" ? "burned and for sale"
+      : state === "dark" ? "Dark and for sale"
       : "for sale";
     $("more-note").textContent = picked.length && total > picked.length
       ? `Showing ${picked.length} of ${total} ${of}.` : "";
@@ -895,17 +985,18 @@ if (typeof document !== "undefined") {
   const openDetail = (tokenId, from) => {
     if (!data) return;
     let found = null;
-    for (const r of data.rows ?? []) {
+    for (const r of boardRows(data)) {
       for (const [key, cell] of cellsOf(r)) {
-        const lit = key === "lit", burned = key === "burned";
+        if (!cell) continue;
+        const lit = key === "lit", burned = key === "burned", dark = key === "dark";
         // Le rayon d'abord, et la même raison qu'au carnet : une annonce
         // OpenSea sur une machine que l'anvil possède est une annonce que son
         // ancien propriétaire n'a pas retirée. C'est la vignette du rayon
         // qu'on a cliquée, c'est son prix qu'il faut ouvrir.
         const shelf = (cell?.anvilEntries ?? []).find((x) => x.tokenId === tokenId);
-        if (shelf) { found = { ...shelf, lit, burned, classLabel: r.classLabel, from: "anvil" }; continue; }
+        if (shelf) { found = { ...shelf, lit, burned, dark, classLabel: r.classLabel, from: "anvil" }; continue; }
         const e = (cell?.entries ?? []).find((x) => x.tokenId === tokenId);
-        if (e) found = { ...e, lit, burned, classLabel: r.classLabel, from: "opensea" };
+        if (e) found = { ...e, lit, burned, dark, classLabel: r.classLabel, from: "opensea" };
       }
     }
     if (!found) return;
@@ -932,11 +1023,24 @@ if (typeof document !== "undefined") {
     openDetail(id, card);
   });
 
+  // Le compteur des Dark mène au carnet, filtré sur elles.
+  $("dark-count").addEventListener("click", (e) => {
+    e.preventDefault();
+    klass = DARK_LABEL;
+    state = null;
+    location.hash = "buy";
+    show("buy");
+    paintBuy();
+    $("cards")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
   // Le plancher d'une classe est aussi son filtre : on lit le prix, on clique.
   $("hero").addEventListener("click", (e) => {
     const b = e.target.closest("button[data-k]");
     if (!b) return;
     klass = b.dataset.k || null;
+    // Les boutons d'état doivent dire ce que la grille montre.
+    if (klass === DARK_LABEL) state = null;
     paintBuy();
   });
 
@@ -1030,6 +1134,10 @@ if (typeof document !== "undefined") {
     $("stats").innerHTML = statsHtml(data);
     paintBuy();
     $("vote").innerHTML = voteHtml(data.vote, data.protocol?.epoch);
+    const dc = darkCountHtml(data);
+    $("dark-count").innerHTML = dc;
+    $("dark-count").hidden = !dc;
+    $("ritual").innerHTML = ritualHtml(data.ritual);
     $("vote-sub").textContent =
       "Every Machine votes with its weight, and the pot is cut between the desks in proportion " +
       "to what they drew. A Machine counts twice on the slice bought for its own desk.";
