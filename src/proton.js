@@ -28,6 +28,7 @@ export const PROTON_ABI = new ethers.Interface([
 ]);
 
 const TRANSFER = ethers.id("Transfer(address,address,uint256)");
+const DEAD = "0x000000000000000000000000000000000000dead";
 const SPAN = 100_000;
 const DRY = 20;
 
@@ -106,6 +107,10 @@ export async function readProton({ provider, proton, factory, machines }) {
     feeEth: Number(ethers.formatEther(feeWei)),
     heldIds: [...heldIds],
     released: outOf.logs.length,
+    // Sorties vers l'adresse morte, comptées à part : le 2026-09-23 le coffre y
+    // a envoyé 3 477 machines d'un coup, et la page annonçait « 3,477 have
+    // come back out » — comme si elles étaient revenues à quelqu'un.
+    releasedToDead: outOf.logs.filter((l) => l.topics[2] === ethers.zeroPadValue(DEAD, 32).toLowerCase()).length,
     // Vrai quand notre compte retombe sur celui du contrat : sans lui, aucune
     // statistique tirée de ces évènements n'a le droit d'être présentée.
     complete: expected === null ? null : committed >= expected,

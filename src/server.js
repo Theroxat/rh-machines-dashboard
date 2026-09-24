@@ -4,11 +4,12 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { ethers } from "ethers";
 
-import { loadConfig, RPC_URL, CHAIN_ID, ADDRESSES, TOTAL_MACHINES, PAD, PROTON, DARK } from "./config.js";
+import { loadConfig, RPC_URL, CHAIN_ID, ADDRESSES, TOTAL_MACHINES, PAD, PROTON, DARK, DROPS } from "./config.js";
 import { fetchListings, fetchCollectionStats } from "./opensea.js";
 import { loadTraits } from "./traits.js";
 import { loadMetadata, readLiveStatus } from "./metadata.js";
 import { readRitualLogs, tallyRituals } from "./dark.js";
+import { readUnpaid, unpaidLines } from "./drops.js";
 import { deriveHeadwearLegend } from "./rarity.js";
 import { readInk } from "./ink.js";
 import { fetchPrinter, fetchEthUsd } from "./prices.js";
@@ -680,10 +681,13 @@ const server = createServer(async (req, res) => {
         machines: body.machines.map((m) => ({
           tokenId: m.tokenId,
           weight: m.weight,
+          burned: m.burned,
+          dark: m.dark,
           classValue: traits.get(m.tokenId)?.weightClass ?? null,
           holds: m.holds,
         })),
         rows: snap?.rows,
+        darkBook: snap?.darkBook,
         ethUsd: snap?.eth?.usd ?? null,
         printer: { amount: own.printer, usd: snap?.printer?.usd ?? null },
         ownStock: own.stock,
@@ -692,8 +696,23 @@ const server = createServer(async (req, res) => {
       console.error(`wallet: could not value ${address.slice(0, 10)} — ${e.message}`);
     }
 
+    // Les parts de drop enregistrées et jamais versées. Le même multicall que
+    // le reste : quelques machines, pas dix mille. Un échec n'annonce aucun dû.
+    let unpaid = null;
+    if (ownedIds.length) {
+      try {
+        const r = await readUnpaid({
+          aggregate3: multicallOf(provider, ADDRESSES.MULTICALL3),
+          contract: DROPS.contract, ids: ownedIds, token: DROPS.rounds[1]?.token ?? null,
+        });
+        unpaid = unpaidLines({ ...r, rounds: DROPS.rounds, priceOf: (sym) => stockPrices.get(sym) ?? null });
+      } catch (e) {
+        console.error(`wallet: unpaid drops unreadable — ${e.message}`);
+      }
+    }
+
     res.writeHead(200, headers);
-    res.end(JSON.stringify({ ...body, worth, sectors: SECTORS, closesAt: snap?.vote?.closesAt ?? null }));
+    res.end(JSON.stringify({ ...body, worth, unpaid, sectors: SECTORS, closesAt: snap?.vote?.closesAt ?? null }));
     return;
     } finally {
       // Dans un `finally` et pas après le `res.end` : un lancer au milieu de la

@@ -417,6 +417,13 @@
   }
   .card-state.off { background: var(--paper); color: var(--ink-2); }
   .card-state.burned { background: var(--blood); color: var(--paper); }
+  /* Une part de drop jamais versée : une ligne au jaune de ce qu'on paie, pas
+     une alarme. */
+  .unpaid {
+    margin: -6px 0 22px; padding: 10px 14px; max-width: 80ch;
+    border: var(--b) solid var(--ink); background: var(--sun);
+    font-size: 14.5px; font-weight: 600;
+  }
   /* Noir plein : la Dark Machine. Ni lime — elle n'imprime pas — ni rouge. */
   .card-state.dark { background: var(--ink); color: var(--paper); box-shadow: 3px 3px 0 var(--blood); }
   /* Ces machines-là ne sont pas sur OpenSea : elles s'achètent au terminal du

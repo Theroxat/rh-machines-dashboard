@@ -902,3 +902,27 @@ Métadonnées d'une Dark : aucun trait de rareté (ni Body, ni Headwear, ni
 Eyes), `Forged In: The Dark Ritual`, une image commune — « Art is not yet
 revealed ». La dérivation des classes s'appuie sur le cache du mint, elle n'en
 souffre pas.
+
+## Le contrat de drop par tours (2026-09-03)
+
+`0xFAc5FD9cabD83A97596063E853632122a901AF9d`, pas un proxy, propriétaire
+`0xA08c58FC…` (la clé du Proton), keeper `0xcC86E51c…`. Il a remplacé le
+distributeur `0xf1C50FfE…` pour le drop NVDA du 3 septembre : `airdrop(uint256[])`
+pousse les parts par lots, `shareOf(id)` et `paidThisRound(id)` en gardent la
+trace. `roundId()` = 1 au 2026-09-24 ; aucun drop depuis.
+
+- 7 689 machines payées, **193 avec une part enregistrée et jamais versée**,
+  16,3 NVDA en tout. Le contrat ne détient plus de NVDA : ces parts ne sont pas
+  financées. Le porteur ne peut rien réclamer — seul le keeper pousse.
+- Le jeton d'un tour n'est exposé par aucune vue. Celui du tour 1 (NVDA,
+  `0xd0601CE1…`) est figé dans `DROPS.rounds` ; un tour inconnu se dit « une
+  part », sans symbole.
+- La page du portefeuille affiche la ligne de ce qui est dû, sous les totaux.
+
+### La règle de partage a changé — pas encore reportée ici
+
+Le drop du 21 août suivait les tranches proportionnelles aux voix (§7, vérifié
+à 0,3 %). Depuis le 27 août, chaque drop ne contient **qu'une action** (AMD le
+27/08, AAPL le 2/09, NVDA le 3/09) : c'est le « winner takes all » que la doc
+officielle décrit désormais, gagnant exclu quatre epochs. `epochUsd` calcule
+encore avec les tranches ; à refaire.

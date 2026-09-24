@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import {
   heroHtml, statsHtml, cardHtml, chipsHtml, floorsHtml, detailHtml, bestPick, pickMachines, walletHtml,
   stepsHtml, voteHtml, scarcityHtml, padHtml, sourcesHtml, bannerMessage, potNote,
-  setContract, itemUrl, esc, ADDRESS_RE, SORTS, STATES, fmtBig, ANVIL_URL, ritualHtml, DARK_LABEL, darkCountHtml, darkGalleryHtml,
+  setContract, itemUrl, esc, ADDRESS_RE, SORTS, STATES, fmtBig, ANVIL_URL, ritualHtml, DARK_LABEL, darkCountHtml, darkGalleryHtml, dormantOnSale, unpaidHtml, nextGate,
 } from "../src/public/app.js";
 
 const page = readFileSync(new URL("../src/public/index.html", import.meta.url), "utf8");
@@ -410,7 +410,7 @@ test("how it works is five steps, in the order they happen to a Machine", () => 
   assert.match(html, /You buy a Machine/);
   assert.match(html, /5,000 \$PRINTER<\/b> — about \$151 today/);
   // Le délai « allumée pendant une epoch » coûte de l'argent à qui l'ignore.
-  assert.match(html, /takes no part in the pot already waiting/);
+  assert.match(html, /takes no part in\s+the pot already waiting/);
   // Vendre la machine vend ce qu'elle contient : ça ne peut pas être tu.
   assert.match(html, /its contents go with it/);
 });
@@ -441,10 +441,10 @@ const SC = {
 test("a Machine in the vault is never called burned", () => {
   const html = scarcityHtml(SC);
   assert.match(html, /It is <b>not burned<\/b> by the fuse/);
-  assert.match(html, /sent all 3,477 it held to the dead address, in the Meltdown/);
+  assert.doesNotMatch(html, /come back out\./);
   assert.match(html, /Locked is not burned, and this page will not call it that/);
   assert.match(html, /owned by a single key, not a multi-signature wallet/);
-  assert.match(html, /Nothing has ever come back out so far/);
+  assert.match(html, /None has ever come back out to a wallet/);
 });
 
 // Le protocole annonce que le coffre allume ce qu'il garde. Le compte des
@@ -454,7 +454,6 @@ test("the page checks the vault against what the protocol says it does", () => {
   const html = scarcityHtml(SC);
   assert.match(html, /the vault activates what it holds and shares the stock back/);
   assert.match(html, /<b>172 of the 178 are dormant<\/b>/);
-  assert.match(html, /has not moved while the vault filled up/);
 });
 
 test("a vault whose machines all run makes no such claim", () => {
@@ -463,7 +462,7 @@ test("a vault whose machines all run makes no such claim", () => {
 });
 
 test("a Machine taken back out of the vault is reported", () => {
-  assert.match(scarcityHtml({ ...SC, proton: { released: 3 } }), /3 have come back out/);
+  assert.match(scarcityHtml({ ...SC, proton: { released: 3 } }), /3 came back out to a wallet/);
 });
 
 // Publier le compte d'échecs seul accuse ; le taire cache. Les deux, donc.
@@ -1122,7 +1121,7 @@ test("the ritual section puts the claimed and the observed odds side by side", (
   assert.match(html, /<b>19<\/b><u>Dark Machines forged/);
   assert.match(html, /<b>124<\/b><u>burned Machines fed to it/);
   assert.match(html, /claims <b>60\.0%<\/b> success; so far <b>19<\/b> of 29 settled rituals were won, and 2 are still being played/);
-  assert.match(html, /#23 is published as Dark without any ritual on chain/);
+  assert.match(html, /#23 is listed as Dark by the team without a ritual on chain/);
   assert.match(ritualHtml(null), /Not read yet/);
 });
 
@@ -1209,4 +1208,85 @@ test("#dark opens the book on the Dark Machines, and the counter links there", (
   assert.match(app, /if \(name !== "dark"\) return show\(name\);\s*klass = DARK_LABEL;\s*state = null;/);
   assert.match(app, /let tab = route\(\(location\.hash/);
   assert.match(page, /<a class="dark-count" id="dark-count" href="#dark"/);
+});
+
+/* ── plus de dormante en vente ─────────────────────────────────────────────
+   Après le Meltdown il en restait deux, et aucune en vente : le filtre ouvrait
+   un carnet vide et « to switch one on » chiffrait un achat impossible. */
+const NODORM = { ...DATA, rows: DATA.rows.map((r) => ({ ...r,
+  dormant: { floorEth: null, listed: 0, supply: r.classValue === 1000 ? 2 : 0, entries: [], anvilEntries: [] } })) };
+
+test("with no dormant Machine for sale, the switch-on figure and the Dormant button go", () => {
+  assert.equal(dormantOnSale(NODORM), false);
+  const stats = statsHtml(NODORM);
+  assert.doesNotMatch(stats, /to switch one on/);
+  assert.equal((stats.match(/class="st /g) ?? []).length, 4);
+  assert.doesNotMatch(chipsHtml(NODORM, null, "cheap", null), /data-st="dormant"/);
+  assert.match(chipsHtml(NODORM, null, "cheap", null), /data-st="burned"/);
+});
+
+// Le de-ink rendort une machine : une seule dormante en vente, même au rayon
+// de l'Anvil, suffit à les faire revenir.
+test("one dormant Machine for sale, even on the Anvil shelf, brings both back", () => {
+  assert.equal(dormantOnSale(DATA), true);
+  const shelfOnly = { ...NODORM, rows: [{ ...NODORM.rows[0],
+    dormant: { listed: 0, entries: [], anvilEntries: [{ tokenId: 1, askPrinter: 9000 }] } }] };
+  assert.equal(dormantOnSale(shelfOnly), true);
+  assert.match(statsHtml(DATA), /to switch one on/);
+  assert.match(chipsHtml(DATA, null, "cheap", null), /data-st="dormant"/);
+});
+
+/* ── les parts de drop jamais versées ─────────────────────────────────────── */
+test("a share of a drop that was never sent is said in one line, with what it is worth", () => {
+  const html = unpaidHtml({ round: 1, date: "2026-09-03", funded: false,
+    lines: [{ tokenId: 5949, amount: 0.0853, symbol: "NVDA", usd: 15.4 }] });
+  assert.match(html, /Still owed from the 3 Sep drop, never sent: #5949: 0\.0853 NVDA \(~\$15\.40\)/);
+  assert.match(html, /Only the protocol's keeper can send it — and the drop contract holds none of it right now\./);
+});
+
+test("an unknown round names no token, and nothing owed shows nothing", () => {
+  assert.match(unpaidHtml({ round: 2, date: null, funded: null, lines: [{ tokenId: 1, amount: null, symbol: null, usd: null }] }),
+    /from drop round 2, never sent: #1: a share\. Only/);
+  assert.equal(unpaidHtml({ lines: [] }), "");
+  assert.equal(unpaidHtml(null), "");
+});
+
+test("the wallet carries the owed line between the totals and the cards", () => {
+  const html = walletHtml({ machines: [{ tokenId: 5949, weight: 800, epochUsd: 6.9, image: null }],
+    unpaid: { round: 1, date: "2026-09-03", funded: false, lines: [{ tokenId: 5949, amount: 0.0853, symbol: "NVDA", usd: null }] } });
+  assert.ok(html.indexOf('class="unpaid"') < html.indexOf('class="grid"'));
+});
+
+// Le 2026-09-24 : « 3,477 have come back out » — elles étaient parties à
+// l'adresse morte, pas revenues à quelqu'un.
+test("Machines the vault sent to the dead address are not said to have come back", () => {
+  const html = scarcityHtml({ ...SC, vault: { ...SC.vault, held: 2, dormant: 1 },
+    proton: { released: 3480, releasedToDead: 3477 } });
+  assert.match(html, /3,477 have left it for the dead address, most of them in the Meltdown of 23 September — gone for good\. 3 came back out to a wallet\./);
+  assert.doesNotMatch(html, /3,480/);
+  assert.doesNotMatch(html, /has not moved while the vault filled up/);
+});
+
+/* ── Learn après le Meltdown ─────────────────────────────────────────────── */
+test("the first step no longer says ten thousand exist", () => {
+  const html = stepsHtml({ ...NODORM, totals: { inked: 2120 } });
+  assert.doesNotMatch(html, /Ten thousand exist/);
+  assert.match(html, /Ten thousand were minted; <b>2,120<\/b> still print today — the Meltdown burned those below 2×/);
+});
+
+// Sans dormante à vendre, « l'allumer » ne concerne plus aucun acheteur.
+test("with no dormant Machine for sale, step two is about making one heavier", () => {
+  const html = stepsHtml({ ...NODORM, protocol: { ceiling: "200" }, burn: { ink: 57_501_435 } });
+  assert.match(html, /You make it heavier/);
+  assert.doesNotMatch(html, /You switch it on/);
+  assert.match(html, /<b>2× today<\/b>, 3× once 60M has gone in as ink — 2\.50M to go/);
+  // Et une dormante à vendre ramène l'allumage.
+  assert.match(stepsHtml(DATA), /You switch it on/);
+});
+
+test("the ceiling gates follow the ink burned, and end uncapped", () => {
+  assert.deepEqual(nextGate(57_501_435), { at: 60_000_000, mult: 3, left: 2_498_565 });
+  assert.deepEqual(nextGate(120_000_000), { at: 150_000_000, mult: null, left: 30_000_000 });
+  assert.equal(nextGate(200_000_000), null);
+  assert.equal(nextGate(null), null);
 });

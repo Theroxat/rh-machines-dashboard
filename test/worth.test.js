@@ -60,3 +60,20 @@ test("an empty wallet is worth nothing knowable, not zero", () => {
   assert.equal(w.total, null);
   assert.equal(w.machinesUsd, null);
 });
+
+// Le 2026-09-24 : une x1 brûlée gardait son poids sur la chaîne et se comptait
+// au floor des vivantes — $107 au lieu de $53, pour quelque 1 400 porteurs.
+const MROWS = [{ classValue: 100, inked: { floorEth: 0.05 }, dormant: { floorEth: null }, burned: { floorEth: 0.02 } }];
+
+test("a burned machine is valued at the burned floor, whatever its on-chain weight", () => {
+  const w = valueWallet({ machines: [{ ...m(1, 100, 100), burned: true }], rows: MROWS, ethUsd: 2000 });
+  assert.equal(w.lines[0].machineUsd, 40);
+});
+
+test("a Dark machine is valued at the Dark floor, and left out when none is for sale", () => {
+  const dark = { ...m(1, 100, 100), dark: true };
+  assert.equal(valueWallet({ machines: [dark], rows: MROWS, darkBook: { floorEth: 1 }, ethUsd: 2000 }).lines[0].machineUsd, 2000);
+  const none = valueWallet({ machines: [dark], rows: MROWS, darkBook: { floorEth: null }, ethUsd: 2000 });
+  assert.equal(none.lines[0].machineUsd, null);
+  assert.equal(none.unpriced, 1);
+});

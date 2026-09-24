@@ -169,3 +169,19 @@ test("a node that refuses the log range yields a reading, flagged incomplete", a
   assert.equal(r.committed, 0);
   assert.equal(r.complete, false);
 });
+
+// Le 2026-09-23, le coffre a envoyé 3 477 machines à l'adresse morte. Ce n'est
+// pas un retour à quelqu'un : compté à part.
+test("a release to the dead address is counted apart from one to a wallet", async () => {
+  const r = await read(chain({
+    nextCommitId: 1,
+    transfers: [
+      xfer(PROTON, FACTORY, 100, 950_000, 0),
+      xfer(PROTON, FACTORY, 101, 950_001, 0),
+      xfer(FACTORY, "0x000000000000000000000000000000000000dEaD", 100, 950_010, 0),
+      xfer(FACTORY, "0x" + "d".repeat(40), 101, 950_011, 0),
+    ],
+  }));
+  assert.equal(r.released, 2);
+  assert.equal(r.releasedToDead, 1);
+});

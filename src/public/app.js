@@ -302,6 +302,19 @@ export function floorsHtml(d, active = null) {
  * de trente pour cent en deux jours sans que rien n'explique pourquoi. Et la
  * capitalisation manquait aussi, alors que le jeton est le carburant de tout.
  */
+/**
+ * Une dormante est-elle à vendre quelque part — OpenSea ou rayon de l'Anvil ?
+ *
+ * Le Meltdown du 2026-09-23 a brûlé toutes les machines sous 2x : il en restait
+ * deux dormantes, deux x10 du même porteur, et aucune en vente. Le filtre
+ * « Dormant » ouvrait un carnet vide et « to switch one on » chiffrait un
+ * achat impossible. Les deux s'effacent tant que rien ne se vend dormant, et
+ * reviennent d'eux-mêmes : le de-ink (~$7) rendort une machine quand on veut.
+ */
+export function dormantOnSale(d) {
+  return (d?.rows ?? []).some((r) => (r.dormant?.listed ?? 0) > 0 || (r.dormant?.anvilEntries?.length ?? 0) > 0);
+}
+
 export function statsHtml(d) {
   if (!d) return "";
   const x1 = (d.rows ?? []).find((r) => r.classValue === 100);
@@ -324,7 +337,9 @@ export function statsHtml(d) {
     cell("st-live", fmtInt(d.totals?.inked ?? 0), "printing now"),
     cell("st-pot", fmtUsdShort(d.official?.potUsd ?? d.pot?.usd ?? 0), "in the pot"),
     cell("st-book", cheapest === null ? "—" : fmtUsdRound(cheapest), "cheapest way in"),
-    cell("st-cost", d.ink?.activationTotalUsd ? fmtUsdRound(d.ink.activationTotalUsd) : "—", "to switch one on"),
+    dormantOnSale(d)
+      ? cell("st-cost", d.ink?.activationTotalUsd ? fmtUsdRound(d.ink.activationTotalUsd) : "—", "to switch one on")
+      : "",
     cell("st-book", cap === null ? "—" : fmtBig(cap), "$PRINTER market"),
   ].join("");
 }
@@ -502,7 +517,7 @@ export function chipsHtml(d, active, sort = SORTS[0].key, state = null) {
   const sorts = SORTS.map((o) =>
     `<button type="button" data-s="${o.key}" aria-pressed="${sort === o.key ? "true" : "false"}">${
       esc(o.label)}</button>`).join("");
-  const states = STATES.map((o) =>
+  const states = STATES.filter((o) => o.key !== "dormant" || dormantOnSale(d)).map((o) =>
     `<button type="button" data-st="${o.key}" aria-pressed="${state === o.key ? "true" : "false"}">${
       esc(o.label)}</button>`).join("");
   return `<div class="chips-row">` +
@@ -657,7 +672,29 @@ export function walletHtml(w, { light = 0 } = {}) {
     priceUsd: wo?.lines?.find((l) => l.tokenId === m.tokenId)?.machineUsd ?? null,
   }, { light })).join("");
 
-  return stats + parts + `<div class="grid">${cards}</div>`;
+  return stats + parts + unpaidHtml(w.unpaid) + `<div class="grid">${cards}</div>`;
+}
+
+/**
+ * Les parts de drop jamais versées.
+ *
+ * Le 2026-09-03, le contrat de drop a enregistré une part pour chaque machine
+ * et en a oublié 193 au versement. Le porteur ne peut pas la réclamer — seul
+ * le keeper du protocole pousse — et le contrat n'avait plus de quoi payer.
+ * Le dire à celui que ça concerne, sans en faire un drame : une ligne.
+ */
+export function unpaidHtml(u) {
+  if (!u?.lines?.length) return "";
+  const what = (l) => l.amount === null
+    ? `#${l.tokenId}: a share`
+    : `#${l.tokenId}: ${String(Number(l.amount.toFixed(4)))} ${esc(l.symbol)}` +
+      (l.usd !== null && l.usd !== undefined ? ` (~${fmtUsd(l.usd)})` : "");
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const day = u.date ? new Date(u.date + "T00:00:00Z") : null;
+  const when = day ? `the ${day.getUTCDate()} ${MONTHS[day.getUTCMonth()]} drop` : `drop round ${u.round}`;
+  return `<p class="unpaid">Still owed from ${when}, never sent: ${u.lines.map(what).join(", ")}. ` +
+    `Only the protocol's keeper can send it` +
+    (u.funded === false ? ` — and the drop contract holds none of it right now.` : ".") + `</p>`;
 }
 
 /* ══ COMPRENDRE ════════════════════════════════════════════════════════════ */
@@ -670,19 +707,58 @@ export function walletHtml(w, { light = 0 } = {}) {
  * elles arrivent à une machine, une idée par étape. Le numéro porte une vraie
  * information — c'est une séquence, pas une décoration.
  */
+/**
+ * Les paliers du plafond de poids, tels que la doc officielle les publie : le
+ * multiplicateur maximal monte avec l'encre brûlée par toute la flotte. Vérifié
+ * le 2026-09-24 : `multiplierCeiling` = 200 (2×) à 57,5 M d'encre, alors que
+ * le total brûlé toutes sources confondues dépassait déjà 70 M — c'est bien
+ * l'encre qui compte, pas le total. `null` : plus de plafond.
+ */
+export const CEILING_GATES = Object.freeze([
+  [25_000_000, 2], [60_000_000, 3], [100_000_000, 4], [150_000_000, null],
+]);
+
+/** Le prochain palier au-dessus de l'encre déjà brûlée, ou null s'il n'y en a plus. */
+export function nextGate(inkBurned) {
+  if (inkBurned === null || inkBurned === undefined || !Number.isFinite(inkBurned)) return null;
+  const g = CEILING_GATES.find(([at]) => at > inkBurned);
+  return g ? { at: g[0], mult: g[1], left: g[0] - inkBurned } : null;
+}
+
 export function stepsHtml(d) {
   const activation = d?.ink?.activationTotalUsd;
+  const printing = d?.totals?.inked;
+  // Dix mille frappées, mais le Meltdown du 2026-09-23 a brûlé tout ce qui
+  // était sous 2× : « Ten thousand exist » ne décrivait plus ce qu'on achète.
+  const buy = ["You buy a Machine",
+    `Ten thousand were minted` +
+    (printing ? `; <b>${fmtInt(printing)}</b> still print today — the Meltdown burned those below 2×` : "") +
+    `. Two things about each are sealed forever: its <b>class</b> — x1 up to x10 — and its ` +
+    `<b>desk</b>, one of sixteen, which decides which stock it earns double on.`];
+  // Sans dormante à vendre, « l'allumer » ne concerne plus aucun acheteur ; ce
+  // qui reste à faire d'une machine achetée, c'est l'alourdir.
+  const ceiling = Number(d?.protocol?.ceiling);
+  const ink = d?.burn?.ink ?? null;
+  const gate = nextGate(ink);
+  const heavier = ["You make it heavier",
+    `Every Machine for sale already prints — the Meltdown burned the ones that did not. Burning ` +
+    `more $PRINTER into one raises its weight, up to a ceiling the whole fleet unlocks together` +
+    (ceiling ? `: <b>${fmtExact(ceiling / 100)}× today</b>` : "") +
+    (gate ? (gate.mult
+      ? `, ${gate.mult}× once ${fmtInt(gate.at / 1e6)}M has gone in as ink — ${fmtBig(gate.left).replace("$", "")} to go`
+      : `, and no ceiling at all once ${fmtInt(gate.at / 1e6)}M has gone in as ink`) : "") +
+    `. That $PRINTER is destroyed and never comes back.`];
+  const switchOn = ["You switch it on",
+    `A Machine with no ink earns nothing and votes on nothing. Burning <b>5,000 $PRINTER</b>` +
+    (activation ? ` — about ${fmtUsdRound(activation)} today` : "") +
+    ` switches it on. That $PRINTER is destroyed and never comes back.`];
   const steps = [
-    ["You buy a Machine",
-     `Ten thousand exist. Two things about each are sealed forever: its <b>class</b> — x1 up to ` +
-     `x10 — and its <b>desk</b>, one of sixteen, which decides which stock it earns double on.`],
-    ["You switch it on",
-     `A Machine with no ink earns nothing and votes on nothing. Burning <b>5,000 $PRINTER</b>` +
-     (activation ? ` — about ${fmtUsdRound(activation)} today` : "") +
-     ` switches it on. That $PRINTER is destroyed and never comes back.`],
-    ["It starts earning at the next drop",
-     `A Machine lit during an epoch takes no part in the pot already waiting. It counts from the ` +
-     `following one — so buying and lighting today does not put you in this round.`],
+    buy,
+    dormantOnSale(d) ? switchOn : heavier,
+    ["It counts from the next drop",
+     `Ink burned during an epoch — to switch a Machine on or to make it heavier — takes no part in ` +
+     `the pot already waiting. It counts from the following one, so a late top-up cannot grab a ` +
+     `drop already earned.`],
     ["The protocol collects fees and buys real stock",
      `Every sale, every trade, every fusion pays into one pot. When the vote closes it buys ` +
      `tokenised shares — NVDA, GME, SPCX — and they land <b>inside each Machine's own wallet</b>, ` +
@@ -749,7 +825,7 @@ export function ritualHtml(r) {
     `page can measure yet.</p>` +
     (r.unforged?.length
       ? `<p>${r.unforged.map((id) => `#${id}`).join(", ")} ${r.unforged.length === 1 ? "is" : "are"} ` +
-        `published as Dark without any ritual on chain: marked by hand, not forged.</p>`
+        `listed as Dark by the team without a ritual on chain.</p>`
       : "") +
     `</div>`;
 }
@@ -822,9 +898,16 @@ export function scarcityHtml(sc) {
     `<div class="prose"><p>Fusing a Machine into another sends the sacrifice to a vault. ` +
     `It is <b>not burned</b> by the fuse — but it leaves your wallet for good, before the ` +
     `dice even roll. The vault is owned by a single key, not a multi-signature wallet, and it ` +
-    `can send any Machine it holds to any address. On 23 September 2026 it sent all 3,477 it ` +
-    `held to the dead address, in the Meltdown. ` +
-    `${p?.released ? `${fmtInt(p.released)} have come back out.` : "Nothing has ever come back out so far."} ` +
+    `can send any Machine it holds to any address. ` +
+    // L'adresse morte n'est pas un retour : le 2026-09-23 la page comptait les
+    // 3 477 machines du Meltdown comme « come back out ».
+    (() => {
+      const dead = p?.releasedToDead ?? 0;
+      const back = (p?.released ?? 0) - dead;
+      return (dead ? `${fmtInt(dead)} have left it for the dead address, most of them in the ` +
+          `Meltdown of 23 September — gone for good. ` : "") +
+        (back > 0 ? `${fmtInt(back)} came back out to a wallet. ` : "None has ever come back out to a wallet. ");
+    })() +
     `Locked is not burned, and this page will not call it that.</p>` +
     // Le protocole annonce que le coffre allume ce qu'il garde et en partage
     // les revenus. Le compte des allumées n'a pas bougé pendant que le coffre
@@ -833,7 +916,7 @@ export function scarcityHtml(sc) {
     (v.dormant
       ? `<p>The protocol says the vault activates what it holds and shares the stock back to ` +
         `the fleet. <b>${fmtInt(v.dormant)} of the ${fmtInt(v.held)} are dormant</b> — they earn ` +
-        `nothing, for anyone. The number that are lit has not moved while the vault filled up.</p>`
+        `nothing, for anyone.</p>`
       : "") +
     (b?.ink === null || b?.ink === undefined ? "" :
       `<p>Of the <b>${fmtInt(b.minted)}</b> $PRINTER ever minted, ${fmtInt(Math.round(b.ink))} ` +
@@ -966,6 +1049,8 @@ if (typeof document !== "undefined") {
 
   const paintBuy = () => {
     if (!data) return;
+    // Le bouton Dormant a pu disparaître depuis qu'on l'a enfoncé.
+    if (state === "dormant" && !dormantOnSale(data)) state = null;
     const light = data.ink?.activationTotalUsd ?? 0;
     const picked = pickMachines(data, { klass, state, sort });
     $("hero").innerHTML = heroHtml(data, klass);
@@ -988,7 +1073,9 @@ if (typeof document !== "undefined") {
         ? "Marked burned in the Meltdown. The team says they will never carry weight again — they are not a way in."
       : state === "dark"
         ? "Forged in the Dark Ritual. No weight, and no share of the pot — the team says they earn 10× on printer.fun and games instead."
-        : "What costs least to get in. Dormant ones are cheaper because they earn nothing yet.";
+        : dormantOnSale(data)
+          ? "What costs least to get in. Dormant ones are cheaper because they earn nothing yet."
+          : "Everything for sale, cheapest first — printing, burned and Dark together.";
     $("buy-sub").textContent = sort === "cheap" ? cheapSub
       : "What each Machine returns — its share of the pot, plus the stock already sitting in it — against what it costs.";
     // Le total doit compter la même chose que la liste, filtre compris :

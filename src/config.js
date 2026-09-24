@@ -87,6 +87,23 @@ export const DARK = Object.freeze({
   claimedWinBps: 6000,
 });
 
+/**
+ * Le contrat de drop par tours, apparu le 2026-09-03 : un « keeper » pousse les
+ * parts une à une (`airdrop(uint256[])`), et le contrat note pour chaque
+ * machine sa part (`shareOf`) et si elle a été versée (`paidThisRound`). Il a
+ * payé 7 689 machines en NVDA ce jour-là ; 193 ont une part enregistrée et
+ * jamais versée — 16,3 NVDA en tout — et le 2026-09-24 le contrat n'en détenait
+ * plus. Adresse relevée dans les journaux `Transfer` du NVDA reçu par #4347 ;
+ * `owner()` est la clé du Proton. Le jeton n'est exposé par aucune vue : il est
+ * figé ici pour le tour 1, et un autre tour se lit sans nom de jeton.
+ */
+export const DROPS = Object.freeze({
+  contract: "0xFAc5FD9cabD83A97596063E853632122a901AF9d",
+  rounds: Object.freeze({
+    1: Object.freeze({ token: "0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC", symbol: "NVDA", decimals: 18, date: "2026-09-03" }),
+  }),
+});
+
 export const PAD = Object.freeze({
   factories: Object.freeze([
     "0x0C8c78ab91b87a03659c8AD4A11e6d23d5Ab869b",

@@ -16,7 +16,7 @@ merely documented, and names where each undocumented contract address came from.
 ## Commands
 
 ```bash
-npm test                      # node --test test/*.test.js — 451 tests, ~2 s, no network, no .env
+npm test                      # node --test test/*.test.js — 478 tests, ~2 s, no network, no .env
 node --test test/floors.test.js                     # one file
 node --test --test-name-pattern "peloton" test/*.test.js   # by name (glob, not test/)
 
@@ -50,7 +50,7 @@ the floor — do not add an SQLite package.
 
 **Readers → pure compute → snapshot store → HTTP.** Each `src/*.js` is either a *reader* that does one
 thing against one source and reports failure as failure (`opensea`, `prices`, `ink`, `traits`,
-`metadata`, `owners`, `anvil`, `vote`, `ballot`, `dark`, `pot`, `protocol`, `pad`, `proton`, `official`,
+`metadata`, `owners`, `anvil`, `vote`, `ballot`, `dark`, `drops`, `pot`, `protocol`, `pad`, `proton`, `official`,
 `holdings`, `balances`), or a *pure* module that takes plain data and returns plain data (`floors`,
 `snapshot`, `rarity`, `scarcity`, `worth`, `wallet`, `alert`, `desks`, `traitindex`, `http`).
 Plumbing: `multicall` (Multicall3 batching), `store` (the non-regressing snapshot holder), `history`
@@ -113,6 +113,10 @@ The full list with reasoning is in README §"What the page will not do". The loa
   mark exists only in off-chain metadata (`readLiveStatus`); destroyed Machines are those owned by
   `0x…dEaD`, read on-chain. A Machine with no status read is excluded, never assumed alive. The
   collection floor and market cap cover the living only.
+- A burned or Dark Machine keeps its on-chain weight: anything that values or rewards a Machine must
+  read its status before its weight (`worth.js` valued burned ones at the living floor until
+  2026-09-24). `epochUsd` still models proportional slices; drops have been winner-takes-all since
+  2026-08-27 (see `docs/protocol.md`).
 - Sealed rarity comes from `TRAITS.weightOf` only — `MINE.weightOf` is a different number
   (effective weight including ink) on a different contract.
 - DEX pairs are pinned **by address** in `src/config.js`. Selecting by symbol or by liquidity lands
