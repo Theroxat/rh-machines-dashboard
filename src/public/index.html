@@ -304,13 +304,19 @@
     letter-spacing: 0.11em; text-transform: uppercase; color: var(--ink-2);
     margin-bottom: 9px;
   }
-  .floors-row { display: flex; flex-wrap: wrap; gap: 9px; }
+  /* Une ligne sur toute la largeur de l'ouverture, colonnes égales : neuf blocs
+     depuis les Dark, et en flex ils passaient à deux lignes avec un trou à
+     droite. Sur un écran étroit, la grille repasse d'elle-même à la ligne. */
+  .floors-row {
+    display: grid; gap: 8px;
+    grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
+  }
   /* En haut, pas centré : un bouton centre son contenu, et un bloc sans ligne
      « burned » flottait plus bas que ses voisins. */
   .fl {
     font: inherit; cursor: pointer; text-align: left;
     display: flex; flex-direction: column; justify-content: flex-start;
-    padding: 8px 13px; min-width: 92px;
+    padding: 7px 10px; min-width: 0;
     color: var(--ink); background: var(--paper);
     border: var(--b) solid var(--ink); box-shadow: var(--shadow-sm);
   }
@@ -321,7 +327,7 @@
   }
   /* Le plancher allumé est le grand chiffre : c'est celui qui rapporte. */
   .fl b {
-    display: block; font-size: 20px; font-weight: 900;
+    display: block; font-size: 18px; font-weight: 900;
     letter-spacing: -0.035em; line-height: 1.1; font-variant-numeric: tabular-nums;
   }
   /* Le dormant, dessous et sans couleur : il ne rapporte rien tant que
@@ -336,21 +342,21 @@
   /* Les autres états, sous un trait : l'étiquette d'abord, le prix ensuite,
      pour qu'aucun ne se lise comme un montant détruit. */
   .fl-alt {
-    display: flex; align-items: baseline; gap: 6px;
-    font-size: 13px; font-weight: 900; font-variant-numeric: tabular-nums;
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 5px;
+    font-size: 12px; font-weight: 900; font-variant-numeric: tabular-nums;
     margin-top: 6px; padding-top: 5px; border-top: 2px solid var(--paper-2);
   }
   .fl-alt + .fl-alt { margin-top: 3px; padding-top: 0; border-top: 0; }
   .fl-alt i {
-    font-style: normal; font-size: 9.5px; font-weight: 900;
-    letter-spacing: 0.08em; text-transform: uppercase;
-    padding: 1px 5px; border: 2px solid var(--ink-2); color: var(--ink-2);
+    font-style: normal; font-size: 8.5px; font-weight: 900;
+    letter-spacing: 0.06em; text-transform: uppercase;
+    padding: 1px 4px; border: 2px solid var(--ink-2); color: var(--ink-2);
   }
   /* Le rouge du Meltdown, en étiquette pleine : la même que sur les cartes. */
   .fl-burned i { background: var(--blood); border-color: var(--blood); color: var(--paper); }
   /* Le bloc Dark, en négatif : un marché à part, pas une classe de plus. */
   .fl-dark { background: var(--ink); color: var(--paper); box-shadow: 4px 4px 0 var(--blood); }
-  .fl-dark u { color: var(--paper-2); }
+  .fl-dark u { color: var(--paper-2); white-space: normal; }
   .fl-dark[aria-pressed="true"] { background: var(--blood); }
   .fl[aria-pressed="true"] .fl-alt { border-top-color: var(--ink-2); }
   .fl[aria-pressed="true"] .fl-alt i { border-color: var(--paper-2); color: var(--paper-2); }
@@ -611,7 +617,7 @@
         <a href="#wallet" role="tab" data-tab="wallet">My wallet</a>
         <a href="#learn"  role="tab" data-tab="learn">Learn</a>
       </nav>
-      <a class="dark-count" id="dark-count" href="#buy" hidden aria-label="Show the Dark Machines for sale"></a>
+      <a class="dark-count" id="dark-count" href="#dark" hidden aria-label="Show the Dark Machines for sale"></a>
     </div>
 
     <div class="banner" id="banner" role="status"></div>
@@ -631,6 +637,8 @@
       <div id="chips"></div>
       <div class="grid" id="cards"></div>
       <p class="note" id="more-note" style="margin-top:16px"></p>
+      <!-- Toutes les Dark Machines, en vente ou non : peintes quand on choisit « Dark ». -->
+      <div id="dark-gallery"></div>
     </section>
 
     <!-- ═══ CE QUE JE POSSÈDE ═══ -->

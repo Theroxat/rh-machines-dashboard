@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import {
   heroHtml, statsHtml, cardHtml, chipsHtml, floorsHtml, detailHtml, bestPick, pickMachines, walletHtml,
   stepsHtml, voteHtml, scarcityHtml, padHtml, sourcesHtml, bannerMessage, potNote,
-  setContract, itemUrl, esc, ADDRESS_RE, SORTS, STATES, fmtBig, ANVIL_URL, ritualHtml, DARK_LABEL, darkCountHtml,
+  setContract, itemUrl, esc, ADDRESS_RE, SORTS, STATES, fmtBig, ANVIL_URL, ritualHtml, DARK_LABEL, darkCountHtml, darkGalleryHtml,
 } from "../src/public/app.js";
 
 const page = readFileSync(new URL("../src/public/index.html", import.meta.url), "utf8");
@@ -1172,4 +1172,41 @@ test("the counter sits outside the tab list, which it is not part of", () => {
 test("choosing Dark shows the Dark Machines whatever state was selected", () => {
   const picked = pickMachines(DARKD, { klass: DARK_LABEL, state: "lit", limit: Infinity });
   assert.equal(picked.length, 2);
+});
+
+/* ── toutes les Dark, en vente ou non ─────────────────────────────────────── */
+const FLEET = { ...DARKD, darkFleet: [
+  { tokenId: 23, image: "https://i2c.seadn.io/d.webp", ritualId: null, owner: "0x6d6015e1aaaaaaaaaaaaaaaaaaaaaaaaaaaa1234", priceEth: null },
+  { tokenId: 93, image: "https://i2c.seadn.io/d.webp", ritualId: 4, owner: "0x4c4d50ddbbbbbbbbbbbbbbbbbbbbbbbbbbbb5678", priceEth: 1.2 },
+] };
+
+test("every Dark Machine gets a card, for sale or not", () => {
+  const html = darkGalleryHtml(FLEET);
+  assert.match(html, /Every Dark Machine/);
+  assert.match(html, /2 exist, 1 for sale/);
+  assert.match(html, /#23 &middot; no ritual on chain<\/span><span class="card-price">Not for sale/);
+  assert.match(html, /#93 &middot; ritual #4<\/span><span class="card-price">\$2,952<small>1\.2000 ETH<\/small>/);
+  assert.match(html, /held by 0x6d60…1234/);
+});
+
+// Le panneau de détail parle d'une annonce : sans `data-id`, le clic mène
+// simplement à la page OpenSea de la machine.
+test("a gallery card links to OpenSea and opens no detail panel", () => {
+  const html = darkGalleryHtml(FLEET);
+  assert.doesNotMatch(html, /data-id=/);
+  assert.match(html, /href="[^"]*\/23"/);
+});
+
+test("no Dark Machine, no gallery", () => {
+  assert.equal(darkGalleryHtml({ darkFleet: [] }), "");
+  assert.equal(darkGalleryHtml(null), "");
+});
+
+// `#dark` est une adresse qu'on partage : elle doit ouvrir le carnet filtré
+// sur les Dark, et le compteur y mener.
+test("#dark opens the book on the Dark Machines, and the counter links there", () => {
+  const app = readFileSync(new URL("../src/public/app.js", import.meta.url), "utf8");
+  assert.match(app, /if \(name !== "dark"\) return show\(name\);\s*klass = DARK_LABEL;\s*state = null;/);
+  assert.match(app, /let tab = route\(\(location\.hash/);
+  assert.match(page, /<a class="dark-count" id="dark-count" href="#dark"/);
 });

@@ -755,6 +755,41 @@ export function ritualHtml(r) {
 }
 
 /**
+ * Toutes les Dark Machines, en vente ou non.
+ *
+ * Le carnet ne montre que ce qui se vend ; le jour de l'ouverture rien ne se
+ * vendait, et la catégorie n'avait aucun visage. Une carte par machine, qui
+ * mène à sa page OpenSea — sans `data-id`, donc sans panneau de détail : le
+ * panneau parle d'une annonce, et la plupart n'en ont pas.
+ */
+export function darkGalleryHtml(d) {
+  const fleet = d?.darkFleet ?? [];
+  if (!fleet.length) return "";
+  const eth = d?.eth?.usd;
+  const onSale = fleet.filter((m) => m.priceEth !== null && m.priceEth !== undefined).length;
+  const short = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : null);
+  const cards = fleet.map((m) => {
+    const sale = m.priceEth !== null && m.priceEth !== undefined;
+    return `<a class="card" href="${itemUrl(m.tokenId)}" target="_blank" rel="noopener">` +
+      `<span class="card-frame">` +
+      (m.image
+        ? `<img class="card-art" src="${esc(m.image)}" alt="" loading="lazy">`
+        : `<span class="card-noart"></span>`) +
+      `<span class="card-state dark">Dark</span></span>` +
+      `<span class="card-body">` +
+        `<span class="card-id">#${m.tokenId} &middot; ${m.ritualId ? `ritual #${m.ritualId}` : "no ritual on chain"}</span>` +
+        `<span class="card-price">${sale ? (eth ? fmtUsdRound(m.priceEth * eth) : `${fmtEth(m.priceEth)} ETH`) : "Not for sale"}` +
+          (sale && eth ? `<small>${fmtEth(m.priceEth)} ETH</small>` : "") + `</span>` +
+        (m.owner ? `<span class="card-inside">held by ${esc(short(m.owner))}</span>` : "") +
+      `</span></a>`;
+  }).join("");
+  return `<h3 class="sec" style="margin-top:40px">Every Dark Machine</h3>` +
+    `<p class="sub">${fmtInt(fleet.length)} exist, ${onSale ? `${fmtInt(onSale)} for sale` : "none for sale right now"}. ` +
+    `Each one cost four burned Machines and a won ritual.</p>` +
+    `<div class="grid">${cards}</div>`;
+}
+
+/**
  * Le compteur des Dark Machines, à droite des onglets.
  *
  * Visible depuis tous les onglets : c'est la seule catégorie qui grossit à vue
@@ -937,11 +972,15 @@ if (typeof document !== "undefined") {
     $("chips").innerHTML = chipsHtml(data, klass, sort, state);
     $("cards").innerHTML = picked.length
       ? picked.map((m) => cardHtml(m, { light })).join("")
-      : `<p class="note">Nothing listed in that class right now.</p>`;
+      : klass === DARK_LABEL
+        ? `<p class="note">No Dark Machine is for sale right now — every one of them is shown below.</p>`
+        : `<p class="note">Nothing listed in that class right now.</p>`;
     $("buy-title").textContent = sort === "cheap" ? "Cheapest first" : "Most back per dollar";
     // La phrase doit décrire ce que la grille montre. « Dormant ones are
     // cheaper » sous une grille filtrée sur les allumées ne parle de rien.
-    const cheapSub = state === "lit"
+    const cheapSub = klass === DARK_LABEL
+      ? "Forged in the Dark Ritual. No weight, and no share of the pot — the team says they earn 10× on printer.fun and games instead."
+      : state === "lit"
       ? "What costs least among the Machines already printing."
       : state === "dormant"
         ? "What costs least to get in. These earn nothing until someone burns ink for them."
@@ -960,6 +999,7 @@ if (typeof document !== "undefined") {
       : state === "burned" ? "burned and for sale"
       : state === "dark" ? "Dark and for sale"
       : "for sale";
+    $("dark-gallery").innerHTML = klass === DARK_LABEL ? darkGalleryHtml(data) : "";
     $("more-note").textContent = picked.length && total > picked.length
       ? `Showing ${picked.length} of ${total} ${of}.` : "";
   };
@@ -1023,14 +1063,22 @@ if (typeof document !== "undefined") {
     openDetail(id, card);
   });
 
-  // Le compteur des Dark mène au carnet, filtré sur elles.
-  $("dark-count").addEventListener("click", (e) => {
-    e.preventDefault();
+  // `#dark` : le carnet filtré sur les Dark Machines, et leur galerie. Une
+  // adresse plutôt qu'un seul clic, pour qu'elle se partage.
+  const route = (name) => {
+    if (name !== "dark") return show(name);
     klass = DARK_LABEL;
     state = null;
-    location.hash = "buy";
-    show("buy");
     paintBuy();
+    return show("buy");
+  };
+
+  // Le compteur des Dark mène à `#dark`. Déjà dessus, le hash ne change pas et
+  // aucun événement ne part : on route à la main.
+  $("dark-count").addEventListener("click", (e) => {
+    e.preventDefault();
+    if (location.hash === "#dark") route("dark");
+    else location.hash = "dark";
     $("cards")?.scrollIntoView({ behavior: "smooth", block: "start" });
   });
 
@@ -1108,10 +1156,10 @@ if (typeof document !== "undefined") {
     }
   };
 
-  let tab = show((location.hash || "").slice(1));
+  let tab = route((location.hash || "").slice(1));
   if (tab === "learn") loadExtras(true);
   addEventListener("hashchange", () => {
-    tab = show((location.hash || "").slice(1));
+    tab = route((location.hash || "").slice(1));
     if (tab === "learn") loadExtras();
   });
 

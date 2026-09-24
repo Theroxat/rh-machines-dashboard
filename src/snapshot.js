@@ -233,6 +233,37 @@ export function composeSnapshot({
   // Le carnet des Dark Machines : une case pour toute la collection.
   const darkBook = withMachines(grid.dark ?? { entries: [], anvilEntries: [] }, null, true);
 
+  // Toutes les Dark Machines, en vente ou non. Une vingtaine : on les montre
+  // toutes, parce qu'une catégorie dont on ne voit que ce qui se vend ne se
+  // voit pas du tout le jour où rien ne se vend — c'était le cas à l'ouverture.
+  // Une machine partie à l'adresse morte n'en fait plus partie.
+  const DEAD = "0x000000000000000000000000000000000000dead";
+  const askOf = new Map(darkBook.entries.map((e) => [e.tokenId, e.priceEth]));
+  const darkIds = new Set([
+    ...(ritual?.forged?.keys() ?? []),
+    ...[...(live?.status ?? [])].filter(([, st]) => st === "dark machine").map(([id]) => id),
+  ]);
+  // OpenSea republie les Dark avec des heures de retard : le 2026-09-24, la
+  // moitié portait encore l'image rouge de brûlée. Toutes les Dark partagent
+  // pour l'instant la même œuvre, non révélée — tant que celles déjà publiées
+  // n'en montrent qu'une, c'est elle qu'on prête aux retardataires. Le jour où
+  // l'œuvre se révèle et les images divergent, chacune garde la sienne.
+  const published = new Set([...(live?.status ?? [])]
+    .filter(([id, st]) => st === "dark machine" && live?.image?.get(id)).map(([id]) => live.image.get(id)));
+  const darkArt = published.size === 1 ? [...published][0] : null;
+  const darkImageOf = (id) => (live?.status?.get(id) !== "dark machine" && darkArt)
+    || live?.image?.get(id) || meta?.get(id)?.image || null;
+  const darkFleet = [...darkIds]
+    .filter((id) => ownerOf?.get(id)?.toLowerCase() !== DEAD)
+    .sort((a, b) => a - b)
+    .map((tokenId) => ({
+      tokenId,
+      image: darkImageOf(tokenId),
+      ritualId: ritual?.forged?.get(tokenId) ?? null,
+      owner: ownerOf?.get(tokenId) ?? null,
+      priceEth: askOf.get(tokenId) ?? null,
+    }));
+
   const listed = new Set();
   for (const e of darkBook.entries) listed.add(e.tokenId);
   for (const r of rows) {
@@ -296,6 +327,7 @@ export function composeSnapshot({
     at: now,
     rows,
     darkBook,
+    darkFleet,
     // Le Rituel noir tel que la chaîne l'enregistre, et ce que le statut publié
     // affirme en plus : une Dark Machine sans rituel est nommée, pas cachée.
     ritual: ritual ? {

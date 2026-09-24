@@ -544,3 +544,44 @@ test("with no ritual read the snapshot says nothing about it", () => {
   assert.equal(s.ritual, null);
   assert.equal(s.darkBook.entries.length, 0);
 });
+
+// Le jour de l'ouverture, aucune Dark n'était en vente : la catégorie ne se
+// voyait pas. Elles sont toutes listées, en vente ou non.
+test("every Dark Machine is listed, for sale or not, and the dead ones are not", () => {
+  const s = composeSnapshot({
+    ...withDark,
+    ritual: ritualOf([[93, 4], [500, 9]]),
+    ownerOf: new Map([[93, "0xabc"], [23, "0xdef"], [500, "0x000000000000000000000000000000000000dEaD"]]),
+  });
+  assert.deepEqual(s.darkFleet.map((m) => m.tokenId), [23, 93]);
+  const [by23, by93] = s.darkFleet;
+  assert.equal(by93.ritualId, 4);
+  assert.equal(by93.priceEth, 1.2);
+  assert.equal(by93.image, "https://now/dark.webp");
+  assert.equal(by23.ritualId, null);
+  assert.equal(by23.priceEth, null);
+  assert.equal(by23.owner, "0xdef");
+});
+
+// OpenSea avait des heures de retard : une Dark forgée portait encore l'image
+// rouge de brûlée. Tant que les Dark publiées partagent une seule œuvre, les
+// retardataires l'empruntent ; dès qu'elles divergent, chacune garde la sienne.
+test("a Dark Machine OpenSea has not republished borrows the one shared Dark picture", () => {
+  const base = {
+    ...withDark,
+    ritual: ritualOf([[93, 4], [500, 9]]),
+    ownerOf: new Map(),
+  };
+  const shared = composeSnapshot({ ...base, live: {
+    status: new Map([[93, "dark machine"], [23, "dark machine"], [500, "burned"]]),
+    image: new Map([[93, "https://seadn/dark.webp"], [23, "https://seadn/dark.webp"], [500, "https://seadn/red.webp"]]),
+  } });
+  assert.equal(shared.darkFleet.find((m) => m.tokenId === 500).image, "https://seadn/dark.webp");
+
+  const revealed = composeSnapshot({ ...base, live: {
+    status: new Map([[93, "dark machine"], [23, "dark machine"], [500, "burned"]]),
+    image: new Map([[93, "https://seadn/a.webp"], [23, "https://seadn/b.webp"], [500, "https://seadn/red.webp"]]),
+  } });
+  assert.equal(revealed.darkFleet.find((m) => m.tokenId === 500).image, "https://seadn/red.webp");
+  assert.equal(revealed.darkFleet.find((m) => m.tokenId === 93).image, "https://seadn/a.webp");
+});
