@@ -527,6 +527,10 @@
   .d-row.d-hot b { color: var(--pink); }
 
   /* ── le champ d'adresse ────────────────────────────────────────────────── */
+  /* L'encadré du portefeuille ouvre son onglet : sans marge, il se collait aux
+     onglets, et le compteur des Dark débordait sur sa bordure. La même marge
+     que la rangée de chiffres qui ouvre la boutique. */
+  #pane-wallet > .hero:first-child { margin-top: 24px; }
   .ask { display: flex; gap: 11px; margin: 20px 0 0; flex-wrap: wrap; }
   .ask input {
     flex: 1 1 260px; min-width: 0; font: 16px var(--mono);

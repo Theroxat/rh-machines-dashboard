@@ -1290,3 +1290,10 @@ test("the ceiling gates follow the ink burned, and end uncapped", () => {
   assert.equal(nextGate(200_000_000), null);
   assert.equal(nextGate(null), null);
 });
+
+// Le 2026-09-24 : l'encadré du portefeuille se collait aux onglets et le
+// compteur des Dark débordait sur sa bordure. Même marge que la boutique.
+test("the wallet box keeps the same distance from the tabs as the shop's figures", () => {
+  const stats = css.match(/\.stats \{[^}]*margin: (\d+)px/)[1];
+  assert.match(css, new RegExp(`#pane-wallet > \\.hero:first-child \\{ margin-top: ${stats}px; \\}`));
+});
