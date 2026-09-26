@@ -12,13 +12,19 @@ const TICKERS = ["NVDA","AMD","MSFT","GOOGL",null,"AAPL","AMZN",null,"TSLA","GME
 const MINE = new Array(16).fill(0);
 MINE[5] = 100; MINE[9] = 200; MINE[10] = 300;
 
-test("a wallet's cut follows the formula, not the naive weight split", () => {
+// Depuis le 27 août le desk en tête rafle le pot. Ce portefeuille ne détient
+// rien sur NVDA, en tête : il touche sa part simple, diluée par le double des
+// machines NVDA — moins que le partage naïf.
+test("a wallet's cut follows the winner-takes-all formula", () => {
   const c = cutUsd({ tally: TALLY, myWeight: 600, myByDesk: MINE, potUsd: POT, fleetWeight: FLEET, sectorWeight: SECTOR });
-  // Le partage naïf du terminal donnerait $83.14 ; le doublement de chaque desk
-  // dilue les autres, et le vrai chiffre est plus bas.
   const naive = (POT * 600) / FLEET;
-  assert.ok(c < naive, "le doublement des autres desks dilue votre part");
-  assert.equal(c.toFixed(0), "78");
+  assert.ok(c < naive, "le double des machines du desk gagnant dilue votre part");
+  assert.equal(c.toFixed(2), ((POT * 600) / (FLEET + SECTOR[0])).toFixed(2));
+});
+
+test("with no vote cast the wallet's cut is the flat split", () => {
+  const c = cutUsd({ tally: new Array(16).fill(0), myWeight: 600, myByDesk: MINE, potUsd: POT, fleetWeight: FLEET, sectorWeight: SECTOR });
+  assert.equal(c.toFixed(2), ((POT * 600) / FLEET).toFixed(2));
 });
 
 test("the best vote is the smallest desk you hold the most of", () => {
@@ -39,8 +45,11 @@ test("the advice says plainly how little a single ballot moves", () => {
     tally: TALLY, myWeight: 600, myByDesk: MINE, potUsd: POT, fleetWeight: FLEET,
     sectorWeight: SECTOR, tickers: TICKERS,
   });
-  assert.ok(best.gainUsd > 0, "voter reste mieux que ne pas voter");
-  assert.ok(best.gainUsd < 0.5, `six centimes, pas six dollars (${best.gainUsd})`);
+  // 600 de poids ne déplacent pas NVDA, en tête à 157 848 : le bulletin seul ne
+  // change rien, et la page ne prétend pas le contraire.
+  assert.equal(best.gainUsd, 0);
+  // Ce qui compte : ce que rapporterait la victoire de ce desk.
+  assert.ok(best.ifWinsUsd > best.cutUsd);
 });
 
 // Ce que le vote pèse vraiment n'est pas dans le bulletin d'un seul : c'est

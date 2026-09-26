@@ -85,8 +85,10 @@ export const SOURCES = Object.freeze([
   },
   {
     what: "What a Machine earns from the pot",
-    kind: "derived", from: "weight, desk and the tally",
-    note: "Validated against the first real drop: predicted $77.77, paid $76.49.",
+    kind: "derived", from: "weight, desk, the leading desk, and the weight of the Machines that earn",
+    note: "The leading desk takes the whole pot and its Machines count twice, as every drop has " +
+      "since 27 Aug. The pot is divided by the weight of the Machines that still earn — burned and " +
+      "Dark ones keep an on-chain weight the protocol no longer pays.",
   },
   { what: "Price per weight point, and the ROI ranking", kind: "derived", from: "asking price and weight" },
 ]);

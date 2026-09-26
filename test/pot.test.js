@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { epochUsd } from "../src/pot.js";
+import { epochUsd, leaderOf, earningWeight } from "../src/pot.js";
 import { cutUsd } from "../src/wallet.js";
 
 // Les chiffres du terminal officiel, relevés le 2026-08-18 : six points de
@@ -65,4 +65,40 @@ test("with no vote cast the split is flat, as the official terminal has it", () 
   const v = epochUsd({ weight: 600, deskIndex: 0, totalWeight: 1140002, potUsd: 160745, tally: new Array(16).fill(0), sectorWeight: SECTOR });
   assert.equal(v.toFixed(2), "84.60");
   assert.equal(epochUsd({ weight: 600, totalWeight: 1140002, potUsd: 160745 }).toFixed(2), "84.60");
+});
+
+/* ── le gagnant rafle tout (depuis le 27 août) ───────────────────────────── */
+test("the leading desk takes the whole pot, and its machines count twice", () => {
+  const W = 1000, SW = new Array(16).fill(0); SW[3] = 200;
+  const T = new Array(16).fill(0); T[3] = 70; T[5] = 30;
+  const on = epochUsd({ weight: 100, deskIndex: 3, totalWeight: W, potUsd: 12000, tally: T, sectorWeight: SW });
+  const off = epochUsd({ weight: 100, deskIndex: 5, totalWeight: W, potUsd: 12000, tally: T, sectorWeight: SW });
+  assert.equal(on, 12000 * 100 * 2 / 1200);
+  assert.equal(off, 12000 * 100 / 1200);
+  // Le second desk ne touche pas de tranche à lui : 30 % des voix ne rapportent rien de plus.
+  assert.equal(on / off, 2);
+});
+
+test("the leader is the desk with the most votes, and none before a vote", () => {
+  const T = new Array(16).fill(0); T[2] = 5; T[9] = 8;
+  assert.equal(leaderOf(T), 9);
+  assert.equal(leaderOf(new Array(16).fill(0)), null);
+  assert.equal(leaderOf(null), null);
+});
+
+// Le terminal officiel divise par « earning weight » : les brûlées, les Dark et
+// l'adresse morte gardent un poids sur la chaîne que le protocole ne paie plus.
+test("the pot is shared by the weight of the machines that earn, not the chain's", () => {
+  const weights = new Map([[1, 800n], [2, 100n], [3, 300n], [4, 0n]]);
+  const deskIndex = new Map([[1, 0], [2, 0], [3, 7]]);
+  const e = earningWeight({ weights, deskIndex, isEarning: (id) => id !== 2 });
+  assert.equal(e.total, 1100);
+  assert.equal(e.bySector[0], 800);
+  assert.equal(e.bySector[7], 300);
+});
+
+// Le 2026-09-26 : le terminal officiel annonçait $21.75 pour 15 points de poids,
+// un pot de $25 480 et 17 554 de poids gagnant. Sans vote, c'est le partage à plat.
+test("with no vote, the split reproduces the official share on the earning weight", () => {
+  assert.equal(epochUsd({ weight: 1500, totalWeight: 1755400, potUsd: 25480 }).toFixed(2), "21.77");
 });

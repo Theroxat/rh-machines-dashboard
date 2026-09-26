@@ -919,13 +919,21 @@ trace. `roundId()` = 1 au 2026-09-24 ; aucun drop depuis.
   part », sans symbole.
 - La page du portefeuille affiche la ligne de ce qui est dû, sous les totaux.
 
-### La règle de partage a changé — pas encore reportée ici
+### La règle de partage a changé — reportée le 2026-09-26
 
 Le drop du 21 août suivait les tranches proportionnelles aux voix (§7, vérifié
 à 0,3 %). Depuis le 27 août, chaque drop ne contient **qu'une action** (AMD le
 27/08, AAPL le 2/09, NVDA le 3/09) : c'est le « winner takes all » que la doc
-officielle décrit désormais, gagnant exclu quatre epochs. `epochUsd` calcule
-encore avec les tranches ; à refaire.
+officielle décrit désormais, gagnant exclu quatre epochs.
+
+`epochUsd` rend désormais `pot × w × (desk gagnant ? 2 : 1) ÷ (W + W_gagnant)`,
+la formule du 21 août réduite à une tranche, avec le desk en tête du scrutin
+comme gagnant, et le partage à plat sans voix. **`W` est le poids des machines
+qui gagnent** — ni adresse morte, ni brûlées, ni Dark — et non le `totalWeight`
+de MINE : le terminal officiel divise par son « earning weight » (17 554 contre
+22 812 le 2026-09-26) et annonce aux brûlées « earn nothing ». L'ancien calcul
+sous-estimait chaque part d'environ un quart. Recoupé : 15 points de poids,
+pot de $25 480 → $21,77 ici, $21,75 sur le terminal.
 
 ### Le second contrat de rituel (2026-09-24)
 

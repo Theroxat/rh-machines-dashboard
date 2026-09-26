@@ -763,9 +763,9 @@ export function stepsHtml(d) {
      `the pot already waiting. It counts from the following one, so a late top-up cannot grab a ` +
      `drop already earned.`],
     ["The protocol collects fees and buys real stock",
-     `Every sale, every trade, every fusion pays into one pot. When the vote closes it buys ` +
-     `tokenised shares — NVDA, GME, SPCX — and they land <b>inside each Machine's own wallet</b>, ` +
-     `split by weight.`],
+     `Every sale, every trade, every fusion pays into one pot. When the vote closes, the winning ` +
+     `desk's stock is bought — NVDA, AAPL, AMD — and lands <b>inside each Machine's own wallet</b>, ` +
+     `split by weight among the Machines that still earn.`],
     ["Selling the Machine sells what is inside it",
      `The stock belongs to the token, not to you. Sell the Machine and its contents go with it, ` +
      `unless you withdraw first — which is why every card here shows what it is carrying.`],
@@ -1277,8 +1277,9 @@ if (typeof document !== "undefined") {
     $("dark-count").hidden = !dc;
     $("ritual").innerHTML = ritualHtml(data.ritual);
     $("vote-sub").textContent =
-      "Every Machine votes with its weight, and the pot is cut between the desks in proportion " +
-      "to what they drew. A Machine counts twice on the slice bought for its own desk.";
+      "Every Machine votes with its weight. The desk with the most votes takes the whole pot, bought " +
+      "as its stock, and its Machines count twice on that drop — the team says a winner then sits out " +
+      "the next four epochs.";
     // Ce qui ne bouge pas se dessine une fois.
     if (!learnPainted) {
       $("learn-steps").innerHTML = stepsHtml(data);

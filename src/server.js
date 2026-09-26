@@ -16,7 +16,7 @@ import { fetchPrinter, fetchEthUsd } from "./prices.js";
 import { readProtocol } from "./protocol.js";
 import { readAnvil } from "./anvil.js";
 import { readVote, readDeskIndex } from "./vote.js";
-import { readPot, epochUsd } from "./pot.js";
+import { readPot, epochUsd, earningWeight } from "./pot.js";
 import { readBallotTickers } from "./ballot.js";
 import { readOwners, tokensOf } from "./owners.js";
 import { openHistory } from "./history.js";
@@ -139,6 +139,10 @@ async function sweepStatus() {
 let ritualEvents = [];
 const ritualCursors = new Map(DARK.contracts.map((c) => [c.address, c.fromBlock]));
 let ritual = null;
+// Le poids des machines qui gagnent, calculé à chaque balayage du carnet et
+// repris tel quel par la route du portefeuille : les deux doivent diviser par
+// le même nombre, sinon la somme d'un portefeuille ne retombe plus sur la page.
+let earning = { total: 0, bySector: new Array(16).fill(0) };
 const officialArt = new Map();     // Dark -> œuvre officielle
 const officialArtAt = new Map();   // Dark -> dernière lecture
 
@@ -421,9 +425,17 @@ async function sweepBook() {
     dark: ritual ? new Set(ritual.forged.keys()) : undefined,
   });
 
-  // Le poids de chaque desk : il décide de la dilution sur sa propre tranche.
-  const sectorWeight = new Array(16).fill(0);
-  for (const [tokenId, index] of deskIndex) sectorWeight[index] += Number(weights.get(tokenId) ?? 0n);
+  // Le poids qui partage le pot : celui des machines qui gagnent, total et par
+  // desk. Le terminal officiel divise par lui (« earning weight », 17 554 le
+  // 2026-09-26) et non par le poids de la chaîne, qui compte encore les
+  // brûlées, les Dark et l'adresse morte.
+  const gone = goneOf();
+  earning = earningWeight({
+    weights, deskIndex,
+    isEarning: (id) => !gone.has(id) && !ritual?.forged.has(id) &&
+      ["active", "dormant", "unmarked"].includes(live.status.get(id)),
+  });
+  const sectorWeight = earning.bySector;
 
   // Seules les machines en vente : lire les dix mille comptes à chaque
   // balayage coûterait cent mille appels pour une information que personne ne
@@ -450,6 +462,7 @@ async function sweepBook() {
     grid, printer, eth, protocol, stats,
     book: { listed: book.listings.size, pages: book.pages, skipped: book.skipped },
     inkMeta, meta, legend, ink, weights, anvil, deskIndex, vote, potUsd, sectorWeight, tickers,
+    earningWeight: earning.total,
     holdings: held?.holdings, stockPrices, ownerOf: owners.byToken, now: Date.now(),
     offCirculation,
     official,
@@ -679,8 +692,7 @@ const server = createServer(async (req, res) => {
       const v = valueHoldings(ownedHeld.holdings.get(id), priceOfStock);
       return v.lines.length ? { lines: v.lines, usd: v.usd } : null;
     };
-    const sectorWeight = new Array(16).fill(0);
-    for (const [tokenId, index] of deskIndex) sectorWeight[index] += Number(weights.get(tokenId) ?? 0n);
+    const sectorWeight = earning.bySector;
     const fleetWeight = snap?.pot?.fleetWeight ?? null;
     const body = analyseWallet({
       address: address.trim().toLowerCase(),

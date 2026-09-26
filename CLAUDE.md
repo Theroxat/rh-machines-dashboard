@@ -16,7 +16,7 @@ merely documented, and names where each undocumented contract address came from.
 ## Commands
 
 ```bash
-npm test                      # node --test test/*.test.js — 482 tests, ~2 s, no network, no .env
+npm test                      # node --test test/*.test.js — 489 tests, ~2 s, no network, no .env
 node --test test/floors.test.js                     # one file
 node --test --test-name-pattern "peloton" test/*.test.js   # by name (glob, not test/)
 
@@ -117,8 +117,9 @@ The full list with reasoning is in README §"What the page will not do". The loa
   collection floor and market cap cover the living only.
 - A burned or Dark Machine keeps its on-chain weight: anything that values or rewards a Machine must
   read its status before its weight (`worth.js` valued burned ones at the living floor until
-  2026-09-24). `epochUsd` still models proportional slices; drops have been winner-takes-all since
-  2026-08-27 (see `docs/protocol.md`).
+  2026-09-24). The pot is divided by the **earning weight** (`earningWeight` in `pot.js`: no dead,
+  burned or Dark Machine), not MINE's `totalWeight`; the leading desk takes the whole pot and its
+  Machines count twice (winner-takes-all since 2026-08-27, see `docs/protocol.md`).
 - Sealed rarity comes from `TRAITS.weightOf` only — `MINE.weightOf` is a different number
   (effective weight including ink) on a different contract.
 - DEX pairs are pinned **by address** in `src/config.js`. Selecting by symbol or by liquidity lands

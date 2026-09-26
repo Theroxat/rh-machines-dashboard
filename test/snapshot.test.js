@@ -600,3 +600,24 @@ test("a Dark Machine on sale wears the borrowed picture too", () => {
   });
   assert.equal(s.darkBook.entries[0].machine.image, "https://seadn/93.png");
 });
+
+// Le 2026-09-26 : le solde USDG du swapper donnait $16.82 là où le terminal
+// annonçait $21.75. Le pot qui sera dépensé est celui du protocole, frais en
+// cours de conversion compris ; le solde lu reste le repli.
+test("returns are shared out of the protocol's pot, with our own read as the fallback", () => {
+  const args = { ...withGrid, protocol: { ...withGrid.protocol, totalWeight: 1000n }, weights: new Map([[1253, 100n]]) };
+  const official = composeSnapshot({ ...args, potUsd: 19693, official: { potUsd: 25480 } });
+  assert.equal(official.pot.usd, 25480);
+  assert.equal(official.pot.swapperUsd, 19693);
+  assert.equal(official.rows[0].inked.entries[0].epochUsd, 25480 * 100 / 1000);
+  const own = composeSnapshot({ ...args, potUsd: 19693, official: null });
+  assert.equal(own.rows[0].inked.entries[0].epochUsd, 19693 * 100 / 1000);
+});
+
+test("the pot is divided by the earning weight when it is known, not the chain's", () => {
+  const s = composeSnapshot({ ...withGrid, protocol: { ...withGrid.protocol, totalWeight: 2000n },
+    earningWeight: 1000, potUsd: 1000, weights: new Map([[1253, 100n]]) });
+  assert.equal(s.pot.fleetWeight, 1000);
+  assert.equal(s.pot.chainWeight, 2000);
+  assert.equal(s.rows[0].inked.entries[0].epochUsd, 100);
+});

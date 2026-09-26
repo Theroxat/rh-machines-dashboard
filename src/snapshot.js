@@ -60,7 +60,7 @@ export function fleetHeadline(off) {
 export function composeSnapshot({
   grid, printer, eth, protocol, stats, book, inkMeta, meta, legend, ink, weights, anvil,
   deskIndex, vote, potUsd, sectorWeight, tickers, holdings, stockPrices, ownerOf, now,
-  offCirculation, official, live, ritual, officialArt,
+  offCirculation, official, live, ritual, officialArt, earningWeight,
 }) {
   // OpenSea republie les Dark avec des heures de retard, et une Dark forgée
   // garde en attendant l'image rouge de brûlée. Le site officiel, lui, publie
@@ -137,13 +137,15 @@ export function composeSnapshot({
   const PRINTER = 10n ** 18n;
 
   // Ce qu'une machine toucherait si le pot était distribué maintenant. Le poids
-  // total est celui de la chaîne : une dormante pèse zéro, donc il ne compte
-  // déjà que les machines qui gagnent.
-  const fleetWeight = protocol?.totalWeight === null || protocol?.totalWeight === undefined
+  // de la chaîne compte encore les brûlées, les Dark et l'adresse morte, que le
+  // protocole ne paie plus : on divise par le poids des machines qui gagnent,
+  // comme le terminal officiel. Celui de la chaîne reste là, pour mémoire.
+  const chainWeight = protocol?.totalWeight === null || protocol?.totalWeight === undefined
     ? null
     : Number(protocol.totalWeight);
-  // Le dépouillement en cours, dans l'ordre des desks : sans lui on ne peut pas
-  // découper le pot en tranches, et le partage à plat est le seul honnête.
+  const fleetWeight = earningWeight || chainWeight;
+  // Le dépouillement en cours, dans l'ordre des desks : il désigne le desk en
+  // tête, qui rafle le pot. Sans voix, le partage à plat est le seul honnête.
   const tally = vote ? Array.from({ length: 16 }, (_, d) => Number(vote.tally.get(d) ?? 0n)) : null;
   // Ce que la machine contient déjà, et ce que ça vaut. Le compte appartient
   // au jeton : cela part avec elle à la vente.
@@ -155,9 +157,15 @@ export function composeSnapshot({
     return { lines: v.lines, usd: v.usd };
   };
 
+  // Le pot qui sera dépensé : celui du protocole, frais en cours de conversion
+  // compris, comme la case « in the pot ». Le solde USDG du swapper n'en est
+  // qu'une partie — prêt à acheter, pas encore tout ce qui sera acheté — et le
+  // 2026-09-26 il donnait $16.82 là où le terminal annonçait $21.75. Il reste
+  // le repli quand le protocole ne répond pas.
+  const splitPot = official?.potUsd ?? potUsd ?? null;
   const returnOf = (tokenId, weight) => epochUsd({
     weight, deskIndex: deskIndex?.get(tokenId) ?? null,
-    totalWeight: fleetWeight, potUsd, tally, sectorWeight,
+    totalWeight: fleetWeight, potUsd: splitPot, tally, sectorWeight,
   });
 
   /**
@@ -358,8 +366,12 @@ export function composeSnapshot({
     // Le pot en attente et le poids de la flotte : les deux nombres qui
     // transforment un poids en dollars.
     pot: {
-      usd: potUsd ?? null,
+      usd: splitPot,
+      // Ce que le swapper détient déjà en USDG, lu nous-mêmes.
+      swapperUsd: potUsd ?? null,
+      // Ce qui divise le pot : le poids des machines qui gagnent.
       fleetWeight,
+      chainWeight,
     },
     ink: {
       activationPrinter,

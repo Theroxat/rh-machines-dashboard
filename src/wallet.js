@@ -1,4 +1,5 @@
 import { deskName, SECTORS } from "./desks.js";
+import { leaderOf } from "./pot.js";
 
 /** Une adresse, et rien d'autre. Ni ENS, ni nom, ni chaîne approchante : ce qui
  *  entre ici sert à interroger un index et à ressortir dans du balisage. */
@@ -6,43 +7,35 @@ export const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 export const isAddress = (s) => typeof s === "string" && ADDRESS_RE.test(s.trim());
 
 /**
- * Ce qu'un portefeuille toucherait, et pour quoi il a intérêt à voter.
+ * Ce qu'un portefeuille toucherait si le vote se closait maintenant.
  *
- * La part d'une machine est proportionnelle à son poids sur chaque tranche, et
- * double sur celle de son propre desk. En sommant les tranches :
+ * Depuis le 27 août le desk le plus voté rafle le pot, et ses machines comptent
+ * double (voir `epochUsd`). Avec `g` le desk en tête :
  *
- *     part(moi) = pot × Σ_s  (voix_s / voix_totales) × (monPoids + monPoids_s)
- *                                                     ÷ (poidsFlotte + poids_s)
+ *     part(moi) = pot × (monPoids + monPoids_g) ÷ (poidsGagnant + poids_g)
  *
- * Le terminal officiel annonce `monPoids / poidsFlotte × pot`, qui ignore que
- * le doublement de chaque desk dilue tous les autres. Les deux chiffres sont
- * proches et le nôtre est le bon ; l'écart est nommé plutôt que caché.
+ * — exactement la somme des parts de chaque machine. Sans voix, le partage à
+ * plat. `fleetWeight` et `sectorWeight` sont le poids des machines qui gagnent.
  */
 export function cutUsd({ tally, myWeight, myByDesk, potUsd, fleetWeight, sectorWeight }) {
   if (!potUsd || !fleetWeight) return null;
-  const votes = tally.reduce((a, b) => a + b, 0);
-  if (!votes) return null;
-
-  let sum = 0;
-  for (let s = 0; s < tally.length; s++) {
-    const w = fleetWeight + (sectorWeight[s] ?? 0);
-    if (!w) continue;
-    sum += (tally[s] / votes) * ((myWeight + (myByDesk[s] ?? 0)) / w);
-  }
-  return potUsd * sum;
+  const g = leaderOf(tally);
+  if (g === null) return (potUsd * myWeight) / fleetWeight;
+  const denom = fleetWeight + (sectorWeight?.[g] ?? 0);
+  return denom ? (potUsd * (myWeight + (myByDesk[g] ?? 0))) / denom : null;
 }
 
 /**
  * Pour quel desk voter.
  *
- * On compare ce que le portefeuille toucherait selon le desk sur lequel il pose
- * tout son poids. Le meilleur est celui où il a le plus de poids **et** dont le
- * desk est le plus petit : sur un gros desk tous les voisins doublent en même
- * temps que vous et l'effet se dilue.
+ * Le gagnant rafle tout : ce qui compte est ce que le portefeuille toucherait
+ * **si ce desk gagnait** (`ifWinsUsd`). Le meilleur est celui où il pèse le
+ * plus et qui est le plus petit — ses machines y comptent double, et un petit
+ * desk dilue moins.
  *
- * L'écart tient souvent en centimes — un portefeuille pèse rarement assez pour
- * déplacer un scrutin. C'est un fait, pas un défaut du calcul, et il est rendu
- * tel quel plutôt que gonflé : `gainUsd` dit ce que le vote rapporte vraiment.
+ * `gainUsd` dit ce que ce seul bulletin change à l'issue telle qu'elle se
+ * dessine : presque toujours zéro, parce qu'un portefeuille déplace rarement le
+ * desk en tête. C'est rendu tel quel plutôt que gonflé.
  */
 export function voteAdvice({ tally, myWeight, myByDesk, potUsd, fleetWeight, sectorWeight, tickers = [] }) {
   const base = cutUsd({ tally, myWeight, myByDesk, potUsd, fleetWeight, sectorWeight });
@@ -64,11 +57,12 @@ export function voteAdvice({ tally, myWeight, myByDesk, potUsd, fleetWeight, sec
       heldWeight: myByDesk[s] ?? 0,
       cutUsd: withVote,
       gainUsd: withVote - base,
+      ifWinsUsd: sweepCut(s, { myWeight, myByDesk, potUsd, fleetWeight, sectorWeight }),
     });
   }
   if (!options.length) return null;
 
-  options.sort((a, b) => b.cutUsd - a.cutUsd || a.index - b.index);
+  options.sort((a, b) => b.ifWinsUsd - a.ifWinsUsd || a.index - b.index);
   return { base, options, best: options[0] };
 }
 
