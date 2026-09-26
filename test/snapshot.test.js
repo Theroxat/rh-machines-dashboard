@@ -564,24 +564,39 @@ test("every Dark Machine is listed, for sale or not, and the dead ones are not",
 });
 
 // OpenSea avait des heures de retard : une Dark forgée portait encore l'image
-// rouge de brûlée. Tant que les Dark publiées partagent une seule œuvre, les
-// retardataires l'empruntent ; dès qu'elles divergent, chacune garde la sienne.
-test("a Dark Machine OpenSea has not republished borrows the one shared Dark picture", () => {
-  const base = {
-    ...withDark,
-    ritual: ritualOf([[93, 4], [500, 9]]),
-    ownerOf: new Map(),
+// rouge de brûlée. Elle emprunte l'image d'une Dark déjà republiée qui porte la
+// même œuvre officielle — les adresses OpenSea, elles, diffèrent par jeton même
+// pour une œuvre identique, et le 2026-09-26 ça a laissé sept Dark en rouge.
+test("a Dark Machine OpenSea has not republished borrows a picture of the same official art", () => {
+  const base = { ...withDark, ritual: ritualOf([[93, 4], [500, 9]]), ownerOf: new Map() };
+  const live = {
+    status: new Map([[93, "dark machine"], [23, "dark machine"], [500, "burned"]]),
+    // Même œuvre, deux adresses OpenSea différentes : c'est le cas réel.
+    image: new Map([[93, "https://seadn/93.png"], [23, "https://seadn/23.webp"], [500, "https://seadn/red.webp"]]),
   };
-  const shared = composeSnapshot({ ...base, live: {
-    status: new Map([[93, "dark machine"], [23, "dark machine"], [500, "burned"]]),
-    image: new Map([[93, "https://seadn/dark.webp"], [23, "https://seadn/dark.webp"], [500, "https://seadn/red.webp"]]),
-  } });
-  assert.equal(shared.darkFleet.find((m) => m.tokenId === 500).image, "https://seadn/dark.webp");
+  const shared = composeSnapshot({ ...base, live,
+    officialArt: new Map([[93, "ipfs://Qm1"], [23, "ipfs://Qm1"], [500, "ipfs://Qm1"]]) });
+  assert.equal(shared.darkFleet.find((m) => m.tokenId === 500).image, "https://seadn/93.png");
+  assert.equal(shared.darkFleet.find((m) => m.tokenId === 23).image, "https://seadn/23.webp");
 
-  const revealed = composeSnapshot({ ...base, live: {
-    status: new Map([[93, "dark machine"], [23, "dark machine"], [500, "burned"]]),
-    image: new Map([[93, "https://seadn/a.webp"], [23, "https://seadn/b.webp"], [500, "https://seadn/red.webp"]]),
-  } });
+  // Œuvre révélée, propre à chacune : aucun emprunt.
+  const revealed = composeSnapshot({ ...base, live,
+    officialArt: new Map([[93, "ipfs://A"], [23, "ipfs://B"], [500, "ipfs://C"]]) });
   assert.equal(revealed.darkFleet.find((m) => m.tokenId === 500).image, "https://seadn/red.webp");
-  assert.equal(revealed.darkFleet.find((m) => m.tokenId === 93).image, "https://seadn/a.webp");
+
+  // Sans œuvre officielle lue, on ne devine pas.
+  const unknown = composeSnapshot({ ...base, live });
+  assert.equal(unknown.darkFleet.find((m) => m.tokenId === 500).image, "https://seadn/red.webp");
+});
+
+test("a Dark Machine on sale wears the borrowed picture too", () => {
+  const s = composeSnapshot({ ...withDark,
+    grid: { ...withDark.grid, dark: cell(1.2, [{ tokenId: 500, priceEth: 1.2 }]) },
+    meta: new Map([...withDark.meta, [500, { image: "https://mint/500.webp", headwear: "Halo" }]]),
+    ritual: ritualOf([[93, 4], [500, 9]]),
+    live: { status: new Map([[93, "dark machine"], [500, "burned"]]),
+      image: new Map([[93, "https://seadn/93.png"], [500, "https://seadn/red.webp"]]) },
+    officialArt: new Map([[93, "ipfs://Qm1"], [500, "ipfs://Qm1"]]),
+  });
+  assert.equal(s.darkBook.entries[0].machine.image, "https://seadn/93.png");
 });

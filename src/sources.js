@@ -47,6 +47,12 @@ export const SOURCES = Object.freeze([
   },
   { what: "Pictures and traits", kind: "api", from: "OpenSea" },
   {
+    what: "The picture of a Dark Machine OpenSea has not caught up with",
+    kind: "api", from: "the collection's own metadata",
+    note: "Only compared, never displayed: a late Dark borrows the OpenSea picture of one that " +
+      "carries the same official art.",
+  },
+  {
     what: "Which Machines were burned in the Meltdown",
     kind: "api", from: "OpenSea, relaying the collection's own metadata",
     note: "The mark lives only in metadata the team rewrote off-chain on 2026-09-23. No contract " +

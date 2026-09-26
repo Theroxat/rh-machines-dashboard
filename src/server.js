@@ -8,7 +8,7 @@ import { loadConfig, RPC_URL, CHAIN_ID, ADDRESSES, TOTAL_MACHINES, PAD, PROTON, 
 import { fetchListings, fetchCollectionStats } from "./opensea.js";
 import { loadTraits } from "./traits.js";
 import { loadMetadata, readLiveStatus } from "./metadata.js";
-import { readRitualLogs, tallyRituals, discoverRitualContract } from "./dark.js";
+import { readRitualLogs, tallyRituals, discoverRitualContract, readOfficialArt } from "./dark.js";
 import { readUnpaid, unpaidLines } from "./drops.js";
 import { deriveHeadwearLegend } from "./rarity.js";
 import { readInk } from "./ink.js";
@@ -139,6 +139,8 @@ async function sweepStatus() {
 let ritualEvents = [];
 const ritualCursors = new Map(DARK.contracts.map((c) => [c.address, c.fromBlock]));
 let ritual = null;
+const officialArt = new Map();     // Dark -> œuvre officielle
+const officialArtAt = new Map();   // Dark -> dernière lecture
 
 async function sweepDark() {
   // Le 2026-09-24 l'équipe a changé de contrat sans prévenir. Un contrat que le
@@ -159,6 +161,21 @@ async function sweepDark() {
     ritualCursors.set(contract, head + 1);
   }
   ritual = tallyRituals(ritualEvents);
+
+  // L'œuvre officielle de chaque Dark, relue au plus toutes les demi-heures :
+  // une quarantaine de requêtes, et c'est ce qui permet à une Dark qu'OpenSea
+  // n'a pas encore republiée de ne pas s'afficher en rouge de brûlée.
+  const darkIds = new Set([...ritual.forged.keys(),
+    ...[...(live?.status ?? [])].filter(([, st]) => st === "dark machine").map(([id]) => id)]);
+  const due = [...darkIds].filter((id) => Date.now() - (officialArtAt.get(id) ?? 0) > 30 * 60_000);
+  if (due.length) {
+    const fresh = await readOfficialArt({ ids: due, base: DARK.meta });
+    for (const id of due) {
+      officialArtAt.set(id, Date.now());
+      if (fresh.has(id)) officialArt.set(id, fresh.get(id));
+    }
+  }
+
   console.log(`dark: ${ritual.rituals} rituals on ${ritualCursors.size} contracts, ${ritual.won} won, ` +
     `${ritual.lost} lost, ${ritual.pending} pending — ${ritual.forged.size} Dark Machines forged on-chain, ` +
     `${ritual.fuelBurned} burned as fuel`);
@@ -438,6 +455,7 @@ async function sweepBook() {
     official,
     live,
     ritual,
+    officialArt,
   });
   store.succeed(composed);
 

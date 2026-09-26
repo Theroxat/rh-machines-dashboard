@@ -60,8 +60,23 @@ export function fleetHeadline(off) {
 export function composeSnapshot({
   grid, printer, eth, protocol, stats, book, inkMeta, meta, legend, ink, weights, anvil,
   deskIndex, vote, potUsd, sectorWeight, tickers, holdings, stockPrices, ownerOf, now,
-  offCirculation, official, live, ritual,
+  offCirculation, official, live, ritual, officialArt,
 }) {
+  // OpenSea republie les Dark avec des heures de retard, et une Dark forgée
+  // garde en attendant l'image rouge de brûlée. Le site officiel, lui, publie
+  // tout de suite l'œuvre de chaque Dark. Une retardataire emprunte donc l'image
+  // OpenSea d'une Dark déjà republiée qui porte la même œuvre officielle.
+  // Comparer les adresses OpenSea ne marche pas : le 2026-09-26, la même œuvre
+  // y avait une adresse par jeton, la règle a cru à une révélation et sept Dark
+  // — dont la #8643 — sont restées rouges. Après la vraie révélation, les
+  // œuvres officielles diffèrent et chacune garde la sienne.
+  const isPublishedDark = (id) => live?.status?.get(id) === "dark machine";
+  const donorOf = new Map();   // œuvre officielle -> image OpenSea d'une Dark republiée
+  for (const [id, art] of officialArt ?? []) {
+    if (!donorOf.has(art) && isPublishedDark(id) && live?.image?.get(id)) donorOf.set(art, live.image.get(id));
+  }
+  const darkImageOf = (id) => (!isPublishedDark(id) && donorOf.get(officialArt?.get(id)))
+    || live?.image?.get(id) || meta?.get(id)?.image || null;
   const activationPrinter = protocol?.activationInk
     ? Number(BigInt(protocol.activationInk) / 10n ** 15n) / 1000
     : null;
@@ -96,7 +111,9 @@ export function composeSnapshot({
       // en rouge les machines qu'il a brûlées, et une vignette d'avant les
       // vendrait sous un visage qu'elles n'ont plus. Les traits, eux, restent
       // ceux du mint — c'est d'eux que dépend la dérivation des classes.
-      image: live?.image?.get(tokenId) ?? m.image,
+      image: ritual?.forged?.has(tokenId) || isPublishedDark(tokenId)
+        ? darkImageOf(tokenId)
+        : live?.image?.get(tokenId) ?? m.image,
       burned: live?.status?.get(tokenId) === "burned",
       // Forgée au Rituel noir, ou seulement publiée comme telle : la page dit
       // lequel, parce que la #23 était la seconde sans être la première.
@@ -243,16 +260,6 @@ export function composeSnapshot({
     ...(ritual?.forged?.keys() ?? []),
     ...[...(live?.status ?? [])].filter(([, st]) => st === "dark machine").map(([id]) => id),
   ]);
-  // OpenSea republie les Dark avec des heures de retard : le 2026-09-24, la
-  // moitié portait encore l'image rouge de brûlée. Toutes les Dark partagent
-  // pour l'instant la même œuvre, non révélée — tant que celles déjà publiées
-  // n'en montrent qu'une, c'est elle qu'on prête aux retardataires. Le jour où
-  // l'œuvre se révèle et les images divergent, chacune garde la sienne.
-  const published = new Set([...(live?.status ?? [])]
-    .filter(([id, st]) => st === "dark machine" && live?.image?.get(id)).map(([id]) => live.image.get(id)));
-  const darkArt = published.size === 1 ? [...published][0] : null;
-  const darkImageOf = (id) => (live?.status?.get(id) !== "dark machine" && darkArt)
-    || live?.image?.get(id) || meta?.get(id)?.image || null;
   const darkFleet = [...darkIds]
     .filter((id) => ownerOf?.get(id)?.toLowerCase() !== DEAD)
     .sort((a, b) => a - b)

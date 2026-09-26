@@ -89,6 +89,9 @@ export const DARK = Object.freeze({
     Object.freeze({ address: "0x6adA619F5e8613BaDb833445F74f467eEeF98c3E", fromBlock: 71_611_000 }),
   ]),
   api: "https://www.rhmachines.com/api/dark",
+  // Les métadonnées officielles, pour l'œuvre de chaque Dark qu'OpenSea n'a
+  // pas encore republiée (voir `composeSnapshot`).
+  meta: "https://www.rhmachines.com/meta/",
   owner: "0xA08c58FCC285D9Cd48b7122293C8a62446AA3d17",
   claimedWinBps: 6000,
 });

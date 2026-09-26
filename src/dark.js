@@ -122,3 +122,25 @@ export async function discoverRitualContract({ provider, api, known, owner, fetc
     return null;
   }
 }
+
+/**
+ * L'œuvre que le site officiel publie pour chaque Dark : l'adresse de son
+ * image, telle quelle. Elle ne sert qu'à comparer — deux Dark de même œuvre
+ * peuvent se prêter leur image OpenSea — et jamais à afficher : l'IPFS n'est
+ * pas une origine que la page charge. Une lecture en échec laisse la machine
+ * absente de la carte, et elle garde alors l'image qu'OpenSea lui donne.
+ */
+export async function readOfficialArt({ ids, base, fetchImpl = fetch }) {
+  const art = new Map();
+  for (const id of ids) {
+    try {
+      const res = await fetchImpl(`${base}${id}.json`, { headers: { accept: "application/json" } });
+      if (!res.ok) continue;
+      const img = (await res.json())?.image;
+      if (typeof img === "string" && img) art.set(id, img);
+    } catch {
+      // absente : pas d'emprunt pour elle
+    }
+  }
+  return art;
+}

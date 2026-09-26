@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ethers } from "ethers";
-import { readRitualLogs, tallyRituals, discoverRitualContract, DARK_ABI } from "../src/dark.js";
+import { readRitualLogs, tallyRituals, discoverRitualContract, readOfficialArt, DARK_ABI } from "../src/dark.js";
 
 const E18 = 10n ** 18n;
 const charged = (ritualId, vessel, fuel = [1, 2, 3, 4]) => ({
@@ -99,4 +99,14 @@ test("a new ritual contract announced by the site is followed only if the right 
   assert.equal(await discoverRitualContract({ ...args, provider: ownerOf(KEY), fetchImpl: api(OLD) }), null);
   assert.equal(await discoverRitualContract({ ...args, provider: ownerOf(KEY), fetchImpl: api("nonsense") }), null);
   assert.equal(await discoverRitualContract({ ...args, provider: ownerOf(KEY), fetchImpl: async () => { throw new Error("down"); } }), null);
+});
+
+test("the official art is read per machine, and a failed read leaves it out", async () => {
+  const fetchImpl = async (url) => {
+    if (url.endsWith("/2.json")) throw new Error("down");
+    if (url.endsWith("/3.json")) return { ok: false };
+    return { ok: true, json: async () => ({ image: "ipfs://Qm1" }) };
+  };
+  const art = await readOfficialArt({ ids: [1, 2, 3], base: "https://x/meta/", fetchImpl });
+  assert.deepEqual([...art], [[1, "ipfs://Qm1"]]);
 });
