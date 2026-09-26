@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ethers } from "ethers";
-import { readRitualLogs, tallyRituals, DARK_ABI } from "../src/dark.js";
+import { readRitualLogs, tallyRituals, discoverRitualContract, DARK_ABI } from "../src/dark.js";
 
 const E18 = 10n ** 18n;
 const charged = (ritualId, vessel, fuel = [1, 2, 3, 4]) => ({
@@ -70,4 +70,33 @@ test("the reader decodes both events and walks the window in spans", async () =>
 test("a refused span fails the whole read instead of skipping it", async () => {
   const provider = { getLogs: async ({ fromBlock }) => { if (fromBlock === 100) throw new Error("429"); return []; } };
   await assert.rejects(readRitualLogs({ provider, contract: "0x1", fromBlock: 0, toBlock: 199, span: 100 }), /429/);
+});
+
+// Le 2026-09-24, un second contrat recompte à partir de 1 : son rituel #20 et
+// celui du premier sont deux parties, et la seconde avait forgé la #8643.
+test("rituals of two contracts sharing a number stay two rituals", () => {
+  const A = "0xaaa", B = "0xbbb";
+  const t = tallyRituals([
+    { ...charged(20, 93), contract: A, block: 10 }, { ...settled(20, 93, false), contract: A, block: 11 },
+    { ...charged(20, 8643), contract: B, block: 50 }, { ...settled(20, 8643, true), contract: B, block: 51 },
+  ]);
+  assert.equal(t.rituals, 2);
+  assert.equal(t.won, 1);
+  assert.equal(t.lost, 1);
+  // Numérotée dans l'ordre de jeu, tous contrats confondus.
+  assert.deepEqual([...t.forged], [[8643, 2]]);
+});
+
+const ownerOf = (who) => ({ call: async () => new ethers.Interface(["function owner() view returns (address)"])
+  .encodeFunctionResult("owner", [who]) });
+const KEY = "0x" + "a".repeat(40), NEW = "0x" + "b".repeat(40), OLD = "0x" + "c".repeat(40);
+const api = (contract) => async () => ({ ok: true, json: async () => ({ contract }) });
+
+test("a new ritual contract announced by the site is followed only if the right key owns it", async () => {
+  const args = { api: "x", known: [OLD], owner: KEY };
+  assert.equal(await discoverRitualContract({ ...args, provider: ownerOf(KEY), fetchImpl: api(NEW) }), ethers.getAddress(NEW));
+  assert.equal(await discoverRitualContract({ ...args, provider: ownerOf(NEW), fetchImpl: api(NEW) }), null);
+  assert.equal(await discoverRitualContract({ ...args, provider: ownerOf(KEY), fetchImpl: api(OLD) }), null);
+  assert.equal(await discoverRitualContract({ ...args, provider: ownerOf(KEY), fetchImpl: api("nonsense") }), null);
+  assert.equal(await discoverRitualContract({ ...args, provider: ownerOf(KEY), fetchImpl: async () => { throw new Error("down"); } }), null);
 });

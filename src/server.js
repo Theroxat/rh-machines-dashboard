@@ -8,7 +8,7 @@ import { loadConfig, RPC_URL, CHAIN_ID, ADDRESSES, TOTAL_MACHINES, PAD, PROTON, 
 import { fetchListings, fetchCollectionStats } from "./opensea.js";
 import { loadTraits } from "./traits.js";
 import { loadMetadata, readLiveStatus } from "./metadata.js";
-import { readRitualLogs, tallyRituals } from "./dark.js";
+import { readRitualLogs, tallyRituals, discoverRitualContract } from "./dark.js";
 import { readUnpaid, unpaidLines } from "./drops.js";
 import { deriveHeadwearLegend } from "./rarity.js";
 import { readInk } from "./ink.js";
@@ -133,23 +133,35 @@ async function sweepStatus() {
     `${r.image.size} current pictures (${r.pages} pages)`);
 }
 
-// Le Rituel noir : ses journaux, lus depuis l'ouverture puis par incréments.
-// Un curseur qui n'avance qu'après une lecture complète — une tranche refusée
-// fait relire la même fenêtre au tour suivant, jamais sauter par-dessus.
+// Le Rituel noir : ses journaux, contrat par contrat, lus depuis l'ouverture de
+// chacun puis par incréments. Un curseur n'avance qu'après une lecture complète
+// — une tranche refusée fait relire la même fenêtre, jamais sauter par-dessus.
 let ritualEvents = [];
-let ritualCursor = DARK.fromBlock;
+const ritualCursors = new Map(DARK.contracts.map((c) => [c.address, c.fromBlock]));
 let ritual = null;
 
 async function sweepDark() {
+  // Le 2026-09-24 l'équipe a changé de contrat sans prévenir. Un contrat que le
+  // site annonce et que la bonne clé possède est suivi dès son apparition — lu
+  // depuis le plancher du plus récent qu'on connaissait, qu'il ne peut précéder.
+  const found = await discoverRitualContract({
+    provider, api: DARK.api, known: [...ritualCursors.keys()], owner: DARK.owner,
+  });
+  if (found) {
+    ritualCursors.set(found, Math.max(...ritualCursors.values()));
+    console.log(`dark: following a new ritual contract, ${found}`);
+  }
   const head = await provider.getBlockNumber();
-  if (ritualCursor <= head) {
-    const fresh = await readRitualLogs({ provider, contract: DARK.contract, fromBlock: ritualCursor, toBlock: head });
+  for (const [contract, from] of ritualCursors) {
+    if (from > head) continue;
+    const fresh = await readRitualLogs({ provider, contract, fromBlock: from, toBlock: head });
     ritualEvents = ritualEvents.concat(fresh);
-    ritualCursor = head + 1;
+    ritualCursors.set(contract, head + 1);
   }
   ritual = tallyRituals(ritualEvents);
-  console.log(`dark: ${ritual.rituals} rituals, ${ritual.won} won, ${ritual.lost} lost, ${ritual.pending} pending — ` +
-    `${ritual.forged.size} Dark Machines forged on-chain, ${ritual.fuelBurned} burned as fuel`);
+  console.log(`dark: ${ritual.rituals} rituals on ${ritualCursors.size} contracts, ${ritual.won} won, ` +
+    `${ritual.lost} lost, ${ritual.pending} pending — ${ritual.forged.size} Dark Machines forged on-chain, ` +
+    `${ritual.fuelBurned} burned as fuel`);
 }
 
 /** Les machines de l'adresse morte, lues sur la carte des propriétaires. */

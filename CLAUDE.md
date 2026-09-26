@@ -16,7 +16,7 @@ merely documented, and names where each undocumented contract address came from.
 ## Commands
 
 ```bash
-npm test                      # node --test test/*.test.js — 478 tests, ~2 s, no network, no .env
+npm test                      # node --test test/*.test.js — 482 tests, ~2 s, no network, no .env
 node --test test/floors.test.js                     # one file
 node --test --test-name-pattern "peloton" test/*.test.js   # by name (glob, not test/)
 
@@ -60,8 +60,10 @@ touches the network.
 **Seven independent loops**, each rescheduling itself *after* it finishes so a slow sweep can never
 overlap the next (`loop()` in `server.js`): book+prices+protocol 60 s, ink 10 min, owners 10 min,
 status 10 min, dark 2 min, pad 2 min, proton 10 min. Owners and status reuse `inkPollIntervalMs`;
-dark reuses `padPollIntervalMs` and reads ritual logs incrementally from `DARK.fromBlock` (the node
-serves logs but no historical state). The book sweep throws until status has been read once.
+dark reuses `padPollIntervalMs` and reads ritual logs incrementally, one cursor per contract in
+`DARK.contracts` (the node serves logs but no historical state). The team swapped ritual contracts
+once without notice (ids restart at 1): rituals are keyed by contract + id, and a contract announced by
+`/api/dark` is followed only if its `owner()` is `DARK.owner`. The book sweep throws until status has been read once.
 One loop failing leaves the others running, and the page says which half is stale.
 
 **The store never regresses.** `createStore` keeps the last payload that actually computed; a failed

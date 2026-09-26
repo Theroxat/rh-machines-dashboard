@@ -926,3 +926,17 @@ Le drop du 21 août suivait les tranches proportionnelles aux voix (§7, vérifi
 27/08, AAPL le 2/09, NVDA le 3/09) : c'est le « winner takes all » que la doc
 officielle décrit désormais, gagnant exclu quatre epochs. `epochUsd` calcule
 encore avec les tranches ; à refaire.
+
+### Le second contrat de rituel (2026-09-24)
+
+Le lendemain de l'ouverture, 2026-09-24 à 19:14 UTC (bloc 71 611 854), l'équipe
+a déployé `0x6adA619F5e8613BaDb833445F74f467eEeF98c3E` — même `owner()`, même
+ABI, 8 274 octets, pas un proxy — et `/api/dark` l'annonce désormais. Rien ne
+l'a signalé. Les numéros de rituel y **repartent à 1** : le rituel #20 du
+second contrat (la #8643, gagnée le 2026-09-26 en 88 tours) n'est pas le #20
+du premier. L'ancien contrat a émis ses derniers journaux au bloc 71 614 804.
+
+Au 2026-09-26 : 36 rituels sur le premier, 20 sur le second, 56 en tout — le
+compte de l'API. Le dashboard lit les deux, numérote les rituels dans l'ordre de
+jeu, et suit un contrat suivant dès que l'API l'annonce, à condition que la clé
+`0xA08c58FC…` le possède.

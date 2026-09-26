@@ -71,18 +71,24 @@ export const PROTON = Object.freeze({
 });
 
 /**
- * Le Rituel noir, ouvert le 2026-09-23 à 22:22 UTC (bloc 70 867 555, premier
- * journal du contrat). Quatre machines brûlées partent à l'adresse morte, une
- * cinquième — le « vessel » — devient Dark Machine si la partie est gagnée.
- * L'adresse vient de `/api/dark` du site officiel, recoupée on-chain : `owner()`
- * est la même clé que le Proton, le contrat n'est pas un proxy, et ses
- * journaux `Charged`/`Settled` retombent sur les compteurs de l'API.
- * `fromBlock` est un plancher de lecture : ce nœud ne sert pas l'état
- * historique, mais il sert les journaux.
+ * Le Rituel noir, ouvert le 2026-09-23 à 22:22 UTC. Quatre machines brûlées
+ * partent à l'adresse morte, une cinquième — le « vessel » — devient Dark
+ * Machine si la partie est gagnée.
+ *
+ * L'équipe a changé de contrat le lendemain, 2026-09-24 à 19:14 UTC, sans rien
+ * annoncer, et les numéros de rituel y repartent à 1. Le dashboard n'en lisait
+ * qu'un : un porteur a gagné sa Dark sur le second et ne la voyait pas. Chaque
+ * contrat a son plancher de lecture (`fromBlock`, un peu avant son premier
+ * journal : ce nœud sert les journaux, pas l'état historique). Un contrat
+ * suivant est découvert par `/api/dark` du site officiel et n'est lu que si son
+ * `owner()` est la clé ci-dessous — celle du Proton et du coffre.
  */
 export const DARK = Object.freeze({
-  contract: "0x207455FDbb3F0DEc567b9c83176FCee3e0940506",
-  fromBlock: 70_867_000,
+  contracts: Object.freeze([
+    Object.freeze({ address: "0x207455FDbb3F0DEc567b9c83176FCee3e0940506", fromBlock: 70_867_000 }),
+    Object.freeze({ address: "0x6adA619F5e8613BaDb833445F74f467eEeF98c3E", fromBlock: 71_611_000 }),
+  ]),
+  api: "https://www.rhmachines.com/api/dark",
   owner: "0xA08c58FCC285D9Cd48b7122293C8a62446AA3d17",
   claimedWinBps: 6000,
 });
