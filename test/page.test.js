@@ -1298,3 +1298,11 @@ test("every figure in the top row wears a colour, and the token's is its own", (
   // L'orange ne sert qu'au jeton.
   assert.equal((css.match(/var\(--fuel\)/g) ?? []).length, 1);
 });
+
+// Le 2026-09-26 : 35,8 % ici, 55,7 % sur le terminal officiel, et des porteurs
+// persuadés que l'un des deux était faux. C'est le même burn, sur deux bases.
+test("the burn is given against what was minted, and against what is left", () => {
+  const html = heroHtml({ ...DATA, burn: { minted: 200000000, supply: 128488565, burned: 71511435, share: 0.3576, ink: 57501435 } });
+  assert.match(html, /<mark>35\.8%<\/mark> of the/);
+  assert.match(html, /Measured against the 128,488,565 that remain rather than everything minted, that burn is <b>55\.7%<\/b> — the figure the official site shows\./);
+});

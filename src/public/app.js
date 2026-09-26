@@ -163,7 +163,15 @@ export function heroHtml(d, active = null) {
     ? `<p>The $PRINTER is the part that burns: ${fmtInt(Math.round(b.burned))} of the ` +
       `${fmtInt(b.minted)} ever minted are gone for good` +
       (b.ink ? `, ${fmtInt(Math.round(b.ink))} of it as ink to switch Machines on` : "") +
-      `, and there is no way to mint more.${gone}</p>`
+      `, and there is no way to mint more.` +
+      // Le terminal officiel affiche 55,7 % : le même burn, rapporté à ce qui
+      // reste plutôt qu'à ce qui a été frappé. Le 2026-09-26, des porteurs ont
+      // cru l'un des deux chiffres faux. Les deux sont justes ; la page dit
+      // lequel est lequel au lieu de laisser choisir entre deux vérités.
+      (b.supply ? ` Measured against the ${fmtInt(Math.round(b.supply))} that remain rather than ` +
+        `everything minted, that burn is <b>${fmtRatio(b.burned / b.supply)}</b> — the figure the ` +
+        `official site shows.` : "") +
+      `${gone}</p>`
     : `<p>Burning $PRINTER is how a Machine is switched on, and none of it ever ` +
       `comes back.${gone}</p>`;
 
