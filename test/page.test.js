@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import {
   heroHtml, statsHtml, cardHtml, chipsHtml, floorsHtml, detailHtml, bestPick, pickMachines, walletHtml,
   stepsHtml, voteHtml, scarcityHtml, padHtml, sourcesHtml, bannerMessage, potNote,
-  setContract, itemUrl, esc, ADDRESS_RE, SORTS, STATES, fmtBig, ANVIL_URL, ritualHtml, DARK_LABEL, darkCountHtml, darkGalleryHtml, dormantOnSale, unpaidHtml, nextGate,
+  setContract, itemUrl, esc, ADDRESS_RE, SORTS, STATES, fmtBig, ANVIL_URL, ritualHtml, DARK_LABEL, darkCountHtml, darkGalleryHtml, dormantOnSale, unpaidHtml, nextGate, BLUE_LABEL, blueCountHtml, blueGalleryHtml,
 } from "../src/public/app.js";
 
 const page = readFileSync(new URL("../src/public/index.html", import.meta.url), "utf8");
@@ -884,7 +884,7 @@ test("the state filter narrows the book to one side or the other", () => {
 });
 
 test("the state buttons say which one is on, and none means everything", () => {
-  assert.deepEqual(STATES.map((s) => s.key), ["lit", "dormant", "burned", "dark"]);
+  assert.deepEqual(STATES.map((s) => s.key), ["lit", "dormant", "burned", "dark", "blue"]);
   assert.match(chipsHtml(DATA, null, "cheap", "lit"), /data-st="lit" aria-pressed="true"/);
   assert.match(chipsHtml(DATA, null, "cheap", "lit"), /data-st="dormant" aria-pressed="false"/);
   const none = chipsHtml(DATA, null, "cheap", null);
@@ -1152,7 +1152,7 @@ test("no Dark Machine, no counter", () => {
 test("the counter sits outside the tab list, which it is not part of", () => {
   const nav = page.slice(page.indexOf('<nav class="nav"'), page.indexOf("</nav>"));
   assert.doesNotMatch(nav, /dark-count/);
-  assert.match(page, /<\/nav>\s*<a class="dark-count" id="dark-count"/);
+  assert.match(page, /<\/nav>\s*<span class="counts">\s*<a class="dark-count blue-count" id="blue-count"[^>]*>\s*<\/a>\s*<a class="dark-count" id="dark-count"/);
 });
 
 // Le 2026-09-24 sur le banc : le bloc Dark ouvrait un carnet vide, parce que
@@ -1194,7 +1194,8 @@ test("no Dark Machine, no gallery", () => {
 // sur les Dark, et le compteur y mener.
 test("#dark opens the book on the Dark Machines, and the counter links there", () => {
   const app = readFileSync(new URL("../src/public/app.js", import.meta.url), "utf8");
-  assert.match(app, /if \(name !== "dark"\) return show\(name\);\s*klass = DARK_LABEL;\s*state = null;/);
+  assert.match(app, /if \(name !== "dark" && name !== "blue"\) return show\(name\);\s*klass = name === "blue" \? BLUE_LABEL : DARK_LABEL;\s*state = null;/);
+  assert.match(page, /<a class="dark-count blue-count" id="blue-count" href="#blue"/);
   assert.match(app, /let tab = route\(\(location\.hash/);
   assert.match(page, /<a class="dark-count" id="dark-count" href="#dark"/);
 });
@@ -1305,4 +1306,59 @@ test("the burn is given against what was minted, and against what is left", () =
   const html = heroHtml({ ...DATA, burn: { minted: 200000000, supply: 128488565, burned: 71511435, share: 0.3576, ink: 57501435 } });
   assert.match(html, /<mark>35\.8%<\/mark> of the/);
   assert.match(html, /Measured against the 128,488,565 that remain rather than everything minted, that burn is <b>55\.7%<\/b> — the figure the official site shows\./);
+});
+
+/* ── les Blue Machines (2026-09-28) ─────────────────────────────────────── */
+const BLUED = {
+  ...DARKD,
+  blueBook: { floorEth: 0.2, listed: 1, supply: 474, entries: [
+    entry({ tokenId: 1523, priceEth: 0.2, epochUsd: null, machine: { image: "https://i2c.seadn.io/blue.webp", blue: true } }),
+  ] },
+  blueFleet: [
+    { tokenId: 1523, image: "https://i2c.seadn.io/blue.webp", owner: "0xe908ba570259e4bb1e1fdd2edd9b15e092b13211", priceEth: 0.2 },
+    { tokenId: 7373, image: null, owner: "0x342ecc6f7be45063f00c0d810942631a5f43e7d7", priceEth: null },
+  ],
+  blueMint: { minted: 474, supply: 500 },
+  collection: { ...DARKD.collection, blue: 474 },
+};
+
+test("the Blue counter says how many exist and how far the mint has gone", () => {
+  assert.match(blueCountHtml(BLUED), /<span class="dc-num">474<\/span><span class="dc-txt"><b>Blue Machines<\/b><u>474 of 500 minted<\/u>/);
+  assert.equal(blueCountHtml({ collection: { blue: 0 } }), "");
+  assert.match(css, /\.blue-count \{[^}]*var\(--blue\)/);
+});
+
+test("the Blue block sits after the Dark one and filters to the Blue Machines only", () => {
+  const html = floorsHtml(BLUED);
+  assert.match(html, /class="fl fl-blue" data-k="Blue"[^>]*><span class="fl-cls">Blue<\/span><b>\$492<\/b><u>1 of 474 for sale<\/u>/);
+  assert.ok(html.indexOf("fl-blue") > html.indexOf("fl-dark"));
+  const picked = pickMachines(BLUED, { klass: BLUE_LABEL, state: "lit", limit: Infinity });
+  assert.deepEqual(picked.map((m) => m.tokenId), [1523]);
+  assert.ok(picked[0].blue && !picked[0].lit);
+});
+
+test("a Blue card wears its own blue and claims no drop", () => {
+  const html = cardHtml({ ...entry({ epochUsd: null }), blue: true, lit: false, classLabel: "Blue", priceUsd: 492 });
+  assert.match(html, /class="card-state blue">Blue</);
+  assert.doesNotMatch(html, /a drop/);
+  assert.match(css, /\.card-state\.blue \{[^}]*var\(--blue\)/);
+});
+
+test("every Blue Machine gets a card in the gallery, for sale or not", () => {
+  const html = blueGalleryHtml(BLUED);
+  assert.match(html, /2 exist, 1 for sale — 474 of 500 minted/);
+  assert.match(html, /#7373 &middot; Blue<\/span><span class="card-price">Not for sale/);
+  assert.equal(blueGalleryHtml({ blueFleet: [] }), "");
+});
+
+test("the Blue colour is its own, apart from the pot's sky", () => {
+  const blue = css.match(/--blue:\s*(#[0-9A-Fa-f]{6})/)[1];
+  const sky = css.match(/--sky:\s*(#[0-9A-Fa-f]{6})/)[1];
+  assert.notEqual(blue.toLowerCase(), sky.toLowerCase());
+});
+
+// « carrying $0.00 of stock » sur une carte Blue le 2026-09-29 : une poussière.
+test("a card does not claim to carry stock worth less than a cent", () => {
+  assert.doesNotMatch(cardHtml({ ...entry({ holds: { usd: 0.001 } }), lit: true, classLabel: "x1", priceUsd: 10 }), /carrying/);
+  assert.match(cardHtml({ ...entry({ holds: { usd: 15.6 } }), lit: true, classLabel: "x1", priceUsd: 10 }), /carrying \$15\.60 of stock/);
 });

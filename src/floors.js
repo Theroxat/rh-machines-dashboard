@@ -47,7 +47,7 @@ function buildCell(entries, supply, pelotonSize) {
  * classe — une vingtaine en tout, sans poids selon l'équipe, un marché à part —
  * et forment une seule case, `grid.dark`, à côté des lignes.
  */
-export function buildGrid({ listings, traits, ink, pelotonSize, shelf, status, gone, dark }) {
+export function buildGrid({ listings, traits, ink, pelotonSize, shelf, status, gone, dark, blue }) {
   const excluded = {
     unknownRarity: 0, unknownInk: 0, unknownStatus: 0, destroyed: 0,
     listingsOffGrid: 0, heldByAnvil: 0,
@@ -55,8 +55,8 @@ export function buildGrid({ listings, traits, ink, pelotonSize, shelf, status, g
   const stateOf = new Map();   // tokenId -> "inked" | "dormant" | "burned" | "dark"
   const classOf = new Map();   // tokenId -> weightClass
   const supply = new Map();    // "class:state" -> compte
-  // Les Dark Machines n'ont qu'une case, sans classe.
-  const keyOf = (wc, state) => (state === "dark" ? "dark" : `${wc}:${state}`);
+  // Les Dark et les Blue Machines n'ont qu'une case chacune, sans classe.
+  const keyOf = (wc, state) => (state === "dark" || state === "blue" ? state : `${wc}:${state}`);
 
   for (const [tokenId, t] of traits) {
     if (t?.weightClass == null) { excluded.unknownRarity++; continue; }
@@ -69,6 +69,14 @@ export function buildGrid({ listings, traits, ink, pelotonSize, shelf, status, g
       stateOf.set(tokenId, "dark");
       classOf.set(tokenId, t.weightClass);
       supply.set("dark", (supply.get("dark") ?? 0) + 1);
+      continue;
+    }
+    // Remise par le contrat Blue (2026-09-28) : la chaîne le dit sans attendre
+    // OpenSea. Même règle que les Dark : une case pour toute la collection.
+    if (blue?.has(tokenId) || marked === "blue machine") {
+      stateOf.set(tokenId, "blue");
+      classOf.set(tokenId, t.weightClass);
+      supply.set("blue", (supply.get("blue") ?? 0) + 1);
       continue;
     }
     if (status && marked === undefined) { excluded.unknownStatus++; continue; }
@@ -141,17 +149,22 @@ export function buildGrid({ listings, traits, ink, pelotonSize, shelf, status, g
 
   const darkCell = buildCell(byCell.get("dark") ?? [], supply.get("dark") ?? 0, pelotonSize);
   darkCell.anvilEntries = shelfFor("dark");
+  const blueCell = buildCell(byCell.get("blue") ?? [], supply.get("blue") ?? 0, pelotonSize);
+  blueCell.anvilEntries = shelfFor("blue");
 
   return {
     rows,
     dark: darkCell,
+    blue: blueCell,
     excluded,
     totals: {
       inked: rows.reduce((n, r) => n + r.inked.supply, 0),
       dormant: rows.reduce((n, r) => n + r.dormant.supply, 0),
       burned: rows.reduce((n, r) => n + r.burned.supply, 0),
       dark: darkCell.supply,
-      listed: rows.reduce((n, r) => n + r.inked.listed + r.dormant.listed + r.burned.listed, 0) + darkCell.listed,
+      blue: blueCell.supply,
+      listed: rows.reduce((n, r) => n + r.inked.listed + r.dormant.listed + r.burned.listed, 0) +
+        darkCell.listed + blueCell.listed,
     },
   };
 }

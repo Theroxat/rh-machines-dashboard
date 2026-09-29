@@ -19,10 +19,10 @@ const sum = (xs) => xs.reduce((a, b) => a + b, 0);
 
 /** Le floor de la case d'une machine — sa classe et son état. Rien si personne
  *  n'en vend une comparable : on ne devine pas un prix sur un marché vide. */
-export function floorFor(rows, classValue, side, ethUsd, darkBook = null) {
-  // Une Dark n'a pas de classe : une seule case pour toute la collection.
-  if (side === "dark") {
-    const eth = darkBook?.floorEth;
+export function floorFor(rows, classValue, side, ethUsd, darkBook = null, blueBook = null) {
+  // Dark et Blue n'ont pas de classe : une seule case chacune pour la collection.
+  if (side === "dark" || side === "blue") {
+    const eth = (side === "dark" ? darkBook : blueBook)?.floorEth;
     return eth && ethUsd ? eth * ethUsd : null;
   }
   const r = (rows ?? []).find((x) => x.classValue === classValue);
@@ -35,12 +35,12 @@ export function floorFor(rows, classValue, side, ethUsd, darkBook = null) {
  *  sur la chaîne : le 2026-09-24, une x1 brûlée se comptait au floor des
  *  vivantes, $107 au lieu de $53, pour quelque 1 400 porteurs. Le statut passe
  *  donc avant le poids. */
-const sideOf = (m) => (m.dark ? "dark" : m.burned ? "burned" : m.weight ? "inked" : "dormant");
+const sideOf = (m) => (m.dark ? "dark" : m.blue ? "blue" : m.burned ? "burned" : m.weight ? "inked" : "dormant");
 
-export function valueWallet({ machines, rows, darkBook, ethUsd, printer, ownStock }) {
+export function valueWallet({ machines, rows, darkBook, blueBook, ethUsd, printer, ownStock }) {
   const lines = (machines ?? []).map((m) => ({
     tokenId: m.tokenId,
-    machineUsd: floorFor(rows, m.classValue, sideOf(m), ethUsd, darkBook),
+    machineUsd: floorFor(rows, m.classValue, sideOf(m), ethUsd, darkBook, blueBook),
     insideUsd: m.holds?.usd ?? 0,
   }));
 

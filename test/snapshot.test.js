@@ -54,7 +54,7 @@ test("every machine on sale carries its picture, its traits and the desk it sits
   const s = composeSnapshot({ ...withGrid, deskIndex: new Map([[1253, 9]]) });
   assert.deepEqual(s.rows[0].inked.entries[0].machine, {
     image: "https://img/1253.webp", headwear: "Blueberries", body: "Cobalt Stripe",
-    eyes: "Rage", burned: false, dark: false, ritualId: null, desk: "utilities", sector: "utilities", ticker: null,
+    eyes: "Rage", burned: false, blue: false, dark: false, ritualId: null, desk: "utilities", sector: "utilities", ticker: null,
   });
 });
 
@@ -620,4 +620,23 @@ test("the pot is divided by the earning weight when it is known, not the chain's
   assert.equal(s.pot.fleetWeight, 1000);
   assert.equal(s.pot.chainWeight, 2000);
   assert.equal(s.rows[0].inked.entries[0].epochUsd, 100);
+});
+
+// Les Blue Machines (2026-09-28) : toutes montrées, en vente ou non, retirées
+// du parc vivant, et le mint compté contre les 500 annoncées.
+test("every Blue Machine is listed, for sale or not, and the mint is counted", () => {
+  const s = composeSnapshot({
+    ...meltdown,
+    grid: { ...meltdown.grid, blue: cell(0.2, [{ tokenId: 1523, priceEth: 0.2 }]), totals: { ...meltdown.grid.totals, blue: 474 } },
+    blue: { ids: new Set([1523, 7373]), supply: 500 },
+    live: { status: new Map([...meltdown.live.status, [9000, "blue machine"]]), image: new Map([[1523, "https://seadn/blue.png"]]) },
+    ownerOf: new Map([[1523, "0xe908"], [7373, "0x000000000000000000000000000000000000dEaD"]]),
+  });
+  assert.deepEqual(s.blueFleet.map((m) => m.tokenId), [1523, 9000]);
+  assert.equal(s.blueFleet[0].priceEth, 0.2);
+  assert.equal(s.blueFleet[0].image, "https://seadn/blue.png");
+  assert.deepEqual(s.blueMint, { minted: 2, supply: 500 });
+  assert.equal(s.collection.blue, 474);
+  assert.equal(s.collection.blueFloorEth, 0.2);
+  assert.equal(s.collection.machines, 10000 - 3497 - 4381 - 474);
 });

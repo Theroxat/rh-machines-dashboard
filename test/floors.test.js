@@ -366,3 +366,22 @@ test("a Dark Machine sent to the dead address is destroyed, not dark", () => {
   assert.equal(grid.dark.supply, 0);
   assert.equal(grid.excluded.destroyed, 1);
 });
+
+// Les Blue Machines (2026-09-28) : une case pour toute la collection, comme les
+// Dark, reconnues par la chaîne ou par leur statut publié.
+test("a Blue Machine has one cell for the whole collection, apart from burned and Dark", () => {
+  const grid = buildGrid({
+    traits: traitsOf([[1, 100], [2, 100], [3, 100], [4, 100]]),
+    ink: inkOf([[1, 4250], [2, 4250], [3, 4250], [4, 4250]]),
+    listings: listingsOf([[1, 0.3], [2, 0.25], [3, 0.01], [4, 2]]),
+    status: statusOf([[1, "burned"], [2, "blue machine"], [3, "burned"], [4, "dark machine"]]),
+    blue: new Set([1]),
+    pelotonSize: 5,
+  });
+  assert.equal(grid.blue.supply, 2);
+  assert.equal(grid.blue.floorEth, 0.25);
+  assert.equal(grid.totals.blue, 2);
+  assert.equal(grid.dark.supply, 1);
+  assert.equal(rowOf(grid, "x1").burned.floorEth, 0.01);
+  assert.equal(grid.totals.listed, 4);
+});

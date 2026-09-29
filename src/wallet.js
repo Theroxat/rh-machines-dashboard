@@ -79,7 +79,7 @@ export function sweepCut(s, { myWeight, myByDesk, potUsd, fleetWeight, sectorWei
 
 /** Le portefeuille : ses machines, son poids, sa part, son conseil. */
 export function analyseWallet({
-  address, tokenIds, weightOf, deskOf, epochUsdOf, imageOf, holdsOf, burnedOf, darkOf,
+  address, tokenIds, weightOf, deskOf, epochUsdOf, imageOf, holdsOf, burnedOf, darkOf, blueOf,
   tally, potUsd, fleetWeight, sectorWeight, tickers = [],
 }) {
   const machines = tokenIds.map((tokenId) => {
@@ -90,6 +90,8 @@ export function analyseWallet({
     const burned = burnedOf ? burnedOf(tokenId) === true : false;
     // Forgée au Rituel noir : sans poids selon l'équipe, payée ailleurs.
     const dark = darkOf ? darkOf(tokenId) === true : false;
+    // Remise par le contrat Blue : rien ne dit qu'elle touche le pot.
+    const blue = !dark && blueOf ? blueOf(tokenId) === true : false;
     return {
       tokenId,
       weight,
@@ -98,7 +100,8 @@ export function analyseWallet({
       ticker: index === null || index === undefined ? null : (tickers[index] ?? null),
       burned,
       dark,
-      epochUsd: epochUsdOf && !burned && !dark ? epochUsdOf(weight, tokenId) : null,
+      blue,
+      epochUsd: epochUsdOf && !burned && !dark && !blue ? epochUsdOf(weight, tokenId) : null,
       // De quoi dessiner la machine plutôt que de la nommer : la page du
       // portefeuille était la seule à parler de machines sans en montrer une.
       image: imageOf ? imageOf(tokenId) : null,

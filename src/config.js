@@ -97,6 +97,23 @@ export const DARK = Object.freeze({
 });
 
 /**
+ * Les Blue Machines, ouvertes le 2026-09-28 à 19:04 UTC (bloc 75 034 477). Le
+ * contrat reçoit des machines existantes des portefeuilles de l'équipe et en
+ * rend une à chaque mint, contre trois brûlées envoyées à l'adresse morte,
+ * 7 777 $PRINTER et 0,07 ETH (la seconde d'un portefeuille : deux brûlées,
+ * 6 913 $PRINTER). 500 annoncées. L'adresse a été relevée dans la transaction
+ * de mint d'un porteur ; `owner()` est la clé du Proton. Est Blue une machine
+ * que ce contrat a remise à quelqu'un — lu sur la chaîne, sans attendre OpenSea,
+ * qui a un jour de retard. Une machine qu'il envoie à l'adresse morte est une
+ * brûlée reçue en paiement, pas une Blue.
+ */
+export const BLUE = Object.freeze({
+  contract: "0xc5B4e6f1Aa1EE8579404B92C14dD4379208ed0f0",
+  fromBlock: 75_034_000,
+  supply: 500,
+});
+
+/**
  * Le contrat de drop par tours, apparu le 2026-09-03 : un « keeper » pousse les
  * parts une à une (`airdrop(uint256[])`), et le contrat note pour chaque
  * machine sa part (`shareOf`) et si elle a été versée (`paidThisRound`). Il a

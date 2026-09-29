@@ -16,7 +16,7 @@ merely documented, and names where each undocumented contract address came from.
 ## Commands
 
 ```bash
-npm test                      # node --test test/*.test.js — 489 tests, ~2 s, no network, no .env
+npm test                      # node --test test/*.test.js — 503 tests, ~2 s, no network, no .env
 node --test test/floors.test.js                     # one file
 node --test --test-name-pattern "peloton" test/*.test.js   # by name (glob, not test/)
 
@@ -50,16 +50,16 @@ the floor — do not add an SQLite package.
 
 **Readers → pure compute → snapshot store → HTTP.** Each `src/*.js` is either a *reader* that does one
 thing against one source and reports failure as failure (`opensea`, `prices`, `ink`, `traits`,
-`metadata`, `owners`, `anvil`, `vote`, `ballot`, `dark`, `drops`, `pot`, `protocol`, `pad`, `proton`, `official`,
+`metadata`, `owners`, `anvil`, `vote`, `ballot`, `dark`, `blue`, `drops`, `pot`, `protocol`, `pad`, `proton`, `official`,
 `holdings`, `balances`), or a *pure* module that takes plain data and returns plain data (`floors`,
 `snapshot`, `rarity`, `scarcity`, `worth`, `wallet`, `alert`, `desks`, `traitindex`, `http`).
 Plumbing: `multicall` (Multicall3 batching), `store` (the non-regressing snapshot holder), `history`
 (SQLite change log). `server.js` is the only place that wires them, owns the mutable state, and
 touches the network.
 
-**Seven independent loops**, each rescheduling itself *after* it finishes so a slow sweep can never
+**Eight independent loops**, each rescheduling itself *after* it finishes so a slow sweep can never
 overlap the next (`loop()` in `server.js`): book+prices+protocol 60 s, ink 10 min, owners 10 min,
-status 10 min, dark 2 min, pad 2 min, proton 10 min. Owners and status reuse `inkPollIntervalMs`;
+status 10 min, dark 2 min, blue 2 min, pad 2 min, proton 10 min. Owners and status reuse `inkPollIntervalMs`;
 dark reuses `padPollIntervalMs` and reads ritual logs incrementally, one cursor per contract in
 `DARK.contracts` (the node serves logs but no historical state). The team swapped ritual contracts
 once without notice (ids restart at 1): rituals are keyed by contract + id, and a contract announced by
@@ -111,7 +111,9 @@ The full list with reasoning is in README §"What the page will not do". The loa
 - The listings book is read to exhaustion or it throws. Listings are deduplicated by machine.
 - Every row has three cells since the 2026-09-23 Meltdown: inked, dormant, **burned**. Dark
   Machines (Dark Ritual, same day) are a fourth state but **one collection-level cell**,
-  `grid.dark` → `snapshot.darkBook`, filtered on the page as the pseudo-class `"Dark"`. The burned
+  `grid.dark` → `snapshot.darkBook`, filtered on the page as the pseudo-class `"Dark"`.
+  Blue Machines (Blue mint, 2026-09-28) follow the same pattern: `grid.blue` → `blueBook`/`blueFleet`,
+  pseudo-class `"Blue"`, read on-chain as machines the Blue contract handed out. The burned
   mark exists only in off-chain metadata (`readLiveStatus`); destroyed Machines are those owned by
   `0x…dEaD`, read on-chain. A Machine with no status read is excluded, never assumed alive. The
   collection floor and market cap cover the living only.

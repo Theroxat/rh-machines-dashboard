@@ -77,3 +77,8 @@ test("a Dark machine is valued at the Dark floor, and left out when none is for 
   assert.equal(none.lines[0].machineUsd, null);
   assert.equal(none.unpriced, 1);
 });
+
+test("a Blue machine is valued at the Blue floor, never at the burned one", () => {
+  const blue = { ...m(1, 100, 100), blue: true, burned: true };
+  assert.equal(valueWallet({ machines: [blue], rows: MROWS, blueBook: { floorEth: 0.1 }, ethUsd: 2000 }).lines[0].machineUsd, 200);
+});

@@ -153,3 +153,13 @@ test("a Dark Machine is marked and promised no drop from the pot", () => {
   assert.equal(w.machines[0].dark, true);
   assert.equal(w.machines[0].epochUsd, null);
 });
+
+test("a Blue Machine is marked and promised no drop from the pot", () => {
+  const w = analyseWallet({
+    address: "0x" + "1".repeat(40), tokenIds: [1523],
+    weightOf: () => 100, deskOf: () => 10, epochUsdOf: () => 5, blueOf: () => true,
+    tally: TALLY, potUsd: POT, fleetWeight: FLEET, sectorWeight: SECTOR, tickers: TICKERS,
+  });
+  assert.equal(w.machines[0].blue, true);
+  assert.equal(w.machines[0].epochUsd, null);
+});

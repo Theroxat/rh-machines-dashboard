@@ -43,6 +43,9 @@
     /* L'orange du $PRINTER : le carburant, et lui seul. Ajouté le 2026-09-24
        quand la case du marché du jeton est sortie du gris. */
     --fuel:   #FF8A3D;
+    /* Le bleu des Blue Machines, et d'elles seules — plus profond que le ciel
+       du pot, pour qu'on ne les confonde pas. */
+    --blue:   #1F4FFF;
 
     /* L'encre diluée, pour ce qui accompagne sans porter. Mesurée sur le
        papier : 4.5:1 minimum pour du petit texte. */
@@ -130,6 +133,10 @@
     border: var(--b) solid var(--ink); box-shadow: 5px 5px 0 var(--blood);
   }
   .dark-count[hidden] { display: none; }
+  .counts { display: inline-flex; gap: 12px; flex-wrap: wrap; }
+  /* Le compteur des Blue : leur bleu plein, ombre d'encre. */
+  .blue-count { background: var(--blue); border-color: var(--ink); box-shadow: 5px 5px 0 var(--ink); }
+  .blue-count:hover { box-shadow: 4px 4px 0 var(--ink); }
   .dark-count:hover { transform: translate(1px, 1px); box-shadow: 4px 4px 0 var(--blood); }
   .dc-num {
     display: inline-flex; align-items: center; gap: 8px;
@@ -352,6 +359,9 @@
   .fl-dark { background: var(--ink); color: var(--paper); box-shadow: 4px 4px 0 var(--blood); }
   .fl-dark u { color: var(--paper-2); white-space: normal; }
   .fl-dark[aria-pressed="true"] { background: var(--blood); }
+  .fl-blue { background: var(--blue); color: var(--paper); }
+  .fl-blue u { color: var(--paper-2); white-space: normal; }
+  .fl-blue[aria-pressed="true"] { background: var(--ink); }
   .fl[aria-pressed="true"] .fl-alt { border-top-color: var(--ink-2); }
   .fl[aria-pressed="true"] .fl-alt i { border-color: var(--paper-2); color: var(--paper-2); }
   .fl[aria-pressed="true"] .fl-burned i { border-color: var(--blood); color: var(--paper); }
@@ -420,6 +430,7 @@
   }
   /* Noir plein : la Dark Machine. Ni lime — elle n'imprime pas — ni rouge. */
   .card-state.dark { background: var(--ink); color: var(--paper); box-shadow: 3px 3px 0 var(--blood); }
+  .card-state.blue { background: var(--blue); color: var(--paper); }
   /* Ces machines-là ne sont pas sur OpenSea : elles s'achètent au terminal du
      protocole et se paient en $PRINTER. Deux marchés, deux monnaies — le dire
      évite d'envoyer quelqu'un sur une page où elle n'est pas en vente. */
@@ -618,7 +629,10 @@
         <a href="#wallet" role="tab" data-tab="wallet">My wallet</a>
         <a href="#learn"  role="tab" data-tab="learn">Learn</a>
       </nav>
-      <a class="dark-count" id="dark-count" href="#dark" hidden aria-label="Show the Dark Machines for sale"></a>
+      <span class="counts">
+        <a class="dark-count blue-count" id="blue-count" href="#blue" hidden aria-label="Show the Blue Machines"></a>
+        <a class="dark-count" id="dark-count" href="#dark" hidden aria-label="Show the Dark Machines for sale"></a>
+      </span>
     </div>
 
     <div class="banner" id="banner" role="status"></div>

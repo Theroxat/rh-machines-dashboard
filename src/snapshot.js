@@ -60,7 +60,7 @@ export function fleetHeadline(off) {
 export function composeSnapshot({
   grid, printer, eth, protocol, stats, book, inkMeta, meta, legend, ink, weights, anvil,
   deskIndex, vote, potUsd, sectorWeight, tickers, holdings, stockPrices, ownerOf, now,
-  offCirculation, official, live, ritual, officialArt, earningWeight,
+  offCirculation, official, live, ritual, officialArt, earningWeight, blue,
 }) {
   // OpenSea republie les Dark avec des heures de retard, et une Dark forgée
   // garde en attendant l'image rouge de brûlée. Le site officiel, lui, publie
@@ -115,6 +115,8 @@ export function composeSnapshot({
         ? darkImageOf(tokenId)
         : live?.image?.get(tokenId) ?? m.image,
       burned: live?.status?.get(tokenId) === "burned",
+      // Remise par le contrat Blue, ou publiée Blue par OpenSea.
+      blue: Boolean(blue?.ids?.has(tokenId) || live?.status?.get(tokenId) === "blue machine"),
       // Forgée au Rituel noir, ou seulement publiée comme telle : la page dit
       // lequel, parce que la #23 était la seconde sans être la première.
       dark: Boolean(ritual?.forged?.has(tokenId) || live?.status?.get(tokenId) === "dark machine"),
@@ -279,8 +281,28 @@ export function composeSnapshot({
       priceEth: askOf.get(tokenId) ?? null,
     }));
 
+  // Les Blue Machines (2026-09-28) : même traitement que les Dark — une case
+  // pour la collection, et toutes montrées, en vente ou non. Est Blue ce que le
+  // contrat Blue a remis, ou ce qu'OpenSea publie déjà comme tel.
+  const blueBook = withMachines(grid.blue ?? { entries: [], anvilEntries: [] }, null, true);
+  const blueAsk = new Map(blueBook.entries.map((e) => [e.tokenId, e.priceEth]));
+  const blueIds = new Set([
+    ...(blue?.ids ?? []),
+    ...[...(live?.status ?? [])].filter(([, st]) => st === "blue machine").map(([id]) => id),
+  ]);
+  const blueFleet = [...blueIds]
+    .filter((id) => ownerOf?.get(id)?.toLowerCase() !== DEAD)
+    .sort((a, b) => a - b)
+    .map((tokenId) => ({
+      tokenId,
+      image: live?.image?.get(tokenId) ?? meta?.get(tokenId)?.image ?? null,
+      owner: ownerOf?.get(tokenId) ?? null,
+      priceEth: blueAsk.get(tokenId) ?? null,
+    }));
+
   const listed = new Set();
   for (const e of darkBook.entries) listed.add(e.tokenId);
+  for (const e of blueBook.entries) listed.add(e.tokenId);
   for (const r of rows) {
     for (const e of r.inked.entries) listed.add(e.tokenId);
     for (const e of r.dormant.entries) listed.add(e.tokenId);
@@ -299,12 +321,14 @@ export function composeSnapshot({
   const floorEth = minOf(rows.flatMap((r) => [r.inked.floorEth, r.dormant.floorEth]));
   const burnedFloorEth = minOf(rows.map((r) => r.burned.floorEth));
   const darkFloorEth = darkBook.floorEth ?? null;
+  const blueFloorEth = blueBook.floorEth ?? null;
   const inEth = (v) => (v !== null && v !== undefined && eth?.usd ? v * eth.usd : null);
   // Ce qui reste vivant : ni à l'adresse morte, ni marqué brûlé. C'est sur
   // cette flotte-là que le floor se multiplie — dix mille fois le prix d'une
   // vivante comptait 3 497 machines détruites et 4 381 brûlées.
   const dead = offCirculation?.dead ?? 0;
-  const alive = TOTAL_MACHINES - dead - (grid.totals?.burned ?? 0) - (grid.totals?.dark ?? 0);
+  const alive = TOTAL_MACHINES - dead - (grid.totals?.burned ?? 0) - (grid.totals?.dark ?? 0) -
+    (grid.totals?.blue ?? 0);
 
   const collection = {
     floorEth,
@@ -320,6 +344,9 @@ export function composeSnapshot({
     dark: grid.totals?.dark ?? null,
     darkFloorEth,
     darkFloorUsd: inEth(darkFloorEth),
+    blue: grid.totals?.blue ?? null,
+    blueFloorEth,
+    blueFloorUsd: inEth(blueFloorEth),
     marketCapEth: floorEth === null ? null : floorEth * alive,
     marketCapUsd: inEth(floorEth === null ? null : floorEth * alive),
     volumeEth: stats?.volume ?? null,
@@ -343,6 +370,10 @@ export function composeSnapshot({
     rows,
     darkBook,
     darkFleet,
+    blueBook,
+    blueFleet,
+    // Le mint Blue : combien le contrat en a remis, sur combien annoncées.
+    blueMint: blue ? { minted: blue.ids.size, supply: blue.supply } : null,
     // Le Rituel noir tel que la chaîne l'enregistre, et ce que le statut publié
     // affirme en plus : une Dark Machine sans rituel est nommée, pas cachée.
     ritual: ritual ? {

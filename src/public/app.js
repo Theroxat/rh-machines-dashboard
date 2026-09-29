@@ -150,6 +150,7 @@ export function heroHtml(d, active = null) {
     marked ? `${fmtInt(marked)} more were marked burned in the Meltdown and still sit in ` +
       `wallets — the team says they will never carry weight again` : null,
     d.collection?.dark ? `${fmtInt(d.collection.dark)} were forged into Dark Machines` : null,
+    d.collection?.blue ? `${fmtInt(d.collection.blue)} went Blue in the Blue mint` : null,
     f.vault ? (f.vault === 1
       ? `1 sits in the Proton's vault, which can send it back out`
       : `${fmtInt(f.vault)} sit in the Proton's vault, which can send them back out`) : null,
@@ -182,7 +183,7 @@ export function heroHtml(d, active = null) {
   // une machine du Meltdown à « $0.00 a drop » parce que les actions qu'elle
   // transporte, rapportées à son prix bradé, faisaient 9,8 %. Une vitrine de
   // retour qui ne rapporte rien ment par sa place.
-  const best = pickMachines(d, { sort: "back", limit: Infinity }).find((m) => !m.burned && !m.dark);
+  const best = pickMachines(d, { sort: "back", limit: Infinity }).find((m) => !m.burned && !m.dark && !m.blue);
 
   // Le pot entre dans la rangée plutôt que de la suivre. Posé dessous, il
   // attendait que la colonne la plus haute ait fini — la vitrine — et laissait
@@ -265,13 +266,14 @@ export function floorsHtml(d, active = null) {
   const listedIn = (r) => (r.inked?.listed ?? 0) + (r.dormant?.listed ?? 0) + (r.burned?.listed ?? 0);
   const rows = (d?.rows ?? []).filter((r) => listedIn(r) > 0);
   const dk = d?.darkBook;
-  if (!rows.length && !dk?.supply) return "";
+  const bk = d?.blueBook;
+  if (!rows.length && !dk?.supply && !bk?.supply) return "";
   const money = (e) => (e && eth ? fmtUsdRound(e * eth) : e ? `${fmtEth(e)} ETH` : "—");
 
   return `<div class="floors"><span class="floors-lab">Cheapest by class — tap one to filter</span>` +
     `<div class="floors-row">` +
     `<button type="button" class="fl fl-all" data-k="" aria-pressed="${active ? "false" : "true"}">` +
-      `<b>All</b><u>${fmtInt(rows.reduce((a, r) => a + listedIn(r), 0) + (dk?.listed ?? 0))} listed</u>` +
+      `<b>All</b><u>${fmtInt(rows.reduce((a, r) => a + listedIn(r), 0) + (dk?.listed ?? 0) + (bk?.listed ?? 0))} listed</u>` +
     `</button>` +
     rows.map((r) =>
       `<button type="button" class="fl" data-k="${esc(r.classLabel)}" ` +
@@ -298,6 +300,13 @@ export function floorsHtml(d, active = null) {
         `aria-pressed="${active === DARK_LABEL ? "true" : "false"}">` +
         `<span class="fl-cls">Dark</span><b>${dk.listed ? money(dk.floorEth) : "—"}</b>` +
         `<u>${dk.listed ? `${fmtInt(dk.listed)} of ${fmtInt(dk.supply)}` : `none of ${fmtInt(dk.supply)}`} for sale</u></button>`
+      : "") +
+    // Les Blue à côté des Dark : même logique, leur couleur à elles.
+    (bk?.supply
+      ? `<button type="button" class="fl fl-blue" data-k="${BLUE_LABEL}" ` +
+        `aria-pressed="${active === BLUE_LABEL ? "true" : "false"}">` +
+        `<span class="fl-cls">Blue</span><b>${bk.listed ? money(bk.floorEth) : "—"}</b>` +
+        `<u>${bk.listed ? `${fmtInt(bk.listed)} of ${fmtInt(bk.supply)}` : `none of ${fmtInt(bk.supply)}`} for sale</u></button>`
       : "") +
     `</div></div>`;
 }
@@ -389,17 +398,22 @@ export const STATES = Object.freeze([
   // Le Rituel noir du 2026-09-23 : quatre brûlées pour en forger une. Une case
   // pour toute la collection, pas une par classe — elles sont une vingtaine.
   { key: "dark", label: "Dark" },
+  // Le mint Blue du 2026-09-28 : trois brûlées pour une machine remise par le
+  // contrat Blue. Une case pour la collection, comme les Dark.
+  { key: "blue", label: "Blue" },
 ]);
 
 /** Les cases d'une ligne, dans l'ordre de la page, avec leur état. */
-const cellsOf = (r) => [["lit", r.inked], ["dormant", r.dormant], ["burned", r.burned], ["dark", r.dark]];
+const cellsOf = (r) => [["lit", r.inked], ["dormant", r.dormant], ["burned", r.burned], ["dark", r.dark], ["blue", r.blue]];
 
 /** Les lignes du carnet, plus celle des Dark Machines, qui n'a pas de classe :
  *  elle se filtre comme une classe, sous le nom « Dark ». */
 export const DARK_LABEL = "Dark";
+export const BLUE_LABEL = "Blue";
 const boardRows = (d) => [
   ...(d?.rows ?? []),
   ...(d?.darkBook ? [{ classValue: null, classLabel: DARK_LABEL, dark: d.darkBook }] : []),
+  ...(d?.blueBook ? [{ classValue: null, classLabel: BLUE_LABEL, blue: d.blueBook }] : []),
 ];
 
 export function pickMachines(d, { klass = null, state = null, limit = 24, sort = SORTS[0].key } = {}) {
@@ -419,7 +433,7 @@ export function pickMachines(d, { klass = null, state = null, limit = 24, sort =
   }
   // Choisir « Dark », c'est choisir un état : le filtre « Printing » par défaut
   // n'y laissait rien, et le bloc Dark ouvrait sur un carnet vide.
-  if (klass === DARK_LABEL) state = null;
+  if (klass === DARK_LABEL || klass === BLUE_LABEL) state = null;
   for (const r of boardRows(d)) {
     if (klass && r.classLabel !== klass) continue;
     for (const [key, cell] of cellsOf(r)) {
@@ -428,6 +442,7 @@ export function pickMachines(d, { klass = null, state = null, limit = 24, sort =
       const lit = key === "lit";
       const burned = key === "burned";
       const dark = key === "dark";
+      const blue = key === "blue";
       // Une brûlée ne s'allume pas : son coût ne porte pas l'allumage.
       const toLight = key === "dormant" ? light : 0;
       for (const e of cell?.entries ?? []) {
@@ -435,7 +450,7 @@ export function pickMachines(d, { klass = null, state = null, limit = 24, sort =
         const priceUsd = eth ? e.priceEth * eth : null;
         const cost = priceUsd === null ? null : priceUsd + toLight;
         const back = (e.epochUsd ?? 0) + (e.holds?.usd ?? 0);
-        out.push({ ...e, lit, burned, dark, classLabel: r.classLabel, priceUsd, cost, back,
+        out.push({ ...e, lit, burned, dark, blue, classLabel: r.classLabel, priceUsd, cost, back,
           ratio: cost ? back / cost : 0, from: "opensea" });
       }
       // Le rayon de l'anvil. Ces machines sont achetables et n'apparaissaient
@@ -445,8 +460,8 @@ export function pickMachines(d, { klass = null, state = null, limit = 24, sort =
       for (const e of cell?.anvilEntries ?? []) {
         const priceUsd = e.askUsd ?? null;
         const cost = priceUsd === null ? null : priceUsd + toLight;
-        const back = burned || dark ? (e.holds?.usd ?? 0) : (e.epochUsd ?? 0) + (e.holds?.usd ?? 0);
-        out.push({ ...e, lit, burned, dark, classLabel: r.classLabel,
+        const back = burned || dark || blue ? (e.holds?.usd ?? 0) : (e.epochUsd ?? 0) + (e.holds?.usd ?? 0);
+        out.push({ ...e, lit, burned, dark, blue, classLabel: r.classLabel,
           priceEth: e.askEth ?? null, priceUsd, cost, back,
           ratio: cost ? back / cost : 0, from: "anvil" });
       }
@@ -478,6 +493,8 @@ export function cardHtml(m, { light = 0 } = {}) {
       : `<span class="card-noart"></span>`) +
     (m.dark
       ? `<span class="card-state dark">Dark</span>`
+      : m.blue
+      ? `<span class="card-state blue">Blue</span>`
       : m.burned
       ? `<span class="card-state burned">Burned</span>`
       : `<span class="card-state${m.lit ? "" : " off"}">${m.lit ? "Printing" : "Dormant"}</span>`) +
@@ -487,6 +504,8 @@ export function cardHtml(m, { light = 0 } = {}) {
   // c'est l'information elle-même.
   const earns = m.dark
     ? `<span class="card-earn off">no weight — paid outside the pot</span>`
+    : m.blue
+    ? `<span class="card-earn off">Blue — art revealed at mint</span>`
     : m.burned
     ? `<span class="card-earn off">burned in the Meltdown</span>`
     : m.lit
@@ -512,7 +531,8 @@ export function cardHtml(m, { light = 0 } = {}) {
       `<span class="card-price">${price}` +
         (sub ? `<small>${sub}</small>` : "") + `</span>` +
       earns +
-      (m.holds?.usd ? `<span class="card-inside">carrying ${fmtUsd(m.holds.usd)} of stock</span>` : "") +
+      // Une poussière d'action s'affichait « carrying $0.00 » : sous un centime, on se tait.
+      (m.holds?.usd >= 0.005 ? `<span class="card-inside">carrying ${fmtUsd(m.holds.usd)} of stock</span>` : "") +
     `</span></a>`;
 }
 
@@ -591,7 +611,9 @@ export function detailHtml(m, d) {
       `<div class="d-head">` +
         `<span class="d-id">#${m.tokenId}</span>` +
         `<h3>${esc(m.classLabel ?? "")}${reinked ? ` <span class="d-re">re-inked</span>` : ""}</h3>` +
-        (m.dark
+        (m.blue && !m.dark
+          ? `<span class="card-earn off">Blue Machine — no drop from the pot</span>`
+          : m.dark
           ? `<span class="card-earn off">${m.machine?.ritualId
               ? `Forged in Dark Ritual #${m.machine.ritualId}`
               : "Marked Dark — no ritual on chain"}</span>`
@@ -650,7 +672,7 @@ export function walletHtml(w, { light = 0 } = {}) {
   }
 
   const wo = w.worth;
-  const earning = w.machines.filter((m) => m.weight && !m.burned && !m.dark).length;
+  const earning = w.machines.filter((m) => m.weight && !m.burned && !m.dark && !m.blue).length;
   const stats = `<div class="stats" style="margin-top:24px">` +
     (wo?.total ? `<div class="st st-pot"><b>${fmtUsdRound(wo.total)}</b><u>all of it, together</u></div>` : "") +
     `<div class="st st-live"><b>${fmtInt(earning)}</b><u>of yours printing</u></div>` +
@@ -674,9 +696,10 @@ export function walletHtml(w, { light = 0 } = {}) {
     tokenId: m.tokenId,
     machine: { image: m.image },
     classLabel: m.desk ?? "",
-    lit: Boolean(m.weight) && !m.burned && !m.dark,
+    lit: Boolean(m.weight) && !m.burned && !m.dark && !m.blue,
     burned: Boolean(m.burned),
     dark: Boolean(m.dark),
+    blue: Boolean(m.blue),
     epochUsd: m.epochUsd,
     holds: m.holds,
     priceEth: null,
@@ -877,6 +900,47 @@ export function darkGalleryHtml(d) {
 }
 
 /**
+ * Toutes les Blue Machines, en vente ou non — la même galerie que les Dark.
+ * Leur œuvre n'est révélée qu'au mint : tant qu'elle ne l'est pas, OpenSea
+ * montre ce qu'il a.
+ */
+export function blueGalleryHtml(d) {
+  const fleet = d?.blueFleet ?? [];
+  if (!fleet.length) return "";
+  const eth = d?.eth?.usd;
+  const onSale = fleet.filter((m) => m.priceEth !== null && m.priceEth !== undefined).length;
+  const short = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : null);
+  const cards = fleet.map((m) => {
+    const sale = m.priceEth !== null && m.priceEth !== undefined;
+    return `<a class="card" href="${itemUrl(m.tokenId)}" target="_blank" rel="noopener">` +
+      `<span class="card-frame">` +
+      (m.image ? `<img class="card-art" src="${esc(m.image)}" alt="" loading="lazy">` : `<span class="card-noart"></span>`) +
+      `<span class="card-state blue">Blue</span></span>` +
+      `<span class="card-body">` +
+        `<span class="card-id">#${m.tokenId} &middot; Blue</span>` +
+        `<span class="card-price">${sale ? (eth ? fmtUsdRound(m.priceEth * eth) : `${fmtEth(m.priceEth)} ETH`) : "Not for sale"}` +
+          (sale && eth ? `<small>${fmtEth(m.priceEth)} ETH</small>` : "") + `</span>` +
+        (m.owner ? `<span class="card-inside">held by ${esc(short(m.owner))}</span>` : "") +
+      `</span></a>`;
+  }).join("");
+  const mint = d?.blueMint;
+  return `<h3 class="sec" style="margin-top:40px">Every Blue Machine</h3>` +
+    `<p class="sub">${fmtInt(fleet.length)} exist, ${onSale ? `${fmtInt(onSale)} for sale` : "none for sale right now"}` +
+    (mint ? ` — ${fmtInt(mint.minted)} of ${fmtInt(mint.supply)} minted` : "") +
+    `. Each one cost three burned Machines, $PRINTER and ETH; its art is revealed at mint.</p>` +
+    `<div class="grid">${cards}</div>`;
+}
+
+/** Le compteur des Blue, à côté de celui des Dark. */
+export function blueCountHtml(d) {
+  const n = d?.collection?.blue;
+  if (!n) return "";
+  const mint = d?.blueMint;
+  return `<span class="dc-num">${fmtInt(n)}</span>` +
+    `<span class="dc-txt"><b>Blue Machines</b><u>${mint ? `${fmtInt(mint.minted)} of ${fmtInt(mint.supply)} minted` : "from the Blue mint"}</u></span>`;
+}
+
+/**
  * Le compteur des Dark Machines, à droite des onglets.
  *
  * Visible depuis tous les onglets : c'est la seule catégorie qui grossit à vue
@@ -1070,12 +1134,16 @@ if (typeof document !== "undefined") {
       ? picked.map((m) => cardHtml(m, { light })).join("")
       : klass === DARK_LABEL
         ? `<p class="note">No Dark Machine is for sale right now — every one of them is shown below.</p>`
+      : klass === BLUE_LABEL
+        ? `<p class="note">No Blue Machine is for sale right now — every one of them is shown below.</p>`
         : `<p class="note">Nothing listed in that class right now.</p>`;
     $("buy-title").textContent = sort === "cheap" ? "Cheapest first" : "Most back per dollar";
     // La phrase doit décrire ce que la grille montre. « Dormant ones are
     // cheaper » sous une grille filtrée sur les allumées ne parle de rien.
     const cheapSub = klass === DARK_LABEL
       ? "Forged in the Dark Ritual. No weight, and no share of the pot — the team says they earn 10× on printer.fun and games instead."
+      : klass === BLUE_LABEL
+      ? "Handed out by the Blue mint for three burned Machines. Their art is revealed at mint."
       : state === "lit"
       ? "What costs least among the Machines already printing."
       : state === "dormant"
@@ -1096,8 +1164,10 @@ if (typeof document !== "undefined") {
       : state === "dormant" ? "dormant and for sale"
       : state === "burned" ? "burned and for sale"
       : state === "dark" ? "Dark and for sale"
+      : state === "blue" ? "Blue and for sale"
       : "for sale";
-    $("dark-gallery").innerHTML = klass === DARK_LABEL ? darkGalleryHtml(data) : "";
+    $("dark-gallery").innerHTML = klass === DARK_LABEL ? darkGalleryHtml(data)
+      : klass === BLUE_LABEL ? blueGalleryHtml(data) : "";
     $("more-note").textContent = picked.length && total > picked.length
       ? `Showing ${picked.length} of ${total} ${of}.` : "";
   };
@@ -1164,8 +1234,8 @@ if (typeof document !== "undefined") {
   // `#dark` : le carnet filtré sur les Dark Machines, et leur galerie. Une
   // adresse plutôt qu'un seul clic, pour qu'elle se partage.
   const route = (name) => {
-    if (name !== "dark") return show(name);
-    klass = DARK_LABEL;
+    if (name !== "dark" && name !== "blue") return show(name);
+    klass = name === "blue" ? BLUE_LABEL : DARK_LABEL;
     state = null;
     paintBuy();
     return show("buy");
@@ -1173,12 +1243,14 @@ if (typeof document !== "undefined") {
 
   // Le compteur des Dark mène à `#dark`. Déjà dessus, le hash ne change pas et
   // aucun événement ne part : on route à la main.
-  $("dark-count").addEventListener("click", (e) => {
-    e.preventDefault();
-    if (location.hash === "#dark") route("dark");
-    else location.hash = "dark";
-    $("cards")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  });
+  for (const name of ["dark", "blue"]) {
+    $(`${name}-count`).addEventListener("click", (e) => {
+      e.preventDefault();
+      if (location.hash === `#${name}`) route(name);
+      else location.hash = name;
+      $("cards")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
 
   // Le plancher d'une classe est aussi son filtre : on lit le prix, on clique.
   $("hero").addEventListener("click", (e) => {
@@ -1186,7 +1258,7 @@ if (typeof document !== "undefined") {
     if (!b) return;
     klass = b.dataset.k || null;
     // Les boutons d'état doivent dire ce que la grille montre.
-    if (klass === DARK_LABEL) state = null;
+    if (klass === DARK_LABEL || klass === BLUE_LABEL) state = null;
     paintBuy();
   });
 
@@ -1283,6 +1355,9 @@ if (typeof document !== "undefined") {
     const dc = darkCountHtml(data);
     $("dark-count").innerHTML = dc;
     $("dark-count").hidden = !dc;
+    const bc = blueCountHtml(data);
+    $("blue-count").innerHTML = bc;
+    $("blue-count").hidden = !bc;
     $("ritual").innerHTML = ritualHtml(data.ritual);
     $("vote-sub").textContent =
       "Every Machine votes with its weight. The desk with the most votes takes the whole pot, bought " +

@@ -948,3 +948,37 @@ Au 2026-09-26 : 36 rituels sur le premier, 20 sur le second, 56 en tout — le
 compte de l'API. Le dashboard lit les deux, numérote les rituels dans l'ordre de
 jeu, et suit un contrat suivant dès que l'API l'annonce, à condition que la clé
 `0xA08c58FC…` le possède.
+
+## Les Blue Machines (2026-09-28)
+
+| | |
+|---|---|
+| contrat | `0xc5B4e6f1Aa1EE8579404B92C14dD4379208ed0f0`, 9 930 octets, pas un proxy |
+| propriétaire | `0xA08c58FC…` (la clé du Proton) |
+| ouverture | bloc 75 034 477, 2026-09-28 19:04 UTC |
+| coût | 3 brûlées (à l'adresse morte) + 7 777 $PRINTER + 0,07 ETH ; la seconde d'un portefeuille : 2 brûlées + 6 913 $PRINTER |
+| offre | 500 annoncées, 102 remises à des portefeuilles au 2026-09-29 |
+
+Le contrat ne frappe rien : il **détient des machines existantes** et en remet
+une à chaque mint. Il reçoit aussi des brûlées en paiement et les envoie à
+l'adresse morte : sur 474 sorties au 2026-09-29, **372 allaient à `0x…dEaD`**
+(dont 264 venues d'un seul portefeuille, `0x342ECC6F…`) et **102 à des
+portefeuilles** — les vraies Blue, le compte d'OpenSea. Les métadonnées
+marquent pourtant « Blue Machine » les 474 : 372 Blue détruites dès leur
+passage. Les brûlées du mineur partent à `0x…dEaD` — pas à
+`0x0` : le contrat NFT ne brûle toujours rien lui-même. L'inscription passe par
+une checklist X hors chaîne (`/blue/apply`). Métadonnées : `Status: Blue
+Machine`, `Revealed: No`, œuvre révélée au mint. OpenSea n'en publiait que 102
+sur 474 le lendemain : la page lit la chaîne (les `Transfer` dont l'expéditeur
+est le contrat Blue).
+
+Les Blue gardent un poids sur MINE (100 à 200, celui des brûlées dont elles
+viennent). Rien ne dit qu'elles touchent le pot : elles sont retirées du poids
+gagnant et ne se voient promettre aucun drop.
+
+### Le contrat NFT a été remplacé cinq fois le 2026-09-28
+
+`Upgraded` à 20:49, 20:50, 20:55, 21:19 et 22:35 UTC, signés par la clé
+propriétaire `0x355dCD59…` ; implémentation finale `0xfaa06e09…`, source non
+vérifiée. `totalSupply` = 10 000. Le contenu des changements n'est pas lisible ;
+aucune machine n'a été envoyée à `0x0` depuis.

@@ -4,12 +4,13 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { ethers } from "ethers";
 
-import { loadConfig, RPC_URL, CHAIN_ID, ADDRESSES, TOTAL_MACHINES, PAD, PROTON, DARK, DROPS } from "./config.js";
+import { loadConfig, RPC_URL, CHAIN_ID, ADDRESSES, TOTAL_MACHINES, PAD, PROTON, DARK, DROPS, BLUE } from "./config.js";
 import { fetchListings, fetchCollectionStats } from "./opensea.js";
 import { loadTraits } from "./traits.js";
 import { loadMetadata, readLiveStatus } from "./metadata.js";
 import { readRitualLogs, tallyRituals, discoverRitualContract, readOfficialArt } from "./dark.js";
 import { readUnpaid, unpaidLines } from "./drops.js";
+import { readBlueMints } from "./blue.js";
 import { deriveHeadwearLegend } from "./rarity.js";
 import { readInk } from "./ink.js";
 import { fetchPrinter, fetchEthUsd } from "./prices.js";
@@ -183,6 +184,25 @@ async function sweepDark() {
   console.log(`dark: ${ritual.rituals} rituals on ${ritualCursors.size} contracts, ${ritual.won} won, ` +
     `${ritual.lost} lost, ${ritual.pending} pending — ${ritual.forged.size} Dark Machines forged on-chain, ` +
     `${ritual.fuelBurned} burned as fuel`);
+}
+
+// Les Blue Machines : celles que le contrat Blue a remises, lues par incréments
+// depuis son ouverture. Même règle de curseur que le rituel.
+const blueIds = new Set();
+let blueCursor = BLUE.fromBlock;
+let blueRead = false;
+
+async function sweepBlue() {
+  const head = await provider.getBlockNumber();
+  if (blueCursor <= head) {
+    const mints = await readBlueMints({
+      provider, machines: ADDRESSES.MACHINES, contract: BLUE.contract, fromBlock: blueCursor, toBlock: head,
+    });
+    for (const m of mints) blueIds.add(m.tokenId);
+    blueCursor = head + 1;
+  }
+  blueRead = true;
+  console.log(`blue: ${blueIds.size} of ${BLUE.supply} Blue Machines handed out`);
 }
 
 /** Les machines de l'adresse morte, lues sur la carte des propriétaires. */
@@ -423,6 +443,7 @@ async function sweepBook() {
     status: live.status, gone: goneOf(),
     // Sans rituel lu, les Dark se reconnaissent encore à leur statut publié.
     dark: ritual ? new Set(ritual.forged.keys()) : undefined,
+    blue: blueRead ? blueIds : undefined,
   });
 
   // Le poids qui partage le pot : celui des machines qui gagnent, total et par
@@ -432,7 +453,7 @@ async function sweepBook() {
   const gone = goneOf();
   earning = earningWeight({
     weights, deskIndex,
-    isEarning: (id) => !gone.has(id) && !ritual?.forged.has(id) &&
+    isEarning: (id) => !gone.has(id) && !ritual?.forged.has(id) && !blueIds.has(id) &&
       ["active", "dormant", "unmarked"].includes(live.status.get(id)),
   });
   const sectorWeight = earning.bySector;
@@ -469,6 +490,7 @@ async function sweepBook() {
     live,
     ritual,
     officialArt,
+    blue: blueRead ? { ids: blueIds, supply: BLUE.supply } : null,
   });
   store.succeed(composed);
 
@@ -700,6 +722,7 @@ const server = createServer(async (req, res) => {
       imageOf: (id) => live?.image.get(id) ?? meta.get(id)?.image ?? null,
       burnedOf: (id) => live?.status.get(id) === "burned",
       darkOf: (id) => Boolean(ritual?.forged.has(id) || live?.status.get(id) === "dark machine"),
+      blueOf: (id) => blueIds.has(id) || live?.status.get(id) === "blue machine",
       holdsOf,
       weightOf: (id) => Number(weights.get(id) ?? 0n),
       deskOf: (id) => deskIndex.get(id) ?? null,
@@ -725,11 +748,13 @@ const server = createServer(async (req, res) => {
           weight: m.weight,
           burned: m.burned,
           dark: m.dark,
+          blue: m.blue,
           classValue: traits.get(m.tokenId)?.weightClass ?? null,
           holds: m.holds,
         })),
         rows: snap?.rows,
         darkBook: snap?.darkBook,
+        blueBook: snap?.blueBook,
         ethUsd: snap?.eth?.usd ?? null,
         printer: { amount: own.printer, usd: snap?.printer?.usd ?? null },
         ownStock: own.stock,
@@ -886,11 +911,13 @@ const started = async () => {
   // séparer les brûlées des vivantes, et il échouerait sinon.
   await sweepStatus().catch((e) => console.error(`status: ${e.message}`));
   await sweepDark().catch((e) => console.error(`dark: ${e.message}`));
+  await sweepBlue().catch((e) => console.error(`blue: ${e.message}`));
 
   loop("book", sweepBook, cfg.bookPollIntervalMs);
   loop("status", sweepStatus, cfg.inkPollIntervalMs, { runNow: false });
   // Une partie se joue en quelques minutes : la cadence du pad, pas celle de l'encre.
   loop("dark", sweepDark, cfg.padPollIntervalMs, { runNow: false });
+  loop("blue", sweepBlue, cfg.padPollIntervalMs, { runNow: false });
   loop("ink", sweepInk, cfg.inkPollIntervalMs, { runNow: false });
   loop("owners", sweepOwners, cfg.inkPollIntervalMs);
   loop("pad", sweepPad, cfg.padPollIntervalMs);
