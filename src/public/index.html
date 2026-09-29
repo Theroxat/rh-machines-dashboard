@@ -361,7 +361,9 @@
   .fl-dark[aria-pressed="true"] { background: var(--blood); }
   .fl-blue { background: var(--blue); color: var(--paper); }
   .fl-blue u { color: var(--paper-2); white-space: normal; }
-  .fl-blue[aria-pressed="true"] { background: var(--ink); }
+  /* Sélectionné, il reste bleu : passer au noir le faisait prendre pour le bloc
+     Dark (2026-09-29). La sélection se lit au liseré clair, dedans. */
+  .fl-blue[aria-pressed="true"] { background: var(--blue); box-shadow: var(--shadow-sm), inset 0 0 0 3px var(--paper); }
   .fl[aria-pressed="true"] .fl-alt { border-top-color: var(--ink-2); }
   .fl[aria-pressed="true"] .fl-alt i { border-color: var(--paper-2); color: var(--paper-2); }
   .fl[aria-pressed="true"] .fl-burned i { border-color: var(--blood); color: var(--paper); }

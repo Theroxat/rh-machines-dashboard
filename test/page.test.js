@@ -272,10 +272,29 @@ test("a market is written at the scale it is read", () => {
 });
 
 /* ── le classement ───────────────────────────────────────────────────────── */
-test("machines are ranked by what they give back per dollar spent", () => {
+test("machines are ranked by what they earn per drop, per dollar spent", () => {
   const picked = pickMachines(DATA, { sort: "back" });
-  assert.equal(picked[0].tokenId, 9769);
-  assert.ok(picked[0].ratio > picked[picked.length - 1].ratio);
+  for (let i = 1; i < picked.length; i++) assert.ok(picked[i - 1].ratio >= picked[i].ratio);
+  assert.equal(picked[0].ratio, picked[0].epochUsd / picked[0].cost);
+});
+
+// Le 2026-09-29 : une brûlée transportant des actions remontait dans « Best
+// return » — son stock comptait comme un retour. Il s'encaisse une fois.
+test("stock already inside a Machine is not counted as a return", () => {
+  const two = { ...DATA, rows: [{ classValue: 100, classLabel: "x1",
+    inked: { entries: [
+      entry({ tokenId: 1, priceEth: 0.1, epochUsd: 2, holds: { usd: 500 } }),
+      entry({ tokenId: 2, priceEth: 0.1, epochUsd: 3, holds: null }),
+    ] }, dormant: { entries: [] } }] };
+  assert.deepEqual(pickMachines(two, { sort: "back" }).map((m) => m.tokenId), [2, 1]);
+});
+
+test("burned, Dark and Blue Machines stay out of Best return unless asked for", () => {
+  const withBurned = { ...MELT, rows: [{ ...MELT.rows[0], burned: { entries: [
+    entry({ tokenId: 5851, priceEth: 0.001, epochUsd: null, holds: { usd: 900 } })] } }, ...MELT.rows.slice(1)] };
+  assert.ok(!pickMachines(withBurned, { sort: "back", limit: Infinity }).some((m) => m.burned));
+  assert.ok(pickMachines(withBurned, { sort: "back", state: "burned", limit: Infinity }).some((m) => m.tokenId === 5851));
+  assert.ok(pickMachines(withBurned, { sort: "cheap", limit: Infinity }).some((m) => m.burned));
 });
 
 // Une dormante rend zéro : classée par retour elle tombe toujours en dernier,
@@ -1361,4 +1380,12 @@ test("the Blue colour is its own, apart from the pot's sky", () => {
 test("a card does not claim to carry stock worth less than a cent", () => {
   assert.doesNotMatch(cardHtml({ ...entry({ holds: { usd: 0.001 } }), lit: true, classLabel: "x1", priceUsd: 10 }), /carrying/);
   assert.match(cardHtml({ ...entry({ holds: { usd: 15.6 } }), lit: true, classLabel: "x1", priceUsd: 10 }), /carrying \$15\.60 of stock/);
+});
+
+// Le 2026-09-29 : le bloc Blue sélectionné passait au noir et se confondait
+// avec le bloc Dark.
+test("the Blue block stays blue when it is the active filter", () => {
+  const rule = css.match(/\.fl-blue\[aria-pressed="true"\] \{[^}]*\}/)[0];
+  assert.match(rule, /background: var\(--blue\)/);
+  assert.match(rule, /inset/);
 });

@@ -203,8 +203,9 @@ export function heroHtml(d, active = null) {
  * « best return » veut dire, et ça ne se devine pas d'un prix et d'un montant.
  */
 export function bestPick(m, d) {
-  if (!m?.cost || !m.back) return "";
-  const rate = m.back / m.cost;
+  if (!m?.cost || !m.epochUsd) return "";
+  // Le taux « every drop » ne compte que ce qui revient à chaque drop.
+  const rate = m.epochUsd / m.cost;
   return `<a class="pick" href="${itemUrl(m.tokenId)}" target="_blank" rel="noopener">` +
     `<span class="pick-lab">Best return on the book</span>` +
     (m.machine?.image
@@ -416,6 +417,16 @@ const boardRows = (d) => [
   ...(d?.blueBook ? [{ classValue: null, classLabel: BLUE_LABEL, blue: d.blueBook }] : []),
 ];
 
+/**
+ * Ce qu'une machine rend à chaque drop, rapporté à ce qu'elle coûte.
+ *
+ * Le stock déjà présent dans son compte n'y entre pas : il s'encaisse une fois,
+ * pas à chaque drop. Le 2026-09-29, l'additionner faisait remonter une brûlée
+ * dans « Best return » — elle ne touche plus rien, mais transportait des
+ * actions — et la vitrine annonçait « every drop » un taux qui ne se répète pas.
+ */
+const yieldOf = (e, cost) => (cost && e.epochUsd ? e.epochUsd / cost : 0);
+
 export function pickMachines(d, { klass = null, state = null, limit = 24, sort = SORTS[0].key } = {}) {
   const eth = d?.eth?.usd;
   const light = d?.ink?.activationTotalUsd ?? 0;
@@ -433,12 +444,16 @@ export function pickMachines(d, { klass = null, state = null, limit = 24, sort =
   }
   // Choisir « Dark », c'est choisir un état : le filtre « Printing » par défaut
   // n'y laissait rien, et le bloc Dark ouvrait sur un carnet vide.
+  // Ce qui ne touche plus le pot — brûlées, Dark, Blue — n'a pas de « retour »
+  // à classer : dans « Best return » il n'apparaît que si on l'a demandé.
+  const asked = ["burned", "dark", "blue"].includes(state) || klass === DARK_LABEL || klass === BLUE_LABEL;
   if (klass === DARK_LABEL || klass === BLUE_LABEL) state = null;
   for (const r of boardRows(d)) {
     if (klass && r.classLabel !== klass) continue;
     for (const [key, cell] of cellsOf(r)) {
       if (state && key !== state) continue;
       if (!cell) continue;
+      if (sort === "back" && !asked && ["burned", "dark", "blue"].includes(key)) continue;
       const lit = key === "lit";
       const burned = key === "burned";
       const dark = key === "dark";
@@ -451,7 +466,7 @@ export function pickMachines(d, { klass = null, state = null, limit = 24, sort =
         const cost = priceUsd === null ? null : priceUsd + toLight;
         const back = (e.epochUsd ?? 0) + (e.holds?.usd ?? 0);
         out.push({ ...e, lit, burned, dark, blue, classLabel: r.classLabel, priceUsd, cost, back,
-          ratio: cost ? back / cost : 0, from: "opensea" });
+          ratio: yieldOf(e, cost), from: "opensea" });
       }
       // Le rayon de l'anvil. Ces machines sont achetables et n'apparaissaient
       // nulle part : elles ne sont pas sur OpenSea, elles se paient en $PRINTER
@@ -463,7 +478,7 @@ export function pickMachines(d, { klass = null, state = null, limit = 24, sort =
         const back = burned || dark || blue ? (e.holds?.usd ?? 0) : (e.epochUsd ?? 0) + (e.holds?.usd ?? 0);
         out.push({ ...e, lit, burned, dark, blue, classLabel: r.classLabel,
           priceEth: e.askEth ?? null, priceUsd, cost, back,
-          ratio: cost ? back / cost : 0, from: "anvil" });
+          ratio: burned || dark || blue ? 0 : yieldOf(e, cost), from: "anvil" });
       }
     }
   }
@@ -1156,7 +1171,7 @@ if (typeof document !== "undefined") {
           ? "What costs least to get in. Dormant ones are cheaper because they earn nothing yet."
           : "Everything for sale, cheapest first — printing, burned and Dark together.";
     $("buy-sub").textContent = sort === "cheap" ? cheapSub
-      : "What each Machine returns — its share of the pot, plus the stock already sitting in it — against what it costs.";
+      : "What each Machine earns at every drop against what it costs. Stock already inside is shown on the card, not counted — it pays once.";
     // Le total doit compter la même chose que la liste, filtre compris :
     // « 24 sur 757 » sous une grille filtrée sur les dormantes est faux.
     const total = pickMachines(data, { klass, state, limit: Infinity }).length;
