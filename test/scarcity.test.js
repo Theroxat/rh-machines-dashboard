@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { burnSplit, lockUp, fuseOdds, PRINTER_MINTED } from "../src/scarcity.js";
+import { burnSplit, lockUp, fuseOdds, vaultIds, PRINTER_MINTED } from "../src/scarcity.js";
 
 test("the mint is the figure the reconciliation lands on", () => {
   // 200 000 000 − 155 814 801.349 − 43 285 198.651 = exactement 900 000
@@ -98,4 +98,15 @@ test("a single roll yields a rate and no confident claim", () => {
 
 test("with nothing resolved there are no odds to report", () => {
   assert.equal(fuseOdds({ won: 0, lost: 0 }), null);
+});
+
+// 2026-10-17 : le nœud avait élagué tous les transferts vers le coffre, la
+// marche arrière n'en trouvait aucun, et la page affichait « 0 machines in the
+// vault » quand `balanceOf(factory)` en comptait 2.
+test("the vault's ids are trusted only when they add up to what it holds on-chain", () => {
+  assert.deepEqual(vaultIds({ held: 2, ids: [100, 102] }), [100, 102]);
+  assert.equal(vaultIds({ held: 2, ids: [] }), null);
+  assert.equal(vaultIds({ held: 2, ids: [100, 101, 102] }), null);
+  assert.equal(vaultIds({ held: null, ids: [100] }), null);
+  assert.deepEqual(vaultIds({ held: 0, ids: [] }), []);
 });

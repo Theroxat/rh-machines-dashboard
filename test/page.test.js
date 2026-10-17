@@ -484,6 +484,16 @@ test("a Machine taken back out of the vault is reported", () => {
   assert.match(scarcityHtml({ ...SC, proton: { released: 3 } }), /3 came back out to a wallet/);
 });
 
+// Quand les journaux du Proton ne remontent plus jusqu'au début, l'absence de
+// sortie lue n'est pas l'absence de sortie : la page ne peut pas l'affirmer.
+test("with the log window incomplete, the vault's history is not asserted", () => {
+  const html = scarcityHtml({ ...SC, proton: { released: 0, releasedToDead: 0, complete: false } });
+  assert.doesNotMatch(html, /None has ever come back out/);
+  assert.doesNotMatch(html, /came back out to a wallet/);
+  assert.match(html, /chain's logs no longer reach back/);
+  assert.match(html, /<b>178<\/b><u>machines in the vault/);
+});
+
 // Publier le compte d'échecs seul accuse ; le taire cache. Les deux, donc.
 test("the observed failure rate comes with the odds it is merely chance", () => {
   const html = scarcityHtml(SC);

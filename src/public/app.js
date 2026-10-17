@@ -991,13 +991,18 @@ export function scarcityHtml(sc) {
     `can send any Machine it holds to any address. ` +
     // L'adresse morte n'est pas un retour : le 2026-09-23 la page comptait les
     // 3 477 machines du Meltdown comme « come back out ».
-    (() => {
+    // Une fenêtre de journaux incomplète ne voit pas toutes les sorties : « aucune
+    // n'est revenue » serait une affirmation tirée de ce qu'on n'a pas lu.
+    (p?.complete === false
+      ? `The chain's logs no longer reach back to the vault's first days, so what has left it ` +
+        `is not counted here. `
+      : (() => {
       const dead = p?.releasedToDead ?? 0;
       const back = (p?.released ?? 0) - dead;
       return (dead ? `${fmtInt(dead)} have left it for the dead address, most of them in the ` +
           `Meltdown of 23 September — gone for good. ` : "") +
         (back > 0 ? `${fmtInt(back)} came back out to a wallet. ` : "None has ever come back out to a wallet. ");
-    })() +
+    })()) +
     `Locked is not burned, and this page will not call it that.</p>` +
     // Le protocole annonce que le coffre allume ce qu'il garde et en partage
     // les revenus. Le compte des allumées n'a pas bougé pendant que le coffre

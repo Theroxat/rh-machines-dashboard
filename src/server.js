@@ -37,7 +37,7 @@ import { multicallOf } from "./multicall.js";
 import { readPad, readPools, priceCoin, padStats, padMovement, markNamesakes } from "./pad.js";
 import { readProton } from "./proton.js";
 import { readOfficial, crossCheck } from "./official.js";
-import { burnSplit, lockUp, fuseOdds } from "./scarcity.js";
+import { burnSplit, lockUp, fuseOdds, vaultIds } from "./scarcity.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const cfg = loadConfig(process.env, JSON.parse(readFileSync(join(here, "..", "config.json"), "utf8")));
@@ -326,14 +326,19 @@ async function sweepScarcity() {
     machines: ADDRESSES.MACHINES,
   });
 
+  // Le nombre vient de la chaîne, pas des journaux : ceux-ci s'élaguent, et le
+  // 2026-10-17 un coffre de 2 machines s'affichait vide.
+  const { vault: held } = await readOffCirculation(provider);
+  const ids = vaultIds({ held, ids: p.heldIds });
+
   // Le poids des machines du coffre : le protocole annonce qu'il les active et
   // partage leurs revenus. Le vérifier tient en une lecture par machine.
   const MINE = new ethers.Interface(["function weightOf(uint256) view returns (uint256)"]);
   let awake = null, vaultWeight = null;
-  if (p.heldIds.length) {
+  if (ids?.length) {
     try {
       const res = await multicallOf(provider, ADDRESSES.MULTICALL3)(
-        p.heldIds.map((id) => ({ target: ADDRESSES.MINE, allowFailure: true, callData: MINE.encodeFunctionData("weightOf", [id]) })));
+        ids.map((id) => ({ target: ADDRESSES.MINE, allowFailure: true, callData: MINE.encodeFunctionData("weightOf", [id]) })));
       awake = 0; vaultWeight = 0;
       for (const r of res) {
         if (!r[0]) continue;
@@ -363,7 +368,7 @@ async function sweepScarcity() {
   scarcity = {
     proton: p,
     rate,
-    vault: lockUp({ held: p.heldIds.length, awake, weight: vaultWeight, total: TOTAL_MACHINES }),
+    vault: lockUp({ held, awake, weight: vaultWeight, total: TOTAL_MACHINES }),
     burn: burnSplit({ supply, inkBurned, protonBurned: p.printerBurned }),
     // Le taux ne se présente que sur une lecture entière : calculé sur un
     // échantillon amputé par la fenêtre de journaux, il serait faux.
@@ -372,8 +377,9 @@ async function sweepScarcity() {
     readAt: Date.now(),
   };
   console.log(`proton: ${p.committed} fusions (${p.won} won, ${p.lost} lost` +
-    (p.pending ? `, ${p.pending} pending` : "") + `), ${p.heldIds.length} machines in the vault` +
-    (awake === null ? "" : ` (${p.heldIds.length - awake} dormant)`) +
+    (p.pending ? `, ${p.pending} pending` : "") + `), ${held ?? "?"} machines in the vault` +
+    (awake === null ? "" : ` (${held - awake} dormant)`) +
+    (held !== null && !ids ? ` (${p.heldIds.length} seen in the logs)` : "") +
     (p.complete === false ? " — LOG WINDOW INCOMPLETE" : ""));
 }
 

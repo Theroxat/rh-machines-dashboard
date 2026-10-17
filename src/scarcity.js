@@ -110,3 +110,17 @@ function upperTail(n, k, p) {
   }
   return tail;
 }
+
+/**
+ * Les identifiants des machines au coffre, quand on peut les croire.
+ *
+ * Ils viennent des journaux de transfert, que le nœud élague en quelques
+ * heures ; le nombre, lui, vient de `balanceOf(factory)` et ne s'élague pas.
+ * Le 2026-10-17 la marche arrière ne trouvait plus aucun transfert et la page
+ * affichait un coffre vide qui en gardait 2. Une liste qui ne retombe pas sur
+ * le compte de la chaîne est incomplète : on ne pèse pas ce qu'on n'a pas vu.
+ */
+export function vaultIds({ held, ids }) {
+  if (held == null || ids.length !== held) return null;
+  return ids;
+}
