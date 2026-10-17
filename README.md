@@ -31,20 +31,6 @@ It never holds a private key, never signs a transaction, and never places an
 order. It reads public marketplace listings and public chain state, computes
 floors, and shows them. Every decision to buy is made by a person, off this tool.
 
-<table>
-  <tr>
-    <td width="68%"><img src="docs/img/section-floors.png" alt="Cheapest Machine per rarity class, with burned, Dark and Blue cells"></td>
-    <td rowspan="2" width="32%"><img src="docs/img/mobile.png" alt="The dashboard on a phone"></td>
-  </tr>
-  <tr>
-    <td><img src="docs/img/section-dark-ritual.png" alt="Dark Ritual: forged, burned as fuel, win rate"></td>
-  </tr>
-  <tr>
-    <td colspan="2"><img src="docs/img/section-sources.png" alt="Provenance table: what is read from the chain, from third parties, and computed here"></td>
-  </tr>
-</table>
-
-<p align="center"><sub>Floors per rarity class · the Dark Ritual · the phone layout · where every number comes from</sub></p>
 
 ## Contents
 
