@@ -16,7 +16,7 @@ merely documented, and names where each undocumented contract address came from.
 ## Commands
 
 ```bash
-npm test                      # node --test test/*.test.js — 503 tests, ~2 s, no network, no .env
+npm test                      # node --test test/*.test.js — ~500 tests, ~2 s, no network, no .env
 node --test test/floors.test.js                     # one file
 node --test --test-name-pattern "peloton" test/*.test.js   # by name (glob, not test/)
 
@@ -52,14 +52,14 @@ the floor — do not add an SQLite package.
 thing against one source and reports failure as failure (`opensea`, `prices`, `ink`, `traits`,
 `metadata`, `owners`, `anvil`, `vote`, `ballot`, `dark`, `blue`, `drops`, `pot`, `protocol`, `pad`, `proton`, `official`,
 `holdings`, `balances`), or a *pure* module that takes plain data and returns plain data (`floors`,
-`snapshot`, `rarity`, `scarcity`, `worth`, `wallet`, `alert`, `desks`, `traitindex`, `http`).
-Plumbing: `multicall` (Multicall3 batching), `store` (the non-regressing snapshot holder), `history`
+`snapshot`, `rarity`, `scarcity`, `worth`, `wallet`, `alert`, `desks`, `traitindex`, `http`), or
+`sources` (the frozen provenance table the page displays). Plumbing: `multicall` (Multicall3 batching), `store` (the non-regressing snapshot holder), `history`
 (SQLite change log). `server.js` is the only place that wires them, owns the mutable state, and
 touches the network.
 
 **Eight independent loops**, each rescheduling itself *after* it finishes so a slow sweep can never
 overlap the next (`loop()` in `server.js`): book+prices+protocol 60 s, ink 10 min, owners 10 min,
-status 10 min, dark 2 min, blue 2 min, pad 2 min, proton 10 min. Owners and status reuse `inkPollIntervalMs`;
+status 10 min, dark 2 min, blue 2 min, pad 2 min, proton 10 min. Owners and status reuse `inkPollIntervalMs`, proton has its own `protonPollIntervalMs`;
 dark reuses `padPollIntervalMs` and reads ritual logs incrementally, one cursor per contract in
 `DARK.contracts` (the node serves logs but no historical state). The team swapped ritual contracts
 once without notice (ids restart at 1): rituals are keyed by contract + id, and a contract announced by
