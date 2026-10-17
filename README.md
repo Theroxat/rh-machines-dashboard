@@ -1,4 +1,20 @@
+<div align="center">
+
 # Unofficial RH MACHINES market dashboard
+
+**What does each rarity class actually cost right now, and how deep is the market behind that price?**
+
+[**rh-machines.sex**](https://rh-machines.sex) · [Source](https://github.com/Theroxat/rh-machines-dashboard) · [Protocol notes](docs/protocol.md) · [Deploy](DEPLOY.md)
+
+![Node >=22](https://img.shields.io/badge/node-%E2%89%A522-339933?logo=nodedotjs&logoColor=white)
+![Runtime deps](https://img.shields.io/badge/runtime%20deps-1%20(ethers)-5a67d8)
+![Tests](https://img.shields.io/badge/tests-510%20passing-2ea44f)
+![Chain](https://img.shields.io/badge/chain-Robinhood%20Chain%204663-ccff00?labelColor=222)
+![Read-only](https://img.shields.io/badge/read--only-no%20keys-blue)
+
+</div>
+
+<img src="docs/img/dashboard.png" alt="The dashboard: floors per rarity class, split by ink state" width="100%">
 
 > **This is not an official RH MACHINES tool.** It is an independent project, not
 > built by, affiliated with, or endorsed by the RH MACHINES team, and nothing it
@@ -14,6 +30,50 @@ class actually cost right now, and how deep is the market behind that price?**
 It never holds a private key, never signs a transaction, and never places an
 order. It reads public marketplace listings and public chain state, computes
 floors, and shows them. Every decision to buy is made by a person, off this tool.
+
+<table>
+  <tr>
+    <td width="68%"><img src="docs/img/section-floors.png" alt="Cheapest Machine per rarity class, with burned, Dark and Blue cells"></td>
+    <td rowspan="2" width="32%"><img src="docs/img/mobile.png" alt="The dashboard on a phone"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/img/section-dark-ritual.png" alt="Dark Ritual: forged, burned as fuel, win rate"></td>
+  </tr>
+  <tr>
+    <td colspan="2"><img src="docs/img/section-sources.png" alt="Provenance table: what is read from the chain, from third parties, and computed here"></td>
+  </tr>
+</table>
+
+<p align="center"><sub>Floors per rarity class · the Dark Ritual · the phone layout · where every number comes from</sub></p>
+
+## Contents
+
+- [Highlights](#highlights)
+- [Why every floor is split by ink](#why-every-floor-is-split-by-ink)
+- [Quick start](#quick-start)
+- [Architecture](#architecture)
+- [HTTP API](#http-api)
+- [The Meltdown, and the third state](#the-meltdown-and-the-third-state)
+- [Dark Machines](#dark-machines)
+- [Reading the grid](#reading-the-grid)
+- [What the page will not do](#what-the-page-will-not-do)
+- [Headwear is the rarity](#headwear-is-the-rarity)
+- [One Machine the bulk pages drop](#one-machine-the-bulk-pages-drop)
+- [Two tokens called USDG](#two-tokens-called-usdg)
+- [Where the data comes from](#where-the-data-comes-from)
+- [Security posture](#security-posture)
+- [Caching, and why the script URL has a hash in it](#caching-and-why-the-script-url-has-a-hash-in-it)
+- [Cadences](#cadences)
+- [Design and plan](#design-and-plan)
+
+## Highlights
+
+| Market | Chain and protocol | Trust |
+|---|---|---|
+| Floors per rarity class **and** per ink state | Dark Machines and Blue Machines, one collection-level cell each | A provenance table naming the source of every number |
+| Inked, dormant and burned cells on every row | Pot, desks and drops, with the protocol state read from `MINE` | A red banner, with age and error, when a sweep fails: stale and labelled beats fresh and wrong |
+| Peloton: median of the five cheapest listings, or none | Destroyed Machines read on-chain (`0x…dEaD`) | Strict CSP, no inline script, no write path |
+| Cost of ink in the header bar, priced from a pinned DEX pair | Wallet lookup, one multicall per request | OpenSea's own `floor_price` shown for comparison only |
 
 ## Why every floor is split by ink
 
@@ -32,15 +92,27 @@ averages two assets separated by a third of their value, and the resulting numbe
 describes neither. Every floor here is computed per class **and** per ink state,
 or not at all.
 
-## Running it
+## Quick start
+
+```bash
+npm test                      # 510 tests, ~2 s, no network, no .env needed
+```
 
 Create `.env` in the project root (gitignored, never committed):
 
-```
-OPENSEA_API_KEY=<your OpenSea API key>
+```bash
+OPENSEA_API_KEY=<your OpenSea API key>   # required: boot fails without it
+# DISCORD_WEBHOOK=...                    # optional: absent means no alerts
 ```
 
-Then:
+Run it locally on Node 22 (`ethers` is the only runtime dependency):
+
+```bash
+npm install
+set -a && . ./.env && set +a && npm start    # http://localhost:3050
+```
+
+Or with Docker:
 
 ```bash
 docker compose up -d --build
@@ -48,7 +120,8 @@ docker compose up -d --build
 
 The dashboard is at **http://192.168.0.11:3050**. The compose file publishes the
 container's port only on the host's `192.168.0.11` address — it is not reachable
-on `0.0.0.0`, and not on `localhost` from the host itself.
+on `0.0.0.0`, and not on `localhost` from the host itself. (Without Docker, the
+local run above listens on `localhost`.)
 
 Two files persist under `./data`, both caching things that are sealed at mint and
 never change, so there is no staleness risk. Delete either and the next boot
@@ -59,8 +132,81 @@ rebuilds it.
   50 calls (about a minute). Losing it costs the thumbnails and the headwear
   legend on the next boot until it is rebuilt; it costs no price and no floor.
 
-To run without Docker: `npm install`, then
-`set -a && . ./.env && set +a && npm start`. Tests: `npm test`.
+See [`DEPLOY.md`](DEPLOY.md) for the bench-then-prod workflow and [`CLAUDE.md`](CLAUDE.md) for the code guide.
+
+## Architecture
+
+Readers do one thing against one source and report failure as failure. Pure modules
+turn plain data into plain data. `server.js` is the only place that wires them and
+touches the network.
+
+```mermaid
+flowchart LR
+  subgraph SRC["Sources"]
+    OS["OpenSea API"]
+    RPC["Robinhood Chain RPC<br/>via Multicall3"]
+    OFF["Official site endpoints"]
+    DEX["DexScreener and CoinGecko"]
+  end
+  subgraph RD["Readers"]
+    R1["opensea, metadata, traits"]
+    R2["ink, owners, protocol, anvil, pot"]
+    R3["dark, blue, proton, drops, pad, vote, ballot"]
+    R4["prices, official, holdings, balances"]
+  end
+  subgraph PC["Pure compute"]
+    C1["floors, rarity, scarcity, worth"]
+    C2["desks, wallet, alert, traitindex"]
+    C3["snapshot"]
+  end
+  ST[("store<br/>non-regressing")]
+  HI[("history<br/>SQLite")]
+  subgraph HT["HTTP routes"]
+    H1["api snapshot, pad, scarcity"]
+    H2["api wallet"]
+  end
+  PG["Page: app.hash.js"]
+  OS --> R1
+  RPC --> R2
+  RPC --> R3
+  OFF --> R3
+  OFF --> R4
+  DEX --> R4
+  R1 --> C1
+  R2 --> C1
+  R3 --> C2
+  R4 --> C2
+  C1 --> C3
+  C2 --> C3
+  C3 --> ST
+  ST --> H1
+  ST --> HI
+  RPC --> H2
+  H1 --> PG
+  H2 --> PG
+```
+
+The store keeps the last payload that actually computed: a failed sweep records its
+error and leaves the data alone. History is written after serving, inside a
+try/catch. Eight independent loops drive the readers; see [Cadences](#cadences).
+
+## HTTP API
+
+`GET` and `HEAD` only; anything else is `405`. Routes match on the URL path, so
+`/?utm_source=x` is `/`. Every response, the 404 included, carries security headers.
+
+| Route | Notes |
+|---|---|
+| `/`, `/index.html` | `no-cache`; carries the hashed script address |
+| `/app.<hash>.js` | content-addressed, `immutable`, cached a year |
+| `/app.js` | unversioned fallback, never cached |
+| `/api/snapshot` | `no-cache` + ETag; `503` (never an empty `200`) until the first sweep lands |
+| `/api/pad`, `/api/scarcity` | own routes because they move on 10-minute cadences, not the book's |
+| `/api/wallet?address=` | the only route that reads the chain per request: one multicall, at most 8 in flight |
+
+```bash
+curl -s http://localhost:3050/api/snapshot | head -c 300
+```
 
 ## The Meltdown, and the third state
 
@@ -151,6 +297,10 @@ row.
 
 A wrong dashboard is worse than no dashboard. These are enforced, not aspirational:
 
+> [!IMPORTANT]
+> **"No listing" is never `0`.** A floor of zero reads as the bargain of the century.
+> The full list follows.
+
 - **"No listing" is never `0`.** A floor of zero reads as the bargain of the century.
 - **Fewer than five listings means no peloton at all.** The cell says how many it
   has instead. A median over two values must never be presented with the same
@@ -218,6 +368,9 @@ quoted against $PRINTER and used by the protocol, is
 on the chain (~$110M) and prices ETH at **$1,786** against the canonical pool's
 **$1,883** and CoinGecko's **$1,884** — 5% wrong, with no error anywhere.
 
+> [!WARNING]
+> The impostor sits in the deepest pool on the chain. Pools are pinned **by address**, never chosen by symbol or liquidity.
+
 Selecting a pool by symbol or by liquidity lands on the impostor, and the ink
 axis of this entire dashboard is scaled by that number. So the pair is pinned by
 address, its `baseToken`/`quoteToken` addresses are verified on every read, and
@@ -249,11 +402,14 @@ This dashboard reads the sealed class from TRAITS only.
 
 ## Security posture
 
-The service holds no private key, signs nothing, and has no write path — the
-HTTP method is never even read, and the five routes are exact string matches, so
-there is no file serving by path to traverse. The OpenSea key is passed as an
-environment variable, never baked into the image, and appears in none of the
-three served routes.
+<details>
+<summary>Read the full security posture</summary>
+
+The service holds no private key, signs nothing, and has no write path — only
+`GET` and `HEAD` are answered (anything else is `405`), and routes are exact
+matches on the URL path, so there is no file serving by path to traverse. The
+OpenSea key is passed as an environment variable, never baked into the image, and
+appears in no served route.
 
 Beyond that:
 
@@ -274,7 +430,12 @@ Beyond that:
 What is *not* covered here: rate limiting, which belongs at the CDN rather than
 in this process.
 
+</details>
+
 ## Caching, and why the script URL has a hash in it
+
+<details>
+<summary>Read the full cache story</summary>
 
 Behind a CDN, an origin that sends no cache headers does not get "no caching" —
 it gets the CDN's defaults. Measured on 2026-08-16 behind Cloudflare: `/` and
@@ -290,7 +451,7 @@ from its content — `/app.<hash>.js` — so a changed script is a changed addre
 and no cache anywhere can serve the old one in its place. That asset is then
 safe to cache for a year. The page itself carries `no-cache` so it always
 revalidates and always hands out the current address, and `/api/snapshot` carries
-`no-store`.
+`no-cache` with an ETag (below).
 
 A deploy therefore needs no cache purge. `/app.js` without a hash is still served
 for anything holding an old page, always uncached.
@@ -308,9 +469,11 @@ the whole thing pointless. The page recomputes age from `at` and the response's
 `Date` header — two server clocks, so a visitor whose own clock is wrong does
 not see a phantom staleness warning.
 
+</details>
+
 ## Cadences
 
-Seven loops, each independent, each rescheduling itself only after it finishes:
+Eight loops, each independent, each rescheduling itself only after it finishes:
 
 | Loop | Every | What |
 |---|---|---|
@@ -319,6 +482,7 @@ Seven loops, each independent, each rescheduling itself only after it finishes:
 | owners | 10 min | who holds every Machine |
 | status | 10 min | current picture and burned mark |
 | dark | 2 min | Dark Ritual logs, read incrementally from the day it opened |
+| blue | 2 min | Blue Machines handed out by the Blue contract |
 | pad | 2 min | PRINTER.FUN coins |
 | proton | 10 min | fusions and the vault |
 
